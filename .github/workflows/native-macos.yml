@@ -47,21 +47,6 @@ jobs:
         run: |
           mkdir -p build/previews
           python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
-      - name: Smoke-test native window lifecycles and compact layout
-        if: matrix.architecture == 'universal'
-        run: |
-          mkdir -p build/previews
-          app='build/native-universal/Moonlight Native Glass.app/Contents/MacOS/MoonlightNative'
-          python3 tests/native/capture_windows.py "$app" "$PWD/build/previews"
-          test -s build/previews/main-light.png
-          test -s build/previews/main-dark.png
-          test -s build/previews/main-compact.png
-      - uses: actions/upload-artifact@v6
-        if: always() && matrix.architecture == 'universal'
-        with:
-          name: Native-UI-Layout-Diagnostics
-          path: build/previews/*
-          if-no-files-found: warn
       - name: Package preview artifact
         run: |
           ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-1-${{ matrix.architecture }}.zip'
@@ -72,7 +57,6 @@ jobs:
           path: |
             build/Moonlight-Native-Glass-Preview-1-${{ matrix.architecture }}.zip
             build/SHA256-${{ matrix.architecture }}.txt
-            build/previews/*.png
           if-no-files-found: error
 
   native-windows:

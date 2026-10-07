@@ -37,7 +37,13 @@ connect the frontend to stock streaming. No Enhanced extensions are imported.
 Added a native checking-connection state, preserving stock discovery behavior.
 README uses the requested custom banner, download/feature tables, actual sample
 screenshots, collapsible build instructions and explicit validation limits.
-Final Intel/Universal and 15-case XCTest run pending. No release published yet.
+`25c1442`, run `37588923998`: Intel passed; Universal compiled and audited,
+framing and real adapter/persistence passed; the obsolete fallback layer-capture
+harness hung on Add Computer. XCTest captured all 15 cases successfully.
+Removing fallback capture code and duplicate diagnostics; XCTest becomes the
+sole UI capture gate, now with Release optimization matching the shipped frontend.
+Removed the redundant “Value” label from numeric Settings fields.
+Final full builds and XCTest rerun pending. No release published yet.
 
 ## Physical Intel Tahoe checklist
 

@@ -80,7 +80,7 @@ struct NativeSettingsView: View {
             let bounds = range(field.id)
             LabeledContent(label(field.id)) {
                 TextField("Value", value: Binding(get: { (store.values[field.id] as? NSNumber)?.intValue ?? bounds.lowerBound }, set: { value in if bounds.contains(value) { store.set(field.id, value) } }), format: .number.grouping(.never))
-                    .textFieldStyle(.roundedBorder).frame(width: 100).multilineTextAlignment(.trailing)
+                    .labelsHidden().textFieldStyle(.roundedBorder).frame(width: 100).multilineTextAlignment(.trailing)
             }
         }
     }
