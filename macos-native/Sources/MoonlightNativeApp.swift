@@ -82,6 +82,7 @@ private struct NativeStatusActions: View {
     var body: some View {
         Color.clear.frame(width: 0, height: 0).onAppear {
             if delegate.statusMenu == nil { delegate.statusMenu = NativeStatusMenu() }
+            delegate.statusMenu?.bind(to: store.$streamWindowExists)
             delegate.statusMenu?.open = {
                 if store.streamWindowExists { store.restoreStreamWindow() }
                 else { openWindow(id: "library"); NSApp.activate(ignoringOtherApps: true) }
@@ -91,44 +92,6 @@ private struct NativeStatusActions: View {
             }
         }
     }
-}
-
-@MainActor final class NativeStatusMenu: NSObject {
-    private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-    var open: (() -> Void)?
-    var settings: (() -> Void)?
-    override init() {
-        super.init()
-        if let url = Bundle.main.url(forResource: "moonlight", withExtension: "icns"),
-           let image = NSImage(contentsOf: url) {
-            image.size = NSSize(width: 18, height: 18)
-            item.button?.image = image
-        }
-        item.button?.setAccessibilityLabel("Moonlight Native Glass")
-        item.button?.setAccessibilityIdentifier("native-status-item")
-        item.button?.toolTip = "Restore the stream window or open Moonlight. Right-click for Settings and Quit."
-        item.button?.target = self
-        item.button?.action = #selector(clicked)
-        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
-    }
-    @objc private func clicked() {
-        if NSApp.currentEvent?.type == .rightMouseUp || NSApp.currentEvent?.modifierFlags.contains(.control) == true {
-            guard let button = item.button else { return }
-            let menu = NSMenu()
-            for (title, action) in [("Open Moonlight or Stream", #selector(openFromMenu)),
-                                    ("Settings…", #selector(settingsFromMenu))] {
-                let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
-                entry.target = self; menu.addItem(entry)
-            }
-            menu.addItem(.separator())
-            let quit = NSMenuItem(title: "Quit Moonlight Native Glass", action: #selector(quitFromMenu), keyEquivalent: "")
-            quit.target = self; menu.addItem(quit)
-            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
-        } else { open?() }
-    }
-    @objc private func openFromMenu() { open?() }
-    @objc private func settingsFromMenu() { settings?() }
-    @objc private func quitFromMenu() { NSApp.terminate(nil) }
 }
 
 // Keep these credits fixed across builds. AppKit reads the build number from
