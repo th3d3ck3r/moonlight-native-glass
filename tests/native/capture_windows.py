@@ -6,13 +6,15 @@ import sys
 executable = sys.argv[1]
 destination = pathlib.Path(sys.argv[2])
 destination.mkdir(parents=True, exist_ok=True)
-for name, flags in [("main-light", ["--light"]), ("main-dark", ["--dark"]),
-                    ("main-compact", ["--dark", "--compact"])]:
+captures = [("main-light", ["--light"]), ("main-dark", ["--dark"]), ("main-compact", ["--dark", "--compact"])]
+for screen in ["empty", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-input", "settings-network", "settings-advanced"]:
+    captures.append((screen, ["--dark", "--preview-screen", screen]))
+for name, flags in captures:
     output = destination / f"{name}.png"
     try:
-        subprocess.run([executable, "--design-preview", *flags, "--capture-preview", str(output)],
+        subprocess.run([executable, "--design-preview", "--settings-fixture", str(destination / "settings-fixture.json"), *flags, "--capture-preview", str(output)],
                        check=True, timeout=35)
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
         reports = pathlib.Path.home() / "Library/Logs/DiagnosticReports"
         for report in sorted(reports.glob("MoonlightNative*"))[-2:]:
             print(report.read_text()[:16000], flush=True)

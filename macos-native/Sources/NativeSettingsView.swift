@@ -23,6 +23,7 @@ struct NativeSettingsView: View {
     @State private var pane = SettingsPane.video
     var body: some View {
         VStack(spacing: 0) {
+            if store.preview { Label("Design preview · Sample settings", systemImage: "photo").font(.caption).foregroundStyle(.secondary).padding(.top, 10) }
             Picker("Settings", selection: $pane) { ForEach(SettingsPane.allCases) { Label($0.rawValue, systemImage: $0.symbol).tag($0) } }
                 .pickerStyle(.segmented).padding(20)
             if store.fields.isEmpty {
@@ -51,13 +52,18 @@ struct NativeSettingsView: View {
                         }
                     }
                 }.formStyle(.grouped)
-                    .disabled(!store.ready || store.streamActive || store.pairing != nil || store.preview)
+                    .disabled(!store.ready || store.streamActive || store.pairing != nil )
             }
             Divider()
             Text(store.streamActive ? "Settings are unavailable while streaming." : "Changes save automatically. App updates are manual.")
                 .font(.caption).foregroundStyle(.secondary).padding(12)
         }
-        .background(NativeWindowAccessor { store.settingsWindow = $0 }.frame(width: 0, height: 0))
+        .background(NativeWindowAccessor { store.settingsWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-settings") }.frame(width: 0, height: 0))
+        .onAppear {
+            guard store.preview, let i = CommandLine.arguments.firstIndex(of: "--preview-screen"), CommandLine.arguments.indices.contains(i + 1) else { return }
+            let name = CommandLine.arguments[i + 1].replacingOccurrences(of: "settings-", with: "").capitalized
+            pane = SettingsPane(rawValue: name) ?? .video
+        }
         .alert(item: Binding(get: { store.message?.settingsScene == true ? store.message : nil }, set: { store.message = $0 })) { message in
             Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK")))
         }

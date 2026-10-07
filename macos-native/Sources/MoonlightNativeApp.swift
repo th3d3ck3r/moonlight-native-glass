@@ -36,6 +36,8 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 .onAppear { delegate.store = store; store.start() }
         }
         .defaultSize(width: 1080, height: 720)
+        .defaultLaunchBehavior(.presented)
+        .restorationBehavior(store.preview ? .disabled : .automatic)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Moonlight Native Glass") {
@@ -73,15 +75,35 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
     guard args.contains("--design-preview"), let index = args.firstIndex(of: "--capture-preview"), args.count > index + 1 else { return }
     if args.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
     if args.contains("--light") { NSApp.appearance = NSAppearance(named: .aqua) }
-    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }), let view = window.contentView else { exit(2) }
-        window.setContentSize(NSSize(width: args.contains("--compact") ? 680 : 1080, height: args.contains("--compact") ? 460 : 720))
-        view.layoutSubtreeIfNeeded()
-        guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(3) }
-        view.cacheDisplay(in: view.bounds, to: bitmap)
-        guard let data = bitmap.representation(using: .png, properties: [:]) else { exit(4) }
-        do { try data.write(to: URL(fileURLWithPath: args[index + 1])); NSApp.terminate(nil) } catch { exit(5) }
+    func prepare(attempt: Int) {
+        let screen = args.firstIndex(of: "--preview-screen").flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil } ?? "main"
+        let identifier = screen.hasPrefix("settings-") ? "native-settings" : "native-library"
+        guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == identifier && $0.isVisible }) else {
+            guard attempt < 40 else { print("No visible \(identifier) window: \(NSApp.windows.map { $0.title })"); exit(2) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { prepare(attempt: attempt + 1) }
+            return
+        }
+        if !screen.hasPrefix("settings-") {
+            window.setContentSize(NSSize(width: args.contains("--compact") ? 680 : 1080, height: args.contains("--compact") ? 460 : 720))
+        }
+        window.makeKeyAndOrderFront(nil)
+        // Let the WindowServer composite SwiftUI layers and native glass across
+        // real display cycles. NSView bitmap caching omits composited layers.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            let number = window.windowNumber
+            DispatchQueue.global(qos: .userInitiated).async {
+                let capture = Process()
+                capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                capture.arguments = ["-x", "-o", "-l", String(number), args[index + 1]]
+                do {
+                    try capture.run(); capture.waitUntilExit()
+                    let status = capture.terminationStatus
+                    DispatchQueue.main.async { if status == 0 { NSApp.terminate(nil) } else { exit(status) } }
+                } catch { print("Window capture failed: \(error)"); exit(3) }
+            }
+        }
     }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { prepare(attempt: 0) }
 }
 
 struct NativeWindowAccessor: NSViewRepresentable {

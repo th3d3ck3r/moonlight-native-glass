@@ -49,6 +49,8 @@ with tempfile.TemporaryDirectory() as root:
         settings = bridge.wait("settings")
         assert isinstance(settings["values"]["videoCodecConfig"], int), settings
         assert len(settings["schema"]) >= 30
+        if len(sys.argv) > 2:
+            pathlib.Path(sys.argv[2]).write_text(json.dumps(settings))
         before = settings["values"]["configurationWarnings"]
         bridge.send({"command": "settings", "values": {"configurationWarnings": not before}})
         assert bridge.wait("settings")["values"]["configurationWarnings"] == (not before)

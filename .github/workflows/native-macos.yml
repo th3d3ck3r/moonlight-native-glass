@@ -41,8 +41,10 @@ jobs:
           build/engine-protocol-tests
       - name: Test real engine bridge and persistence
         if: matrix.architecture == 'universal'
-        run: python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight'
-      - name: Capture native app windows and exercise resizing
+        run: |
+          mkdir -p build/previews
+          python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
+      - name: Capture native windows, sheets, settings and compact layout
         if: matrix.architecture == 'universal'
         run: |
           mkdir -p build/previews

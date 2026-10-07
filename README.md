@@ -1,3 +1,46 @@
+# Moonlight Native Glass — Native UI Preview
+
+A SwiftUI/AppKit macOS frontend for the Moonlight Qt **6.2.0** streaming engine.
+The native interface follows system light/dark appearance, uses native Liquid
+Glass controls on macOS 26+, and uses regular native controls on macOS 15.
+
+- Work happens on `native-ui`. `master` remains the exact upstream v6.2.0
+  baseline, `de2467e433821664cdd2224aad8c89a625be1ad9`.
+- Native sidebar, game library, pairing/address/details sheets, and five settings
+  panes replace the Qt navigation. Moonlight's icon, host artwork and SF Symbols
+  are reused.
+- A bundled Qt helper handles discovery, pairing and preferences. Each stream
+  uses the stock Session/SDL video window. The upstream streaming, networking,
+  settings, common-c and mDNS implementations are unchanged.
+- Updates are manual. Preferences and pairing credentials are separate from
+  stock Moonlight and the earlier Enhanced app; pair again in this app.
+- Intel and Universal packages are built. Ad-hoc signatures are verified;
+  these previews are **not Developer ID signed or notarized**.
+
+This is an experimental frontend. A build passing does not establish working
+pairing, streaming, Intel performance or feature parity on a physical Mac.
+Enhanced-only microphone, clipboard and AWDL features are not included.
+The stream disconnect shortcut is Control–Option–Shift–Q, or
+Start + Select + L1 + R1 on a controller. The stock performance overlay remains.
+
+See [the checkpoint and physical test checklist](docs/NATIVE_UI_CHECKPOINT.md)
+and [validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml).
+Preview releases will appear in
+[Releases](https://github.com/th3d3ck3r/moonlight-native-glass/releases) after validation.
+
+## Native build
+
+Use Xcode 26+, Qt 6.11.2, Python 3 and a recursive checkout. From the repository
+root run `bash scripts/build-native-macos.sh universal` (or `x86_64`). The script
+builds the Qt engine with the upstream dependency setup, compiles the native
+frontend for macOS 15, bundles both, signs ad-hoc and audits all nested binaries.
+CI also checks the real adapter, preference persistence and native window captures.
+
+The original upstream documentation and acknowledgements follow. Their downloads
+refer to stock Moonlight, not this experimental native frontend.
+
+---
+
 # Moonlight PC
 
 [Moonlight PC](https://moonlight-stream.org) is an open source PC client for NVIDIA GameStream and [Sunshine](https://github.com/LizardByte/Sunshine).

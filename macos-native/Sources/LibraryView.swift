@@ -3,6 +3,8 @@ import SwiftUI
 
 struct LibraryView: View {
     @ObservedObject var store: EngineStore
+    @Environment(\.openSettings) private var openSettings
+    @State private var previewConfigured = false
     @State private var search = ""
     @State private var showHidden = false
     @State private var addPresented = false
@@ -66,7 +68,7 @@ struct LibraryView: View {
         .sheet(item: $store.pairing) { request in PairingSheet(request: request).interactiveDismissDisabled() }
         .sheet(item: $details) { ComputerDetailsSheet(computer: $0) }
         .sheet(item: $rename) { RenameComputerSheet(store: store, computer: $0) }
-        .background(NativeWindowAccessor { store.libraryWindow = $0 }.frame(width: 0, height: 0))
+        .background(NativeWindowAccessor { store.libraryWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-library") }.frame(width: 0, height: 0))
         .alert(item: Binding(get: { store.message?.settingsScene == false ? store.message : nil }, set: { store.message = $0 })) { message in Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK"))) }
         .confirmationDialog("Remove \(removal?.name ?? "computer")?", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } }), titleVisibility: .visible) {
             if let computer = removal { Button("Remove Computer", role: .destructive) { store.send("remove", ["host": computer.id]) } }
@@ -79,7 +81,18 @@ struct LibraryView: View {
             Button("Cancel", role: .cancel) { store.cancelLaunch() }
         } message: { Text("Unsaved progress in the running app may be lost.") }
         .onReceive(NotificationCenter.default.publisher(for: .nativeAddComputer)) { _ in if controlsEnabled { addPresented = true } }
-        .onAppear { configureController() }
+        .onAppear {
+            configureController()
+            guard store.preview, !previewConfigured else { return }
+            previewConfigured = true
+            let args = CommandLine.arguments
+            guard let i = args.firstIndex(of: "--preview-screen"), args.indices.contains(i + 1) else { return }
+            let screen = args[i + 1]
+            if screen.hasPrefix("settings-") { openSettings() }
+            else if screen == "add" { addPresented = true }
+            else if screen == "details" { details = store.selected }
+            else if screen == "pair", let computer = store.selected { store.pairing = PairingRequest(computer: computer, pin: "1234") }
+        }
         .onDisappear { controller.stop() }
         .onChange(of: store.streamActive) { _, active in if active { controller.stop() } else { configureController() } }
         .onChange(of: store.selectedID) { _, _ in focusedGame = nil; search = "" }

@@ -112,6 +112,22 @@ struct PairingRequest: Identifiable {
                 serverVersion: "Sunshine", gpu: "Gaming GPU", supported: true,
                 apps: [Game(id: 1, name: "Desktop", hdr: false, hidden: false, artwork: ""),
                        Game(id: 2, name: "Steam", hdr: true, hidden: false, artwork: "")])]
+            let args = CommandLine.arguments
+            if let i = args.firstIndex(of: "--preview-screen"), args.indices.contains(i + 1) {
+                let screen = args[i + 1]
+                if screen == "empty" { computers = [] }
+                else if screen == "offline" || screen == "unpaired", let host = computers.first {
+                    computers = [Computer(id: host.id, name: host.name, online: screen != "offline", unknown: false,
+                        paired: screen != "unpaired", runningApp: 0, address: host.address, localAddress: host.localAddress,
+                        serverVersion: host.serverVersion, gpu: host.gpu, supported: true, apps: [])]
+                }
+            }
+            if let i = args.firstIndex(of: "--settings-fixture"), args.indices.contains(i + 1),
+               let data = try? Data(contentsOf: URL(fileURLWithPath: args[i + 1])),
+               let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                values = event["values"] as? [String: Any] ?? [:]
+                fields = (try? decodeEngineValue(event["schema"] ?? [], as: [PreferenceField].self)) ?? []
+            }
             selectedID = computers.first?.id
             ready = true
             status = "Design preview — sample computers and games"
@@ -161,7 +177,7 @@ struct PairingRequest: Identifiable {
                 message = NativeMessage(title: "Connection Test", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true)
             case "paused":
                 if let request = pendingStream { pendingStream = nil; runStream(request.0, game: request.1) }
-            case "error": addingHost = false; hostDeadline?.cancel(); pairing = nil; fail(event["message"] as? String ?? "The engine could not complete this request.")
+            case "error": testingConnection = false; addingHost = false; hostDeadline?.cancel(); pairing = nil; fail(event["message"] as? String ?? "The engine could not complete this request.")
             default: break
             }
         } catch { fail("Could not read the engine response: \(error.localizedDescription)") }

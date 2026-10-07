@@ -28,6 +28,19 @@ renderer defaults, codec capability checks and persistence implementation have
 not been edited. Existing settings property names and enum values are retained.
 No Qt update-checker object is instantiated by the native adapter.
 
+## Commits and validation
+
+- `6c4a4b8`: native frontend and engine adapter.
+- `4ca1f46`: baseline fetch and app-ID launch selection.
+- `bd4a3e8`: native actions and dependency/signature audits.
+- Validation run `37581985013`: Intel build passed; Universal compilation,
+  bundle audit, framing, real adapter and persistence passed. Window capture
+  failed on compact launch; earlier NSView bitmap screenshots omitted layers
+  and are unsuitable for visual approval. No preview release published.
+- Next change uses WindowServer captures, preview-only state-restoration
+  isolation, explicit window identifiers and sample screenshots of sheets,
+  empty/offline/unpaired states and every settings pane.
+
 ## Current validation
 
 Local: shell syntax, Python syntax and whitespace checks pass.
@@ -58,7 +71,7 @@ This is a new adapter, not a finished compatibility guarantee. Local Network
 attribution for the bundled helper needs Finder-launched physical testing.
 Ad-hoc signatures are verifiable but are not Developer ID signing/notarization.
 The stream's stock SDL shortcuts and performance overlay remain upstream's.
-Advanced native library functions such as app hide/unhide and connection tests
-still need parity review. No microphone/clipboard enhancements from Enhanced
+App hide/unhide and the stock Internet-port test are exposed in native UI;
+their host behavior still needs physical verification. No microphone/clipboard enhancements from Enhanced
 are implied. Multi-display mapping and interrupted-launch cleanup need runtime
 coverage. Physical pairing, streaming and Intel performance are not claimed.
