@@ -58,7 +58,8 @@ struct NativeSettingsView: View {
             Text(store.streamActive ? "Settings are unavailable while streaming." : "Changes save automatically. App updates are manual.")
                 .font(.caption).foregroundStyle(.secondary).padding(12)
         }
-        .background(NativeWindowAccessor { store.settingsWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-settings"); $0?.setAccessibilityIdentifier("native-settings") }.frame(width: 0, height: 0))
+        .background(NativeWindowAccessor { store.settingsWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-settings"); $0?.setAccessibilityIdentifier("native-settings")
+            if store.preview, let window = $0 { DispatchQueue.main.async { window.makeKeyAndOrderFront(nil) } } }.frame(width: 0, height: 0))
         .onAppear {
             guard store.preview, let screen = nativeArgument("--preview-screen") else { return }
             let name = screen.replacingOccurrences(of: "settings-", with: "").capitalized

@@ -18,6 +18,9 @@ import XCTest
                 target = window.sheets.firstMatch
                 XCTAssertTrue(target.waitForExistence(timeout: 5), "Missing sheet: \(screen)")
             } else { target = window }
+            if screen.hasPrefix("settings-") {
+                window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.025)).click()
+            }
             // XCTest captures the composited UI, including system-owned glass.
             let screenshot = target.screenshot()
             let attachment = XCTAttachment(screenshot: screenshot)

@@ -12,7 +12,9 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         DispatchQueue.main.async {
-            NSApp.windows.first(where: { $0.contentView != nil })?.makeKeyAndOrderFront(nil)
+            if !(nativeArgument("--preview-screen") ?? "").hasPrefix("settings-") {
+                NSApp.windows.first(where: { $0.contentView != nil })?.makeKeyAndOrderFront(nil)
+            }
             captureDesignPreviewIfRequested()
         }
     }
