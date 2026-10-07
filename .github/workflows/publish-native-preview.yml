@@ -1,0 +1,60 @@
+name: Publish Native Glass Preview
+on:
+  push:
+    branches: [native-ui]
+    paths: [.github/workflows/publish-native-preview.yml]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    if: contains(github.event.head_commit.message, '[publish preview]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VALIDATED_SHA: d746f2adf461e0dced2ef49e8c15c6e91642a198
+      VALIDATED_RUN: '37589657439'
+      RELEASE_TAG: native-glass-6.2-preview-1
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify the exact validated source and all required jobs
+        run: |
+          gh api "repos/$GH_REPO/actions/runs/$VALIDATED_RUN" > /tmp/validated-run.json
+          jq -e --arg sha "$VALIDATED_SHA" '.head_sha == $sha and .head_branch == "native-ui" and .conclusion == "success" and .name == "Native macOS Validation"' /tmp/validated-run.json
+          gh api "repos/$GH_REPO/actions/runs/$VALIDATED_RUN/jobs?per_page=100" > /tmp/validated-jobs.json
+          python3 - <<'PY'
+          import json
+          jobs = json.load(open('/tmp/validated-jobs.json'))['jobs']
+          for name in ['build (x86_64)', 'build (universal)', 'Native UI window smoke test']:
+              matches = [j for j in jobs if j['name'] == name]
+              assert len(matches) == 1 and matches[0]['conclusion'] == 'success', name
+          PY
+          test "$(gh api "repos/$GH_REPO/git/ref/heads/master" --jq .object.sha)" = de2467e433821664cdd2224aad8c89a625be1ad9
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then echo 'Preview already exists; refusing to replace it.' >&2; exit 1; fi
+      - name: Download only previously validated artifacts
+        run: |
+          mkdir -p release-assets capture-assets
+          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-1-x86_64 -D release-assets
+          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-1-universal -D release-assets
+          gh run download "$VALIDATED_RUN" -n Native-UI-Quick-Window-Captures -D capture-assets
+          # Full-build layer images are diagnostics; publish composited XCTest images.
+          rm -f release-assets/*.png
+          python3 - <<'PY'
+          import json, pathlib, shutil
+          source = pathlib.Path('capture-assets')
+          manifest = json.loads((source / 'manifest.json').read_text())
+          attachments = [a for test in manifest for a in test['attachments']]
+          for name in ['main-light', 'main-dark', 'main-compact', 'loading', 'settings-video', 'settings-audio', 'settings-input', 'settings-network', 'settings-advanced']:
+              matches = [a for a in attachments if a['suggestedHumanReadableName'].startswith(name + '_0_')]
+              assert len(matches) == 1, name
+              shutil.copyfile(source / matches[0]['exportedFileName'], pathlib.Path('release-assets') / (name + '.png'))
+          PY
+          (cd release-assets && sha256sum Moonlight-Native-Glass-Preview-1-*.zip > SHA256SUMS.txt)
+      - name: Publish the separately labeled preview
+        run: |
+          gh release create "$RELEASE_TAG" --target "$VALIDATED_SHA" --prerelease \
+            --title 'Moonlight Native Glass · Qt 6.2 · Native UI Preview 1' \
+            --notes-file docs/NATIVE_PREVIEW_RELEASE.md \
+            release-assets/*.zip release-assets/SHA256SUMS.txt release-assets/*.png

@@ -43,7 +43,14 @@ harness hung on Add Computer. XCTest captured all 15 cases successfully.
 Removing fallback capture code and duplicate diagnostics; XCTest becomes the
 sole UI capture gate, now with Release optimization matching the shipped frontend.
 Removed the redundant “Value” label from numeric Settings fields.
-Final full builds and XCTest rerun pending. No release published yet.
+`d746f2a`, run `37589657439`: **all three jobs passed**. Full Intel and Universal
+builds, signatures, permissions, identities and dependencies (105 Mach-O files),
+event framing, real bridge/atomic settings validation/restart persistence, and
+15 Release-mode XCTest screenshots passed. Composited screenshots inspected.
+Publisher is gated to this exact SHA/run and its successful jobs/artifacts;
+release publication pending. Source/native work is complete for Preview 1.
+Non-blocking warnings include unused preview argument locals and upstream API
+warnings. Physical validation limits below remain unchanged.
 
 ## Physical Intel Tahoe checklist
 

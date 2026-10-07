@@ -17,18 +17,18 @@
 A native macOS frontend for Sunshine and compatible GameStream hosts.
 Liquid Glass navigation and controls on **macOS 26+**, regular native styling on **macOS 15**, and system light/dark appearance throughout.
 
-[📦 Downloads](#-downloads) · [✨ Features](#-features) · [🖼️ Preview](#️-preview) · [🧪 Validation](#-validation) · [🛠️ Build](#️-build)
+[📦 Downloads](#-downloads) · [✨ Features](#-features) · [🖼️ Preview](#-preview) · [🧪 Validation](#-validation) · [🛠️ Build](#-build)
 
 </div>
 
 ## 📦 Downloads
 
-**Native UI Preview 1 is being validated. No release has been published yet.**
+**Native UI Preview 1 has passed build validation. Publishing the validated packages is the final step.**
 
 | Your Mac | Package |
 |---|---|
-| 🖥️ **Intel** | Dedicated x86_64 ZIP — pending final validation |
-| 🍎 **Intel + Apple Silicon** | Universal ZIP — pending final validation |
+| 🖥️ **Intel** | Dedicated x86_64 ZIP — validated; release publication pending |
+| 🍎 **Intel + Apple Silicon** | Universal ZIP — validated; release publication pending |
 
 [Preview releases](https://github.com/th3d3ck3r/moonlight-native-glass/releases) · [Validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml) · [Checkpoint](docs/NATIVE_UI_CHECKPOINT.md)
 
@@ -70,10 +70,10 @@ This is a separate project from Enhanced. Enhanced-only microphone, clipboard an
 
 | Check | Verified state |
 |---|---|
-| Full Intel + Universal app builds | Earlier milestones passed; final preview build pending |
-| Nested binaries, architectures and signatures | Earlier full bundles passed dependency and signature audits |
+| Full Intel + Universal app builds | Passed at `d746f2a` · [validation run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37589657439) |
+| Nested binaries, architectures and signatures | Passed signature, identity, permission and dependency audits of 105 Mach-O files |
 | Engine bridge and settings persistence | Passed real helper validation, including restart persistence and invalid-input rejection |
-| Native UI screenshots | XCTest passed light/dark/compact, empty/offline/unpaired, sheets and five Settings panes; screenshots inspected |
+| Native UI screenshots | 15 Release-mode XCTest captures passed: light/dark/compact, loading/empty/offline/unpaired, sheets and five Settings panes; screenshots inspected |
 | Physical Intel Tahoe pairing and streaming | **Not tested for this new app** |
 | Intel CPU/GPU usage and frame pacing | **Not measured**; compilation does not prove performance parity |
 
@@ -122,7 +122,7 @@ xcodebuild -project tests/native/NativeUITests.xcodeproj \
 |---|---|
 | Native sidebar, library, Settings and sheets | Implemented |
 | Tahoe controls + macOS 15 fallback | Implemented; physical accessibility checks remain |
-| Intel + Universal preview packages | Final validation in progress |
+| Intel + Universal preview packages | Validated; preview publication pending |
 | Physical streaming and performance comparison | Required before calling this a stable replacement |
 
 Built on [Moonlight Qt](https://github.com/moonlight-stream/moonlight-qt) and [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c). See [GPL-3.0 license](LICENSE) and [original upstream documentation](docs/UPSTREAM_README.md).

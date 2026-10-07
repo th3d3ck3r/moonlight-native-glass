@@ -2,6 +2,7 @@ name: Native macOS Validation
 on:
   push:
     branches: [native-ui]
+    paths-ignore: [README.md, "docs/**", "readme-assets/**", .github/workflows/publish-native-preview.yml]
   workflow_dispatch:
 permissions:
   contents: read
