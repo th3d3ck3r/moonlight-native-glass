@@ -223,6 +223,11 @@ struct PairingRequest: Identifiable {
         }
         send("settings", ["values": changes])
     }
+    func setResolution(width: Int, height: Int) {
+        // One transaction preserves the engine's stock automatic bitrate update.
+        if preview { values["width"] = width; values["height"] = height; return }
+        send("settings", ["values": ["width": width, "height": height]])
+    }
     func startStream(_ computer: Computer, game: Game) {
         guard ready, !streamActive, pairing == nil, !addingHost, !preview else { return }
         streamActive = true; streamStarted = false; warnings = []

@@ -38,7 +38,7 @@ if [ "$arch_set" = universal ]; then
 else
     cp "$build_root/bin/MoonlightNative-x86_64" "$app/Contents/MacOS/MoonlightNative"
 fi
-cp app/moonlight.icns "$app/Contents/Resources/moonlight.icns"
+cp macos-native/Resources/moonlight.icns "$app/Contents/Resources/moonlight.icns"
 cp macos-native/Info.plist "$app/Contents/Info.plist"
 ditto "$engine_app" "$app/Contents/Helpers/MoonlightEngine.app"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.moonlight-stream.NativeGlass.Engine' "$app/Contents/Helpers/MoonlightEngine.app/Contents/Info.plist"

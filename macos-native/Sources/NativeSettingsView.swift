@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import IOKit
 
 private enum SettingsPane: String, CaseIterable, Identifiable {
     case video = "Video", audio = "Audio", input = "Input", network = "Network", advanced = "Advanced"
@@ -9,7 +10,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
     }
     var keys: [String] {
         switch self {
-        case .video: ["width", "height", "fps", "bitrateKbps", "autoAdjustBitrate", "videoCodecConfig", "videoDecoderSelection", "rendererSelection", "enableHdr", "enableYUV444", "windowMode", "framePacing", "enableVsync"]
+        case .video: [ "fps", "bitrateKbps", "autoAdjustBitrate", "videoCodecConfig", "videoDecoderSelection", "rendererSelection", "enableHdr", "enableYUV444", "windowMode", "framePacing", "enableVsync"]
         case .audio: ["audioConfig", "playAudioOnHost", "muteOnFocusLoss"]
         case .input: ["multiController", "gamepadMouse", "backgroundGamepad", "swapFaceButtons", "absoluteMouseMode", "absoluteTouchMode", "swapMouseButtons", "reverseScrollDirection", "captureSysKeysMode"]
         case .network: ["enableMdns", "detectNetworkBlocking", "connectionWarnings"]
@@ -21,6 +22,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 struct NativeSettingsView: View {
     @ObservedObject var store: EngineStore
     @State private var pane = SettingsPane.video
+    @State private var nativeSize: VideoResolution?
+    @State private var choseNative = false
     var body: some View {
         VStack(spacing: 0) {
             if store.preview { Label("Design preview · Sample settings", systemImage: "photo").font(.caption).foregroundStyle(.secondary).padding(.top, 10) }
@@ -31,6 +34,7 @@ struct NativeSettingsView: View {
             } else {
                 Form {
                     Section(pane.rawValue) {
+                        if pane == .video { resolutionPicker }
                         ForEach(pane.keys.compactMap { key in store.fields.first { $0.id == key } }) { field in preference(field) }
                     }
                     if pane == .video {
@@ -60,7 +64,12 @@ struct NativeSettingsView: View {
         }
         .background(NativeWindowAccessor { store.settingsWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-settings"); $0?.setAccessibilityIdentifier("native-settings")
             if store.preview, let window = $0 { DispatchQueue.main.async { window.makeKeyAndOrderFront(nil) } } }.frame(width: 0, height: 0))
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification)) { notification in
+            if let window = notification.object as? NSWindow, window === store.settingsWindow { refreshNativeResolution() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in refreshNativeResolution() }
         .onAppear {
+            refreshNativeResolution()
             guard store.preview, let screen = nativeArgument("--preview-screen") else { return }
             let name = screen.replacingOccurrences(of: "settings-", with: "").capitalized
             pane = SettingsPane(rawValue: name) ?? .video
@@ -68,6 +77,57 @@ struct NativeSettingsView: View {
         .alert(item: Binding(get: { store.message?.settingsScene == true ? store.message : nil }, set: { store.message = $0 })) { message in
             Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK")))
         }
+    }
+    private struct VideoResolution: Equatable {
+        let width: Int
+        let height: Int
+        var id: String { "\(width)x\(height)" }
+    }
+    private var savedResolution: VideoResolution {
+        VideoResolution(width: (store.values["width"] as? NSNumber)?.intValue ?? 1920,
+                        height: (store.values["height"] as? NSNumber)?.intValue ?? 1080)
+    }
+    private var presets: [(String, VideoResolution)] {
+        [("720p", VideoResolution(width: 1280, height: 720)),
+         ("1080p", VideoResolution(width: 1920, height: 1080)),
+         ("1440p", VideoResolution(width: 2560, height: 1440)),
+         ("4K", VideoResolution(width: 3840, height: 2160))]
+    }
+    private var selectedResolution: String {
+        if let nativeSize, nativeSize == savedResolution,
+           choseNative || !presets.contains(where: { $0.1 == savedResolution }) { return "native" }
+        return savedResolution.id
+    }
+    private var resolutionPicker: some View {
+        Picker("Resolution", selection: Binding(get: { selectedResolution }, set: { choice in
+            let size = choice == "native" ? nativeSize : presets.first(where: { $0.1.id == choice })?.1
+            guard let size else { return }
+            choseNative = choice == "native"
+            if size != savedResolution { store.setResolution(width: size.width, height: size.height) }
+        })) {
+            ForEach(presets, id: \.0) { name, size in Text(name).tag(size.id) }
+            Text(nativeSize.map { "Native (\($0.width) × \($0.height))" } ?? "Native (Unavailable)")
+                .tag("native").disabled(nativeSize == nil)
+            if !presets.contains(where: { $0.1 == savedResolution }), nativeSize != savedResolution {
+                Text("Custom (\(savedResolution.width) × \(savedResolution.height))").tag(savedResolution.id)
+            }
+        }
+        .pickerStyle(.menu)
+        .accessibilityIdentifier("resolution-picker")
+        .help("Native uses the monitor containing this Settings window. The selected dimensions are saved for future streams.")
+    }
+    private func refreshNativeResolution() {
+        let screen = store.settingsWindow?.screen ?? NSScreen.main
+        let displayID = (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? CGMainDisplayID()
+        // Match stock Moonlight's native-mode detection, rather than logical
+        // points or a scaled Retina framebuffer that can exceed panel resolution.
+        let modes = CGDisplayCopyAllDisplayModes(displayID, nil) as? [CGDisplayMode] ?? []
+        guard let mode = modes.first(where: { ($0.ioFlags & UInt32(kDisplayModeNativeFlag)) != 0 }),
+              (320...16384).contains(mode.width), (240...16384).contains(mode.height) else {
+            nativeSize = nil
+            return
+        }
+        nativeSize = VideoResolution(width: mode.width, height: mode.height)
     }
     @ViewBuilder private func preference(_ field: PreferenceField) -> some View {
         if field.boolean {

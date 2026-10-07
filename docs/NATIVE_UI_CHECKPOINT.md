@@ -96,3 +96,6 @@ builds and screenshot checks provide the available evidence.
 
 - About version line now reads `Native UI Preview 3 - Moonlight 6.2`, with the preview number derived from CFBundleVersion. The standard appended build suffix is suppressed. Credits and GitHub hyperlink stay fixed.
 - Build number and validation artifact names advanced to 3. Streaming engine sources unchanged. Icon concept pending selection; current shipping icon unchanged. Preview 3 is not published yet.
+
+- Build 3 Settings: native resolution dropdown replaces separate width/height fields; presets 720p/1080p/1440p/4K plus current Settings monitor's native mode (stock CoreGraphics native-mode flag). Dimensions sent atomically to existing preferences; stock bitrate adjustment preserved. Unknown saved sizes displayed as Custom. Native choices refresh on display/window changes, without silently rewriting saved dimensions.
+- New crescent icon packaged only in the native frontend; stock streaming helper icon unchanged. UI test bundle now includes actual app icon. Added dropdown interaction and real resolution transaction/restart persistence coverage. Full builds and screenshot review pending before publication.

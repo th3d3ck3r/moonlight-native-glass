@@ -68,13 +68,18 @@ with tempfile.TemporaryDirectory() as root:
         for invalid in [{"objectName": "overwrite"}, {"rendererSelection": -1}, {"enableHdr": "true"}]:
             bridge.send({"command": "settings", "values": invalid})
             bridge.wait("error")
+        bridge.send({"command": "settings", "values": {"width": 2560, "height": 1440}})
+        resolution = bridge.wait("settings")["values"]
+        assert (resolution["width"], resolution["height"]) == (2560, 1440), "Resolution transaction failed"
         bridge.p.stdin.write("not json\n"); bridge.p.stdin.flush(); bridge.wait("error")
     finally:
         bridge.close()
     restarted = Bridge(root)
     try:
         restarted.wait("ready")
-        assert restarted.wait("settings")["values"]["configurationWarnings"] == (not before), "Preference did not persist"
+        persisted = restarted.wait("settings")["values"]
+        assert persisted["configurationWarnings"] == (not before), "Preference did not persist"
+        assert (persisted["width"], persisted["height"]) == (2560, 1440), "Resolution did not persist"
     finally:
         restarted.close()
 print("PASS: adapter startup, JSON validation, atomic settings validation, persistence across restart")

@@ -21,6 +21,19 @@ import XCTest
             if screen.hasPrefix("settings-") {
                 window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.025)).click()
             }
+            if screen == "settings-video" {
+                let resolution = window.popUpButtons["resolution-picker"]
+                XCTAssertTrue(resolution.exists, "Resolution dropdown is missing")
+                resolution.click()
+                for label in ["720p", "1080p", "1440p", "4K"] {
+                    XCTAssertTrue(app.menuItems[label].exists, "Missing resolution: \(label)")
+                }
+                app.menuItems["720p"].click()
+                XCTAssertEqual(resolution.value as? String, "720p")
+                resolution.click()
+                app.menuItems["1080p"].click()
+                XCTAssertEqual(resolution.value as? String, "1080p")
+            }
             // XCTest captures the composited UI, including system-owned glass.
             let screenshot = target.screenshot()
             let attachment = XCTAttachment(screenshot: screenshot)
