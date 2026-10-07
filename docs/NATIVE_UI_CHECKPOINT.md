@@ -104,5 +104,9 @@ builds and screenshot checks provide the available evidence.
 
 ## Preview 3 physical feedback
 
-- User reports 720p and 1080p work, while higher resolutions show a black screen. No failed-session log supplied yet; cause not established. Review confirms preset dimensions save atomically and stock Session reads those width/height preferences directly. No decoder/renderer fallback or backend modification made. Need 1440p engine log, audio/cursor behavior, codec/renderer/HDR selections, and comparison with stock 6.2 at the same settings.
-- Engine Dock icon remained old because only the outer frontend resource was replaced. Packaging now copies the same crescent ICNS into the nested engine bundle before signing; bundle audit checks both declared icons are identical. Existing bundle identities and engine executable remain unchanged. Validation pending; no new release yet.
+- User initially reported black video above 1080p with audio continuing, then confirmed it works and requested only the icon change. No streaming workaround or decoder/renderer/backend change was made. No cause established; investigation closed at user direction.
+- Engine Dock icon remained old because only the outer frontend resource was replaced. Packaging now copies the same crescent ICNS into the nested engine bundle before signing; bundle audit checks both declared icons are identical. Existing bundle identities and engine executable remain unchanged. Icon packaging revision `25f78a4f3304fc624fcf881e4b25eb33e1bdab61`, validation run `37677092273`: full Intel/Universal bundles and declared-icon equality audits passed; protocol, real helper/persistence and all 16 native UI captures passed. No new release yet.
+
+## Build 4 preparation
+
+- Scope: match streaming engine Dock icon to frontend crescent, plus build number 4. About wording remains fixed and automatically reads Native UI Preview 4 - Moonlight 6.2. Streaming code and settings behavior unchanged. Full final build validation pending before publication.
