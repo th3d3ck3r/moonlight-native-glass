@@ -116,3 +116,5 @@ builds and screenshot checks provide the available evidence.
 - Menu bar probe at `845ac62`, run `37679491188`: app remained running after close and all menu actions were accessible. Screenshot query selected an empty menu frame; switched to composited main-screen capture so the status icon and visible menu are captured together. Remaining reopen/Settings/Quit checks rerun before publication.
 
 - Follow-up probe `d908f4d` selected the left application menu by its title. Captured screen/AX hierarchy confirms the crescent status item exists as StatusItem `native-status-item`. Test now targets that item and its own menu descendants, using their observed frames for mouse clicks. No application code changes required for the test correction.
+
+- Menu bar lifecycle probe bdfc99f582b0e8a22ec58601d57c3c081febd2bf passed (run 37681428750): close, reopen, Settings and Quit. All 17 captures passed. Final full Intel/Universal validation follows.

@@ -60,6 +60,7 @@ jobs:
             build/SHA256-${{ matrix.architecture }}.txt
           if-no-files-found: error
 
+  # Capture all native screens and verify close/reopen/Settings/Quit via the status item.
   native-windows:
     name: Native UI window smoke test
     runs-on: macos-26
