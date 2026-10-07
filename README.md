@@ -23,14 +23,14 @@ Liquid Glass navigation and controls on **macOS 26+**, regular native styling on
 
 ## 📦 Downloads
 
-**Native UI Preview 1 is available. Requires macOS 15 or later.**
+**Native UI Preview 2 is available. Requires macOS 15 or later.**
 
 | Your Mac | Package |
 |---|---|
-| 🖥️ **Intel** | [⬇️ Download Intel ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-1/Moonlight-Native-Glass-Preview-1-x86_64.zip) |
-| 🍎 **Intel + Apple Silicon** | [⬇️ Download Universal ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-1/Moonlight-Native-Glass-Preview-1-universal.zip) |
+| 🖥️ **Intel** | [⬇️ Download Intel ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-2/Moonlight-Native-Glass-Preview-2-x86_64.zip) |
+| 🍎 **Intel + Apple Silicon** | [⬇️ Download Universal ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-2/Moonlight-Native-Glass-Preview-2-universal.zip) |
 
-[Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-6.2-preview-1) · [SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-1/SHA256SUMS.txt) · [Validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml) · [Checkpoint](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/docs/NATIVE_UI_CHECKPOINT.md)
+[Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-6.2-preview-2) · [SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-2/SHA256SUMS.txt) · [Validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml) · [Checkpoint](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/docs/NATIVE_UI_CHECKPOINT.md)
 
 English interface. Manual updates only. Preview packages use verified **ad-hoc signatures**, not Developer ID signing or notarization.
 
@@ -70,10 +70,10 @@ This is a separate project from Enhanced. Enhanced-only microphone, clipboard an
 
 | Check | Verified state |
 |---|---|
-| Full Intel + Universal app builds | Passed at `d746f2a` · [validation run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37589657439) |
+| Full Intel + Universal app builds | Passed at `aa7fe3b` · [validation run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37628909463) |
 | Nested binaries, architectures and signatures | Passed signature, identity, permission and dependency audits of 105 Mach-O files |
 | Engine bridge and settings persistence | Passed real helper validation, including restart persistence and invalid-input rejection |
-| Native UI screenshots | 15 Release-mode XCTest captures passed: light/dark/compact, loading/empty/offline/unpaired, sheets and five Settings panes; screenshots inspected |
+| Native UI screenshots | 16 Release-mode XCTest captures passed: light/dark/compact, loading/empty/offline/unpaired, sheets and five Settings panes; screenshots inspected |
 | Physical Intel Tahoe pairing and streaming | **Not tested for this new app** |
 | Intel CPU/GPU usage and frame pacing | **Not measured**; compilation does not prove performance parity |
 
@@ -122,7 +122,7 @@ xcodebuild -project tests/native/NativeUITests.xcodeproj \
 |---|---|
 | Native sidebar, library, Settings and sheets | Implemented |
 | Tahoe controls + macOS 15 fallback | Implemented; physical accessibility checks remain |
-| Intel + Universal preview packages | Preview 1 published · experimental |
+| Intel + Universal preview packages | Preview 2 published · experimental |
 | Physical streaming and performance comparison | Required before calling this a stable replacement |
 
 Built on [Moonlight Qt](https://github.com/moonlight-stream/moonlight-qt) and [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c). See [GPL-3.0 license](LICENSE) and [original upstream documentation](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/docs/UPSTREAM_README.md).
