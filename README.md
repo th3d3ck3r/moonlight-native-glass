@@ -1,157 +1,128 @@
-# Moonlight Native Glass — Native UI Preview
+<div align="center">
 
-A SwiftUI/AppKit macOS frontend for the Moonlight Qt **6.2.0** streaming engine.
-The native interface follows system light/dark appearance, uses native Liquid
-Glass controls on macOS 26+, and uses regular native controls on macOS 15.
+![Moonlight Native Glass — Native UI Preview](readme-assets/images/native-glass-banner.svg)
 
-- Work happens on `native-ui`. `master` remains the exact upstream v6.2.0
-  baseline, `de2467e433821664cdd2224aad8c89a625be1ad9`.
-- Native sidebar, game library, pairing/address/details sheets, and five settings
-  panes replace the Qt navigation. Moonlight's icon, host artwork and SF Symbols
-  are reused.
-- A bundled Qt helper handles discovery, pairing and preferences. Each stream
-  uses the stock Session/SDL video window. The upstream streaming, networking,
-  settings, common-c and mDNS implementations are unchanged.
-- Updates are manual. Preferences and pairing credentials are separate from
-  stock Moonlight and the earlier Enhanced app; pair again in this app.
-- Intel and Universal packages are built. Ad-hoc signatures are verified;
-  these previews are **not Developer ID signed or notarized**.
+# 🌙 Moonlight Native Glass
 
-This is an experimental frontend. A build passing does not establish working
-pairing, streaming, Intel performance or feature parity on a physical Mac.
-Enhanced-only microphone, clipboard and AWDL features are not included.
-The stream disconnect shortcut is Control–Option–Shift–Q, or
-Start + Select + L1 + R1 on a controller. The stock performance overlay remains.
+### Your games. Your Mac. A native interface.
 
-See [the checkpoint and physical test checklist](docs/NATIVE_UI_CHECKPOINT.md)
-and [validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml).
-Preview releases will appear in
-[Releases](https://github.com/th3d3ck3r/moonlight-native-glass/releases) after validation.
+**SwiftUI / AppKit · Moonlight Qt 6.2.0 · Intel + Universal · Manual updates**
 
-## Native build
+[![Native macOS validation](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml/badge.svg?branch=native-ui)](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml)
+[![Moonlight Qt 6.2.0](https://img.shields.io/badge/engine-Moonlight_Qt_6.2.0-blue)](https://github.com/moonlight-stream/moonlight-qt/releases/tag/v6.2.0)
+![macOS 15+](https://img.shields.io/badge/macOS-15%2B-silver)
+![Manual updates](https://img.shields.io/badge/updates-Manual_only-8A2BE2)
+[![GPLv3](https://img.shields.io/badge/license-GPLv3-blue)](LICENSE)
 
-Use Xcode 26+, Qt 6.11.2, Python 3 and a recursive checkout. From the repository
-root run `bash scripts/build-native-macos.sh universal` (or `x86_64`). The script
-builds the Qt engine with the upstream dependency setup, compiles the native
-frontend for macOS 15, bundles both, signs ad-hoc and audits all nested binaries.
-CI also checks the real adapter, preference persistence and native window captures.
+A native macOS frontend for Sunshine and compatible GameStream hosts.
+Liquid Glass navigation and controls on **macOS 26+**, regular native styling on **macOS 15**, and system light/dark appearance throughout.
 
-The original upstream documentation and acknowledgements follow. Their downloads
-refer to stock Moonlight, not this experimental native frontend.
+[📦 Downloads](#-downloads) · [✨ Features](#-features) · [🖼️ Preview](#️-preview) · [🧪 Validation](#-validation) · [🛠️ Build](#️-build)
 
----
+</div>
 
-# Moonlight PC
+## 📦 Downloads
 
-[Moonlight PC](https://moonlight-stream.org) is an open source PC client for NVIDIA GameStream and [Sunshine](https://github.com/LizardByte/Sunshine).
+**Native UI Preview 1 is being validated. No release has been published yet.**
 
-Moonlight also has mobile versions for [Android](https://github.com/moonlight-stream/moonlight-android) and [iOS](https://github.com/moonlight-stream/moonlight-ios).
+| Your Mac | Package |
+|---|---|
+| 🖥️ **Intel** | Dedicated x86_64 ZIP — pending final validation |
+| 🍎 **Intel + Apple Silicon** | Universal ZIP — pending final validation |
 
-You can follow development on our [Discord server](https://moonlight-stream.org/discord) and help translate Moonlight into your language on [Weblate](https://hosted.weblate.org/projects/moonlight/moonlight-qt/).
+[Preview releases](https://github.com/th3d3ck3r/moonlight-native-glass/releases) · [Validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml) · [Checkpoint](docs/NATIVE_UI_CHECKPOINT.md)
 
- [![Build](https://img.shields.io/github/actions/workflow/status/moonlight-stream/moonlight-qt/build.yml?branch=master)](https://github.com/moonlight-stream/moonlight-qt/actions/workflows/build.yml?query=branch%3Amaster)
- [![Downloads](https://img.shields.io/github/downloads/moonlight-stream/moonlight-qt/total)](https://github.com/moonlight-stream/moonlight-qt/releases)
- [![Translation Status](https://hosted.weblate.org/widgets/moonlight/-/moonlight-qt/svg-badge.svg)](https://hosted.weblate.org/projects/moonlight/moonlight-qt/)
+English interface. Manual updates only. Preview packages use verified **ad-hoc signatures**, not Developer ID signing or notarization.
 
-## Features
- - Hardware accelerated video decoding on Windows, Mac, and Linux
- - H.264, HEVC, and AV1 codec support (AV1 requires Sunshine and a supported host GPU)
- - YUV 4:4:4 support (Sunshine only)
- - HDR streaming support
- - 7.1 surround sound audio support
- - 10-point multitouch support (Sunshine only)
- - Gamepad support with force feedback and motion controls for up to 16 players
- - Support for both pointer capture (for games) and direct mouse control (for remote desktop)
- - Support for passing system-wide keyboard shortcuts like Alt+Tab to the host
- 
-## Downloads
-- [Windows, macOS, and Steam Link](https://github.com/moonlight-stream/moonlight-qt/releases)
-- [Snap (for Ubuntu-based Linux distros)](https://snapcraft.io/moonlight)
-- [Flatpak (for other Linux distros)](https://flathub.org/apps/details/com.moonlight_stream.Moonlight)
-- [AppImage](https://github.com/moonlight-stream/moonlight-qt/releases)
-- [Raspberry Pi 4 and 5](https://github.com/moonlight-stream/moonlight-docs/wiki/Installing-Moonlight-Qt-on-Raspberry-Pi-4)
-- [Generic ARM 32-bit and 64-bit Debian packages](https://github.com/moonlight-stream/moonlight-docs/wiki/Installing-Moonlight-Qt-on-ARM%E2%80%90based-Single-Board-Computers) (not for Raspberry Pi)
-- [Experimental RISC-V Debian packages](https://github.com/moonlight-stream/moonlight-docs/wiki/Installing-Moonlight-Qt-on-RISC%E2%80%90V-Single-Board-Computers)
-- [NVIDIA Jetson and Nintendo Switch (Ubuntu L4T)](https://github.com/moonlight-stream/moonlight-docs/wiki/Installing-Moonlight-Qt-on-Linux4Tegra-(L4T)-Ubuntu)
+## ✨ Features
 
-### Nightly Builds
-- [Downloads](https://nightly.link/moonlight-stream/moonlight-qt/workflows/build/master)
+| Area | What this app provides |
+|---|---|
+| 🫧 **Native interface** | SwiftUI/AppKit sidebar, toolbar, game library, Settings and sheets |
+| 🌓 **Appearance** | System light/dark mode; native Liquid Glass controls on Tahoe; standard controls on macOS 15 |
+| 🖥️ **Computers** | Discovery, manual address, pairing, wake, rename, remove and connection details |
+| 🎮 **Library** | Host artwork, search, keyboard/controller navigation, game launch, hide and quit |
+| ⚙️ **Settings** | Video, Audio, Input, Network and Advanced panes backed by the stock engine's settings |
+| 🎬 **Streaming** | Original Moonlight Qt 6.2 Session/SDL window, renderer and codec capability checks |
+| 🔊 **Input and audio** | Stock Moonlight keyboard, mouse, controller and audio paths |
+| 📦 **Updates** | One English edition. Download new versions when you choose. |
 
-#### Special Thanks
+The frontend is native; a bundled Qt helper still handles discovery, pairing, preferences and streaming. The streaming, backend, settings, common-c and mDNS source remains unchanged from the 6.2.0 baseline. Codec, HDR and hardware decoding availability depends on your Mac and host.
 
-[![Hosted By: Cloudsmith](https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square)](https://cloudsmith.com)
+This is a separate project from Enhanced. Enhanced-only microphone, clipboard and AWDL extensions are not included. Preferences and pairing credentials are isolated from stock Moonlight and Enhanced; pair your host in this app.
 
-Hosting for Moonlight's Debian and L4T package repositories is graciously provided for free by [Cloudsmith](https://cloudsmith.com).
+## 🖼️ Preview
 
-## Building
+**Actual app screenshots from macOS CI, using sample computers and games. These are not mockups or proof of live streaming.**
 
-### Windows Build Requirements
-* Qt 6.11 SDK or later (earlier versions may work but are not officially supported)
-* [Visual Studio 2026](https://visualstudio.microsoft.com/downloads/) (Community edition is fine)
-* Select **MSVC** option during Qt installation. MinGW is not supported.
-* [7-Zip](https://www.7-zip.org/) (only if building installers for non-development PCs)
-* Graphics Tools (only if running debug builds)
-  * Install "Graphics Tools" in the Optional Features page of the Windows Settings app.
-  * Alternatively, run `dism /online /add-capability /capabilityname:Tools.Graphics.DirectX~~~~0.0.1.0` and reboot.
+| Light | Dark |
+|---|---|
+| ![Native library in light appearance](readme-assets/images/main-light.png) | ![Native library in dark appearance](readme-assets/images/main-dark.png) |
 
-### macOS Build Requirements
-* Qt 6.11 SDK or later (earlier versions may work but are not officially supported)
-* Xcode 15 or later (earlier versions may work but are not officially supported)
-* [create-dmg](https://github.com/sindresorhus/create-dmg) (only if building DMGs for use on non-development Macs)
+<details>
+<summary>Native Settings screenshot</summary>
 
-### Linux/Unix Build Requirements
-* Qt 6 is recommended, but Qt 5.12 or later is also supported (replace `qmake6` with `qmake` when using Qt 5).
-* GCC or Clang
-* FFmpeg 4.0 or later
-* Install the required packages:
-  * Debian/Ubuntu:
-    * Base Requirements: `libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev libsdl2-ttf-dev libssl-dev libavcodec-dev libavformat-dev libswscale-dev libva-dev libvdpau-dev libxkbcommon-dev wayland-protocols libdrm-dev`
-    * Qt 6 (Recommended): `qt6-base-dev qt6-declarative-dev libqt6svg6-dev qt6-wayland qml6-module-qtquick-controls qml6-module-qtquick-templates qml6-module-qtquick-layouts qml6-module-qtqml-workerscript qml6-module-qtquick-window qml6-module-qtquick`
-    * Qt 5: `qtbase5-dev qt5-qmake qtdeclarative5-dev qtquickcontrols2-5-dev qml-module-qtquick-controls2 qml-module-qtquick-layouts qml-module-qtquick-window2 qml-module-qtquick2 qtwayland5`
-  * RedHat/Fedora (RPM Fusion repo required):
-    * Base Requirements: `openssl-devel SDL2-devel SDL2_ttf-devel ffmpeg-devel libva-devel libvdpau-devel opus-devel pulseaudio-libs-devel alsa-lib-devel libdrm-devel`
-    * Qt 6 (Recommended): `qt6-qtsvg-devel qt6-qtdeclarative-devel`
-    * Qt 5: `qt5-qtsvg-devel qt5-qtquickcontrols2-devel`
-* Building the Vulkan renderer requires a `libplacebo-dev`/`libplacebo-devel` version of at least v7.349.0 and FFmpeg 6.1 or later.
+![Native Video Settings with sample preferences](readme-assets/images/settings-video.png)
 
-### Steam Link Build Requirements
-* [Steam Link SDK](https://github.com/ValveSoftware/steamlink-sdk) cloned on your build system
-* STEAMLINK_SDK_PATH environment variable set to the Steam Link SDK path
+</details>
 
-**Steam Link Hardware Limitations**  
-Moonlight builds for Steam Link are subject to hardware limitations of the Steam Link device:
-* Maximum resolution: **1080p (1920x1080)**
-* Maximum framerate: **60 FPS**
-* Maximum video bitrate: **40 Mbps**
-* **HDR streaming is not supported** on the original hardware
+## 🧪 Validation
 
-### Docker containers
-If you want to use Docker for building, look at [this repo](https://github.com/cgutman/moonlight-packaging) containing canonical containers
-for different architectures, which handle building deps and extra linking for you.
+| Check | Verified state |
+|---|---|
+| Full Intel + Universal app builds | Earlier milestones passed; final preview build pending |
+| Nested binaries, architectures and signatures | Earlier full bundles passed dependency and signature audits |
+| Engine bridge and settings persistence | Passed real helper validation, including restart persistence and invalid-input rejection |
+| Native UI screenshots | XCTest passed light/dark/compact, empty/offline/unpaired, sheets and five Settings panes; screenshots inspected |
+| Physical Intel Tahoe pairing and streaming | **Not tested for this new app** |
+| Intel CPU/GPU usage and frame pacing | **Not measured**; compilation does not prove performance parity |
 
-### Build Setup Steps
-1. Install the latest Qt SDK (and optionally, the Qt Creator IDE) from https://www.qt.io/download
-    * You can install Qt via Homebrew on macOS, but you will need to use `brew install qt --with-debug` to be able to create debug builds of Moonlight.
-    * You may also use your Linux distro's package manager for the Qt SDK as long as the packages are Qt 5.12 or later.
-    * This step is not required for building on Steam Link, because the Steam Link SDK includes Qt 5.14.
-2. Download submodules and dependencies
-    * Run `git submodule update --init --recursive` from within `moonlight-qt/`.
-    * On Windows and macOS, you must also run `setup-deps.ps1` (Windows) or `setup-deps.py` (macOS).
-    * Perform these steps each time you pull new changes from the Git repository.
-3. Open the project in Qt Creator or build from qmake on the command line.
-    * To build a binary for use on non-development machines, use the scripts in the `scripts` folder.
-        * For Windows builds, use `scripts\build-arch.bat` and `scripts\generate-bundle.bat`. Execute these scripts from the root of the repository within a Qt command prompt. Ensure  7-Zip binary directory is on your `%PATH%`.
-        * For macOS builds, use `scripts/generate-dmg.sh`. Execute this script from the root of the repository and ensure Qt's `bin` folder is in your `$PATH`.
-        * For Steam Link builds, run `scripts/build-steamlink-app.sh` from the root of the repository.
-    * To build from the command line for development use on macOS or Linux, run `qmake6 moonlight-qt.pro` then `make debug` or `make release`.
-        * The final binary will be placed in `app/moonlight`.
-    * To create an embedded build for a single-purpose device, use `qmake6 "CONFIG+=embedded" moonlight-qt.pro` and build normally.
-        * This build will lack windowed mode, Discord/Help links, and other features that don't make sense on an embedded device.
-        * For platforms with poor GPU performance, add `"CONFIG+=gpuslow"` to prefer direct KMSDRM rendering over GL/Vulkan renderers. Direct KMSDRM rendering can use dedicated YUV/RGB conversion and scaling hardware rather than slower GPU shaders for these operations.
+`master` stays at upstream Moonlight Qt **v6.2.0**, commit `de2467e433821664cdd2224aad8c89a625be1ad9`. Native work lives on `native-ui`. The earlier Enhanced repository and releases are untouched.
 
-## Contribute
-1. Fork us
-2. Write code
-3. Send Pull Requests
+<details>
+<summary>Intel Tahoe test checklist and known limits</summary>
 
-Check out our [website](https://moonlight-stream.org) for project links and information.
+- Launch through Finder; approve Local Network access and verify discovery/manual address.
+- Pair, relaunch, and confirm the saved pairing and preferences.
+- Launch/resume/disconnect a game; test H.264/HEVC hardware decode, audio and controller/keyboard/mouse input.
+- Check resizing, fullscreen, display switching, light/dark mode, Reduce Transparency, Reduce Motion and increased contrast.
+- Compare stock 6.2.0 and this app on the same Mac, host and settings: CPU/GPU usage, decode time, frame pacing and network statistics.
+
+The bundled helper's Local Network attribution, multi-display behavior and interrupted-launch cleanup need physical testing. Disconnect with **Control–Option–Shift–Q** or **Start + Select + L1 + R1**. The streaming overlay remains the stock engine's overlay.
+
+</details>
+
+## 🛠️ Build
+
+<details>
+<summary>Build Intel or Universal on a Mac</summary>
+
+Use Xcode 26+, Qt 6.11.2 and Python 3. Start with a recursive checkout on `native-ui`:
+
+```bash
+git clone --recurse-submodules --branch native-ui https://github.com/th3d3ck3r/moonlight-native-glass.git
+cd moonlight-native-glass
+bash scripts/build-native-macos.sh universal
+# Intel only:
+# bash scripts/build-native-macos.sh x86_64
+```
+
+The script builds the stock Qt engine, compiles the frontend for macOS 15+, bundles both, signs ad-hoc and audits nested dependencies. CI also checks protocol framing, actual engine persistence and native UI windows.
+
+```bash
+xcodebuild -project tests/native/NativeUITests.xcodeproj \
+  -scheme NativeUITests -destination 'platform=macOS' test
+```
+
+</details>
+
+## 🫧 Roadmap
+
+| Stage | Status |
+|---|---|
+| Native sidebar, library, Settings and sheets | Implemented |
+| Tahoe controls + macOS 15 fallback | Implemented; physical accessibility checks remain |
+| Intel + Universal preview packages | Final validation in progress |
+| Physical streaming and performance comparison | Required before calling this a stable replacement |
+
+Built on [Moonlight Qt](https://github.com/moonlight-stream/moonlight-qt) and [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c). See [GPL-3.0 license](LICENSE) and [original upstream documentation](docs/UPSTREAM_README.md).

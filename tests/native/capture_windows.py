@@ -7,7 +7,7 @@ executable = sys.argv[1]
 destination = pathlib.Path(sys.argv[2])
 destination.mkdir(parents=True, exist_ok=True)
 captures = [("main-light", ["--light"]), ("main-dark", ["--dark"]), ("main-compact", ["--dark", "--compact"])]
-for screen in ["empty", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-input", "settings-network", "settings-advanced"]:
+for screen in ["empty", "loading", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-input", "settings-network", "settings-advanced"]:
     captures.append((screen, ["--dark", "--preview-screen=" + screen]))
 for name, flags in captures:
     output = destination / f"{name}.png"

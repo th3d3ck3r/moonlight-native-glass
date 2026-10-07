@@ -5,7 +5,7 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication()
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "preview-settings", withExtension: "json"))
-        let screens = ["main-light", "main-dark", "main-compact", "empty", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-input", "settings-network", "settings-advanced"]
+        let screens = ["main-light", "main-dark", "main-compact", "empty", "loading", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-input", "settings-network", "settings-advanced"]
         for screen in screens {
             app.launchArguments = ["--design-preview", "--settings-fixture=" + fixture.path, screen == "main-light" ? "--light" : "--dark"]
             if screen == "main-compact" { app.launchArguments.append("--compact") }

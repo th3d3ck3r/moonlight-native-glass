@@ -115,8 +115,8 @@ struct PairingRequest: Identifiable {
             let args = CommandLine.arguments
             if let screen = nativeArgument("--preview-screen") {
                 if screen == "empty" { computers = [] }
-                else if screen == "offline" || screen == "unpaired", let host = computers.first {
-                    computers = [Computer(id: host.id, name: host.name, online: screen != "offline", unknown: false,
+                else if ["offline", "unpaired", "loading"].contains(screen), let host = computers.first {
+                    computers = [Computer(id: host.id, name: host.name, online: screen != "offline" && screen != "loading", unknown: screen == "loading",
                         paired: screen != "unpaired", runningApp: 0, address: host.address, localAddress: host.localAddress,
                         serverVersion: host.serverVersion, gpu: host.gpu, supported: true, apps: [])]
                 }

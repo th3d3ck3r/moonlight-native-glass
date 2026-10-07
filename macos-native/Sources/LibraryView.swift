@@ -108,13 +108,19 @@ struct LibraryView: View {
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if computer.online && !computer.paired {
+                if computer.online && !computer.unknown && !computer.paired {
                     NativePrimaryButton(title: "Pair Computer", symbol: "link") { store.pair(computer) }.disabled(!controlsEnabled)
-                } else if !computer.online {
+                } else if !computer.online && !computer.unknown {
                     Button("Wake Computer") { store.send("wake", ["host": computer.id]) }.disabled(!controlsEnabled)
                 }
             }.padding(24)
-            if !computer.online {
+            if computer.unknown {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Checking Connection…").font(.headline)
+                    Text("Contacting your computer's streaming service.").foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !computer.online {
                 empty("Computer Offline", "Start the host's streaming service and check Local Network permission in System Settings.", symbol: "network.slash")
             } else if !computer.paired {
                 empty("Pair Your Computer", "Pair with Sunshine or a compatible host to see your games and apps.", symbol: "link")
