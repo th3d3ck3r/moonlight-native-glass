@@ -14,9 +14,9 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VALIDATED_SHA: d746f2adf461e0dced2ef49e8c15c6e91642a198
-      VALIDATED_RUN: '37589657439'
-      RELEASE_TAG: native-glass-6.2-preview-1
+      VALIDATED_SHA: aa7fe3bffee47f4ad6542871402dd9d6a541beac
+      VALIDATED_RUN: '37628909463'
+      RELEASE_TAG: native-glass-6.2-preview-2
     steps:
       - uses: actions/checkout@v5
       - name: Verify the exact validated source and all required jobs
@@ -40,13 +40,19 @@ jobs:
           assert all(p == 'README.md' or p.startswith(('docs/', 'readme-assets/', '.github/workflows/')) for p in paths), paths
           PY
           test "$(gh api "repos/$GH_REPO/git/ref/heads/native-ui" --jq .object.sha)" = "$GITHUB_SHA"
-          test "$(gh api "repos/$GH_REPO/git/ref/heads/master" --jq .object.sha)" = de2467e433821664cdd2224aad8c89a625be1ad9
+          # Master now has a fork-specific README; its application code must
+          # still match the original 6.2 baseline exactly.
+          git fetch --no-tags --depth=1 origin master de2467e433821664cdd2224aad8c89a625be1ad9
+          git diff --name-only de2467e433821664cdd2224aad8c89a625be1ad9 origin/master > /tmp/master-changes.txt
+          python3 - <<'PYMASTER'
+          assert all(p == 'README.md' for p in open('/tmp/master-changes.txt').read().splitlines()), 'Master application baseline changed'
+          PYMASTER
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then echo 'Preview already exists; refusing to replace it.' >&2; exit 1; fi
       - name: Download only previously validated artifacts
         run: |
           mkdir -p release-assets capture-assets
-          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-1-x86_64 -D release-assets
-          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-1-universal -D release-assets
+          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-2-x86_64 -D release-assets
+          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-2-universal -D release-assets
           gh run download "$VALIDATED_RUN" -n Native-UI-Quick-Window-Captures -D capture-assets
           # Full-build layer images are diagnostics; publish composited XCTest images.
           rm -f release-assets/*.png
@@ -55,15 +61,15 @@ jobs:
           source = pathlib.Path('capture-assets')
           manifest = json.loads((source / 'manifest.json').read_text())
           attachments = [a for test in manifest for a in test['attachments']]
-          for name in ['main-light', 'main-dark', 'main-compact', 'loading', 'settings-video', 'settings-audio', 'settings-input', 'settings-network', 'settings-advanced']:
+          for name in ['main-light', 'main-dark', 'main-compact', 'loading', 'settings-video', 'settings-audio', 'settings-input', 'settings-network', 'settings-advanced', 'about-dark']:
               matches = [a for a in attachments if a['suggestedHumanReadableName'].startswith(name + '_0_')]
               assert len(matches) == 1, name
               shutil.copyfile(source / matches[0]['exportedFileName'], pathlib.Path('release-assets') / (name + '.png'))
           PY
-          (cd release-assets && sha256sum Moonlight-Native-Glass-Preview-1-*.zip > SHA256SUMS.txt)
+          (cd release-assets && sha256sum Moonlight-Native-Glass-Preview-2-*.zip > SHA256SUMS.txt)
       - name: Publish the separately labeled preview
         run: |
           gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --prerelease \
-            --title 'Moonlight Native Glass · Qt 6.2 · Native UI Preview 1' \
+            --title 'Moonlight Native Glass · Qt 6.2 · Native UI Preview 2' \
             --notes-file docs/NATIVE_PREVIEW_RELEASE.md \
             release-assets/*.zip release-assets/SHA256SUMS.txt release-assets/*.png

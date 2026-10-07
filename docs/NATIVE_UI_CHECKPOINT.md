@@ -1,7 +1,7 @@
 # Native UI checkpoint
 
 Repository: `th3d3ck3r/moonlight-native-glass` · branch: `native-ui`.
-`master` remains stock Qt v6.2.0: `de2467e433821664cdd2224aad8c89a625be1ad9`.
+`master` application code remains stock Qt v6.2.0: `de2467e433821664cdd2224aad8c89a625be1ad9`. Its README-only homepage commit is `e0c36c9`.
 The Enhanced repository is untouched.
 
 ## Architecture
@@ -79,3 +79,13 @@ notarization. Stock stream shortcuts/overlay remain; no Enhanced microphone,
 clipboard or AWDL extensions. Minimum macOS is 15; new glass APIs are guarded
 for 26 with native fallbacks. The Linux workspace cannot run AppKit; macOS CI
 builds and screenshot checks provide the available evidence.
+
+## Build 2 fixes and About policy
+
+- `e298884`, run `37625715679`: full Intel/Universal and 15-screen native UI validation passed. The packaged background helper's real AppKit activation policy is verified accessory. Stream processes keep regular activation. Successful pairing publishes its confirmed host snapshot before dismissing the PIN sheet and resumes stock polling/app-list retrieval.
+- `7400b7b`: fixed About credits, native GitHub hyperlink and bundle build number 2. An XCTest menu-coordinate exception blocked the new About case; the same production About function now opens through the design-preview entry point (`b5159b5`).
+- Keep About text fixed: “Native Glass created and maintained by Th3D3ck3r”, GitHub Repository link, existing engine/interface/manual-update/license credits. Future builds change only CFBundleVersion; add no release-specific notices to About.
+- Before publication, require all full build jobs plus the About screenshot/link check to pass on the final revision. Live pairing refresh and stream focus still require physical Mac/host testing.
+
+- `73c85e3`, run `37628175967`: About dialog/link check and all 16 composited UI captures passed; About screenshot inspected for exact credits and clipping.
+- Final build 2 source/package revision: `aa7fe3bffee47f4ad6542871402dd9d6a541beac`; validation run `37628909463`. Full Intel/Universal jobs and all UI checks passed. The real helper Dock-policy, JSON framing, atomic settings and restart persistence checks passed; About screenshot inspected. Preview 2 publication is gated to this source and run.
