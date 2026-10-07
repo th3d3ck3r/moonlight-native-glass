@@ -10,6 +10,9 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    # UI probes compile/render the actual native frontend quickly. A final
+    # ordinary push must pass both complete builds before any release.
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[ui probe]')
     strategy:
       fail-fast: false
       matrix:

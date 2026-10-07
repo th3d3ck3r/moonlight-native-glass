@@ -30,7 +30,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     @NSApplicationDelegateAdaptor(NativeAppDelegate.self) private var delegate
     @StateObject private var store = EngineStore(preview: CommandLine.arguments.contains("--design-preview"))
     var body: some Scene {
-        Window("Moonlight Native Glass", id: "library") {
+        WindowGroup("Moonlight Native Glass", id: "library") {
             LibraryView(store: store)
                 .frame(minWidth: 680, minHeight: 460)
                 .onAppear { delegate.store = store; store.start() }
@@ -73,13 +73,16 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
 @MainActor func captureDesignPreviewIfRequested() {
     let args = CommandLine.arguments
     guard args.contains("--design-preview"), let index = args.firstIndex(of: "--capture-preview"), args.count > index + 1 else { return }
+    let logURL = URL(fileURLWithPath: args[index + 1] + ".log")
+    func record(_ message: String) { try? (message + "\n").data(using: .utf8)?.write(to: logURL) }
+    record("Capture launched; windows=\(NSApp.windows.map { $0.title })")
     if args.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
     if args.contains("--light") { NSApp.appearance = NSAppearance(named: .aqua) }
     func prepare(attempt: Int) {
         let screen = args.firstIndex(of: "--preview-screen").flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil } ?? "main"
         let identifier = screen.hasPrefix("settings-") ? "native-settings" : "native-library"
         guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == identifier && $0.isVisible }) else {
-            guard attempt < 40 else { print("No visible \(identifier) window: \(NSApp.windows.map { $0.title })"); exit(2) }
+            guard attempt < 40 else { record("No visible \(identifier) window: \(NSApp.windows.map { $0.title })"); exit(2) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { prepare(attempt: attempt + 1) }
             return
         }
@@ -90,6 +93,7 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
         // Let the WindowServer composite SwiftUI layers and native glass across
         // real display cycles. NSView bitmap caching omits composited layers.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            record("Capturing window \(window.title), number=\(window.windowNumber), frame=\(window.frame)")
             let number = window.windowNumber
             DispatchQueue.global(qos: .userInitiated).async {
                 let capture = Process()

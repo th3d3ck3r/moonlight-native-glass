@@ -19,5 +19,8 @@ for name, flags in captures:
         for report in sorted(reports.glob("MoonlightNative*"))[-2:]:
             print(report.read_text()[:16000], flush=True)
         raise
+    if not output.is_file():
+        log = pathlib.Path(str(output) + ".log")
+        if log.exists(): print(log.read_text(), flush=True)
     assert output.is_file() and output.stat().st_size > 0
     print(f"PASS: app-rendered {name} screenshot", flush=True)
