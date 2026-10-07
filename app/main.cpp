@@ -44,6 +44,9 @@
 #include "cli/startstream.h"
 #include "cli/pair.h"
 #include "cli/commandlineparser.h"
+#ifdef Q_OS_DARWIN
+#include "native/nativebridge.h"
+#endif
 #include "path.h"
 #include "utils.h"
 #include "gui/computermodel.h"
@@ -431,6 +434,17 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("Moonlight Game Streaming Project");
     QCoreApplication::setOrganizationDomain("moonlight-stream.com");
     QCoreApplication::setApplicationName("Moonlight");
+#ifdef Q_OS_DARWIN
+    if (argc > 1 && QString::fromUtf8(argv[1]) == "native") {
+        QCoreApplication::setApplicationName("Moonlight Native Glass");
+        signal(SIGPIPE, SIG_IGN);
+        const QString testRoot = qEnvironmentVariable("MOONLIGHT_NATIVE_TEST_ROOT");
+        if (!testRoot.isEmpty()) {
+            QSettings::setDefaultFormat(QSettings::IniFormat);
+            QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, testRoot);
+        }
+    }
+#endif
 
     if (QFile(QDir::currentPath() + "/portable.dat").exists()) {
         QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -807,6 +821,9 @@ int main(int argc, char *argv[])
     GlobalCommandLineParser::ParseResult commandLineParserResult = parser.parse(app.arguments());
     switch (commandLineParserResult) {
     case GlobalCommandLineParser::ListRequested:
+#ifdef Q_OS_DARWIN
+    case GlobalCommandLineParser::NativeRequested:
+#endif
         // Don't log to the console since it will jumble the command output
         s_SuppressVerboseOutput = true;
         break;
@@ -988,6 +1005,12 @@ int main(int argc, char *argv[])
     bool hasGUI = true;
 
     switch (commandLineParserResult) {
+#ifdef Q_OS_DARWIN
+    case GlobalCommandLineParser::NativeRequested:
+        new NativeBridge(app.arguments(), &app);
+        hasGUI = false;
+        break;
+#endif
     case GlobalCommandLineParser::NormalStartRequested:
         initialView = "qrc:/gui/PcView.qml";
         break;

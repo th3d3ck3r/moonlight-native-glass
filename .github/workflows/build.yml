@@ -5,6 +5,8 @@ permissions:
 
 on:
   push:
+    branches-ignore:
+      - native-ui
   pull_request:
     branches:
       - master

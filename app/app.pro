@@ -580,3 +580,8 @@ macx {
 
 VERSION = "$$cat(version.txt)"
 DEFINES += VERSION_STR=\\\"$$cat(version.txt)\\\"
+
+macx {
+    SOURCES += native/nativebridge.cpp
+    HEADERS += native/nativebridge.h
+}

@@ -1,0 +1,72 @@
+"""Exercise the real built adapter without requiring a network host."""
+import json
+import os
+import pathlib
+import queue
+import subprocess
+import sys
+import tempfile
+import threading
+
+executable = sys.argv[1]
+
+class Bridge:
+    def __init__(self, root):
+        self.events = queue.Queue()
+        self.p = subprocess.Popen([executable, "native", "test"], stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                  env={**os.environ, "MOONLIGHT_NATIVE_TEST_ROOT": root}, text=True)
+        def read():
+            for line in self.p.stdout:
+                try:
+                    self.events.put(json.loads(line))
+                except Exception as error:
+                    self.events.put({"event": "invalid", "message": str(error)})
+        self.reader = threading.Thread(target=read, daemon=True)
+        self.reader.start()
+
+    def wait(self, event):
+        while True:
+            item = self.events.get(timeout=30)
+            assert item["event"] != "invalid", item
+            if item["event"] == event:
+                return item
+
+    def send(self, request):
+        self.p.stdin.write(json.dumps(request) + "\n")
+        self.p.stdin.flush()
+
+    def close(self):
+        if self.p.poll() is None:
+            self.send({"command": "shutdown"})
+            self.p.wait(timeout=30)
+        assert self.p.returncode == 0, self.p.returncode
+
+with tempfile.TemporaryDirectory() as root:
+    bridge = Bridge(root)
+    try:
+        assert bridge.wait("ready")["protocol"] == 1
+        settings = bridge.wait("settings")
+        assert isinstance(settings["values"]["videoCodecConfig"], int), settings
+        assert len(settings["schema"]) >= 30
+        before = settings["values"]["configurationWarnings"]
+        bridge.send({"command": "settings", "values": {"configurationWarnings": not before}})
+        assert bridge.wait("settings")["values"]["configurationWarnings"] == (not before)
+        bridge.send({"command": "settings", "values": {"fps": 0, "width": 1280}})
+        bridge.wait("error")
+        bridge.send({"command": "snapshot"})
+        unchanged = bridge.wait("settings")["values"]
+        assert unchanged["width"] == settings["values"]["width"], "Invalid transaction partially applied"
+        for invalid in [{"objectName": "overwrite"}, {"rendererSelection": -1}, {"enableHdr": "true"}]:
+            bridge.send({"command": "settings", "values": invalid})
+            bridge.wait("error")
+        bridge.p.stdin.write("not json\n"); bridge.p.stdin.flush(); bridge.wait("error")
+    finally:
+        bridge.close()
+    restarted = Bridge(root)
+    try:
+        restarted.wait("ready")
+        assert restarted.wait("settings")["values"]["configurationWarnings"] == (not before), "Preference did not persist"
+    finally:
+        restarted.close()
+print("PASS: adapter startup, JSON validation, atomic settings validation, persistence across restart")

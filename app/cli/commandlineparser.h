@@ -14,6 +14,9 @@ public:
         QuitRequested,
         PairRequested,
         ListRequested,
+#ifdef Q_OS_DARWIN
+        NativeRequested,
+#endif
     };
 
     GlobalCommandLineParser();

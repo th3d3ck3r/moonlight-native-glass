@@ -150,6 +150,9 @@ GlobalCommandLineParser::~GlobalCommandLineParser()
 
 GlobalCommandLineParser::ParseResult GlobalCommandLineParser::parse(const QStringList &args)
 {
+#ifdef Q_OS_DARWIN
+    if (args.size() > 1 && args[1] == "native") return NativeRequested;
+#endif
     CommandLineParser parser;
     parser.setupCommonOptions();
     parser.setApplicationDescription(
