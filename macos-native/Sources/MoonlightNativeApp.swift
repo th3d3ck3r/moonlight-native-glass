@@ -5,6 +5,10 @@ import QuartzCore
 final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     weak var store: EngineStore?
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if CommandLine.arguments.contains("--design-preview") {
+            if CommandLine.arguments.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
+            if CommandLine.arguments.contains("--light") { NSApp.appearance = NSAppearance(named: .aqua) }
+        }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         DispatchQueue.main.async {
@@ -78,7 +82,7 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
     if args.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
     if args.contains("--light") { NSApp.appearance = NSAppearance(named: .aqua) }
     func prepare(attempt: Int) {
-        let screen = args.firstIndex(of: "--preview-screen").flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil } ?? "main"
+        let screen = nativeArgument("--preview-screen") ?? "main"
         let identifier = screen.hasPrefix("settings-") ? "native-settings" : "native-library"
         guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == identifier && $0.isVisible }) else {
             guard attempt < 40 else { record("No visible \(identifier) window: \(NSApp.windows.map { $0.title })"); exit(2) }
@@ -93,7 +97,8 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
         // real display cycles. NSView bitmap caching omits composited layers.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             record("Capturing window \(window.title), number=\(window.windowNumber), frame=\(window.frame)")
-            let number = window.windowNumber
+            let captureWindow = window.attachedSheet ?? window
+            let number = captureWindow.windowNumber
             DispatchQueue.global(qos: .userInitiated).async {
                 let capture = Process()
                 capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
@@ -111,7 +116,7 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
                             // CI may create windows without permitting WindowServer
                             // screenshots. Render only our own UI for layout review;
                             // this does not reproduce composited glass materials.
-                            captureNativeLayout(window: window, destination: destination)
+                            captureNativeLayout(window: captureWindow, destination: destination)
                         }
                     }
                 } catch { print("Window capture failed: \(error)"); exit(3) }

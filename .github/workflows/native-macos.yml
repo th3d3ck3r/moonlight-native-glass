@@ -84,33 +84,14 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
-      - name: Compile the native frontend for rapid UI feedback
+      - name: Capture composited native UI with XCTest
         run: |
-          app="$PWD/build/window-smoke/Moonlight Native Glass.app"
-          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" build/previews
-          xcrun swiftc -swift-version 5 -parse-as-library -O -sdk "$(xcrun --sdk macosx --show-sdk-path)" -target arm64-apple-macos15.0 macos-native/Sources/*.swift -o "$app/Contents/MacOS/MoonlightNative"
-          cp macos-native/Info.plist "$app/Contents/Info.plist"
-          cp app/moonlight.icns "$app/Contents/Resources/moonlight.icns"
-          codesign --force --sign - "$app"
-          cp tests/native/preview-settings.json build/previews/settings-fixture.json
-          python3 tests/native/capture_windows.py "$app/Contents/MacOS/MoonlightNative" "$PWD/build/previews"
-      - name: Diagnose native window lifecycle if capture fails
-        if: failure()
+          xcodebuild -project tests/native/NativeUITests.xcodeproj -scheme NativeUITests -destination 'platform=macOS' -derivedDataPath build/ui-tests -resultBundlePath build/native-ui.xcresult test
+      - name: Collect native screenshots
+        if: always()
         run: |
-          for mode in swiftui appkit; do
-            app="$PWD/build/probe-$mode/Probe.app"
-            mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-            cp macos-native/Info.plist "$app/Contents/Info.plist"
-            cp app/moonlight.icns "$app/Contents/Resources/moonlight.icns"
-            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.moonlight-stream.probe.$mode" "$app/Contents/Info.plist"
-            if [ "$mode" = appkit ]; then flags='-DAPPKIT_PROBE'; else flags=''; fi
-            xcrun swiftc -swift-version 5 -parse-as-library -O $flags -target arm64-apple-macos15.0 tests/native/WindowLifecycleProbe.swift -o "$app/Contents/MacOS/MoonlightNative"
-            codesign --force --sign - "$app"
-            /usr/bin/open -n -W "$app"
-            cp /tmp/moonlight-probe-$mode*.log build/previews/
-            if [ -f /tmp/moonlight-probe-$mode.png ]; then cp /tmp/moonlight-probe-$mode.png build/previews/; fi
-            cat build/previews/moonlight-probe-$mode*.log
-          done
+          mkdir -p build/previews
+          if [ -d /tmp/moonlight-xctest-previews ]; then cp /tmp/moonlight-xctest-previews/*.png build/previews/; fi
       - uses: actions/upload-artifact@v6
         if: always()
         with:

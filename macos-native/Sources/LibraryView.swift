@@ -68,7 +68,8 @@ struct LibraryView: View {
         .sheet(item: $store.pairing) { request in PairingSheet(request: request).interactiveDismissDisabled() }
         .sheet(item: $details) { ComputerDetailsSheet(computer: $0) }
         .sheet(item: $rename) { RenameComputerSheet(store: store, computer: $0) }
-        .background(NativeWindowAccessor { store.libraryWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-library") }.frame(width: 0, height: 0))
+        .background(NativeWindowAccessor { store.libraryWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-library"); $0?.setAccessibilityIdentifier("native-library")
+            if store.preview && CommandLine.arguments.contains("--compact") { $0?.setContentSize(NSSize(width: 680, height: 460)) } }.frame(width: 0, height: 0))
         .alert(item: Binding(get: { store.message?.settingsScene == false ? store.message : nil }, set: { store.message = $0 })) { message in Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK"))) }
         .confirmationDialog("Remove \(removal?.name ?? "computer")?", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } }), titleVisibility: .visible) {
             if let computer = removal { Button("Remove Computer", role: .destructive) { store.send("remove", ["host": computer.id]) } }
@@ -86,8 +87,7 @@ struct LibraryView: View {
             guard store.preview, !previewConfigured else { return }
             previewConfigured = true
             let args = CommandLine.arguments
-            guard let i = args.firstIndex(of: "--preview-screen"), args.indices.contains(i + 1) else { return }
-            let screen = args[i + 1]
+            guard let screen = nativeArgument("--preview-screen") else { return }
             if screen.hasPrefix("settings-") { openSettings() }
             else if screen == "add" { addPresented = true }
             else if screen == "details" { details = store.selected }

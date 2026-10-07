@@ -83,3 +83,9 @@ App hide/unhide and the stock Internet-port test are exposed in native UI;
 their host behavior still needs physical verification. No microphone/clipboard enhancements from Enhanced
 are implied. Multi-display mapping and interrupted-launch cleanup need runtime
 coverage. Physical pairing, streaming and Intel performance are not claimed.
+
+### Composited screenshot gate (October 7)
+- `6d94a3d`: main light/dark/compact windows launch; the empty-case launch still passed a separate value argument. All fixture arguments now use equals form.
+- CALayer fallback captures omit system glass/sidebar surfaces. These are layout diagnostics only, not visually approved previews.
+- Added a UI-only Xcode test target compiling the actual native sources. XCTest captures each native window/sheet with sample content, without loading the engine or changing production signing. Its first CI run is pending.
+- Next: inspect XCTest screenshots, resolve any failures, then run ordinary full Intel and Universal validation before a preview release. No release published yet.

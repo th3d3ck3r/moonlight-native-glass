@@ -113,8 +113,7 @@ struct PairingRequest: Identifiable {
                 apps: [Game(id: 1, name: "Desktop", hdr: false, hidden: false, artwork: ""),
                        Game(id: 2, name: "Steam", hdr: true, hidden: false, artwork: "")])]
             let args = CommandLine.arguments
-            if let i = args.firstIndex(of: "--preview-screen"), args.indices.contains(i + 1) {
-                let screen = args[i + 1]
+            if let screen = nativeArgument("--preview-screen") {
                 if screen == "empty" { computers = [] }
                 else if screen == "offline" || screen == "unpaired", let host = computers.first {
                     computers = [Computer(id: host.id, name: host.name, online: screen != "offline", unknown: false,
