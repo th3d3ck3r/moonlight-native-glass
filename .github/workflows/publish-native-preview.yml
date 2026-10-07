@@ -14,9 +14,9 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VALIDATED_SHA: aa7fe3bffee47f4ad6542871402dd9d6a541beac
-      VALIDATED_RUN: '37628909463'
-      RELEASE_TAG: native-glass-6.2-preview-2
+      VALIDATED_SHA: 904f5d127cd1e57629ca21d7b972be07719149a9
+      VALIDATED_RUN: '37670613344'
+      RELEASE_TAG: native-glass-6.2-preview-3
     steps:
       - uses: actions/checkout@v5
       - name: Verify the exact validated source and all required jobs
@@ -51,8 +51,8 @@ jobs:
       - name: Download only previously validated artifacts
         run: |
           mkdir -p release-assets capture-assets
-          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-2-x86_64 -D release-assets
-          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-2-universal -D release-assets
+          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-3-x86_64 -D release-assets
+          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-3-universal -D release-assets
           gh run download "$VALIDATED_RUN" -n Native-UI-Quick-Window-Captures -D capture-assets
           # Full-build layer images are diagnostics; publish composited XCTest images.
           rm -f release-assets/*.png
@@ -66,10 +66,10 @@ jobs:
               assert len(matches) == 1, name
               shutil.copyfile(source / matches[0]['exportedFileName'], pathlib.Path('release-assets') / (name + '.png'))
           PY
-          (cd release-assets && sha256sum Moonlight-Native-Glass-Preview-2-*.zip > SHA256SUMS.txt)
+          (cd release-assets && sha256sum Moonlight-Native-Glass-Preview-3-*.zip > SHA256SUMS.txt)
       - name: Publish the separately labeled preview
         run: |
           gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --prerelease \
-            --title 'Moonlight Native Glass · Qt 6.2 · Native UI Preview 2' \
+            --title 'Moonlight Native Glass · Qt 6.2 · Native UI Preview 3' \
             --notes-file docs/NATIVE_PREVIEW_RELEASE.md \
             release-assets/*.zip release-assets/SHA256SUMS.txt release-assets/*.png
