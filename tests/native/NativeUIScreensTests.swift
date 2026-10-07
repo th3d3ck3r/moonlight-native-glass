@@ -5,8 +5,6 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication()
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "preview-settings", withExtension: "json"))
-        let directory = URL(fileURLWithPath: "/tmp/moonlight-xctest-previews", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let screens = ["main-light", "main-dark", "main-compact", "empty", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-input", "settings-network", "settings-advanced"]
         for screen in screens {
             app.launchArguments = ["--design-preview", "--settings-fixture=" + fixture.path, screen == "main-light" ? "--light" : "--dark"]
@@ -22,7 +20,6 @@ import XCTest
             } else { target = window }
             // XCTest captures the composited UI, including system-owned glass.
             let screenshot = target.screenshot()
-            try screenshot.pngRepresentation.write(to: directory.appendingPathComponent(screen + ".png"))
             let attachment = XCTAttachment(screenshot: screenshot)
             attachment.name = screen
             attachment.lifetime = .keepAlways

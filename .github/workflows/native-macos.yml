@@ -91,7 +91,7 @@ jobs:
         if: always()
         run: |
           mkdir -p build/previews
-          if [ -d /tmp/moonlight-xctest-previews ]; then cp /tmp/moonlight-xctest-previews/*.png build/previews/; fi
+          xcrun xcresulttool export attachments --path build/native-ui.xcresult --output-path build/previews
       - uses: actions/upload-artifact@v6
         if: always()
         with:
