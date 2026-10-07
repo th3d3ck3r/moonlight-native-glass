@@ -14,6 +14,9 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             if !(nativeArgument("--preview-screen") ?? "").hasPrefix("settings-") {
                 NSApp.windows.first(where: { $0.contentView != nil })?.makeKeyAndOrderFront(nil)
             }
+            if CommandLine.arguments.contains("--design-preview"), nativeArgument("--preview-screen") == "about" {
+                showNativeAboutPanel()
+            }
         }
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

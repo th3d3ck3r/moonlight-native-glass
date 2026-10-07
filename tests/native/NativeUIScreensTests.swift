@@ -34,11 +34,9 @@ import XCTest
     func testAboutPanel() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--design-preview", "--dark"]
+        app.launchArguments = ["--design-preview", "--preview-screen=about", "--dark"]
         app.launch()
         XCTAssertTrue(app.windows["native-library"].waitForExistence(timeout: 10))
-        app.menuBars.menuBarItems.element(boundBy: 0).click()
-        app.menuItems["About Moonlight Native Glass"].click()
         let about = app.windows["native-about"]
         XCTAssertTrue(about.waitForExistence(timeout: 5))
         XCTAssertTrue(about.links["GitHub Repository"].exists, "About GitHub link is not accessible")
