@@ -49,9 +49,12 @@ event framing, real bridge/atomic settings validation/restart persistence, and
 15 Release-mode XCTest screenshots passed. Composited screenshots inspected.
 Publisher is gated to this exact SHA/run and its successful jobs/artifacts;
 first publication attempt returned GitHub HTTP 403 on a historical target SHA.
-Retry targets the existing native-ui head after verifying that all changed paths
-since the built commit are documentation/assets/workflows, with no build input
-changes. This retains the exact validated ZIPs and test evidence. Publication pending. Source/native work is complete for Preview 1.
+`8b69293`, publication run `37590985636`: **published Preview 1** successfully.
+Tag `native-glass-6.2-preview-1` points to `8b69293`; all build inputs match
+`d746f2a` (publisher verifies only docs/assets/workflows changed). Intel and
+Universal ZIPs, SHA256SUMS and composited UI captures are uploaded; release is a
+prerelease. Master SHA verified unchanged after publishing. Final README links
+point to the live assets. Next step is physical Intel Tahoe validation below. Source/native work is complete for Preview 1.
 Non-blocking warnings include unused preview argument locals and upstream API
 warnings. Physical validation limits below remain unchanged.
 

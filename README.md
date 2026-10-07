@@ -23,14 +23,14 @@ Liquid Glass navigation and controls on **macOS 26+**, regular native styling on
 
 ## 📦 Downloads
 
-**Native UI Preview 1 has passed build validation. Publishing the validated packages is the final step.**
+**Native UI Preview 1 is available. Requires macOS 15 or later.**
 
 | Your Mac | Package |
 |---|---|
-| 🖥️ **Intel** | Dedicated x86_64 ZIP — validated; release publication pending |
-| 🍎 **Intel + Apple Silicon** | Universal ZIP — validated; release publication pending |
+| 🖥️ **Intel** | [⬇️ Download Intel ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-1/Moonlight-Native-Glass-Preview-1-x86_64.zip) |
+| 🍎 **Intel + Apple Silicon** | [⬇️ Download Universal ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-1/Moonlight-Native-Glass-Preview-1-universal.zip) |
 
-[Preview releases](https://github.com/th3d3ck3r/moonlight-native-glass/releases) · [Validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml) · [Checkpoint](docs/NATIVE_UI_CHECKPOINT.md)
+[Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-6.2-preview-1) · [SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-1/SHA256SUMS.txt) · [Validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml) · [Checkpoint](docs/NATIVE_UI_CHECKPOINT.md)
 
 English interface. Manual updates only. Preview packages use verified **ad-hoc signatures**, not Developer ID signing or notarization.
 
@@ -122,7 +122,7 @@ xcodebuild -project tests/native/NativeUITests.xcodeproj \
 |---|---|
 | Native sidebar, library, Settings and sheets | Implemented |
 | Tahoe controls + macOS 15 fallback | Implemented; physical accessibility checks remain |
-| Intel + Universal preview packages | Validated; preview publication pending |
+| Intel + Universal preview packages | Preview 1 published · experimental |
 | Physical streaming and performance comparison | Required before calling this a stable replacement |
 
 Built on [Moonlight Qt](https://github.com/moonlight-stream/moonlight-qt) and [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c). See [GPL-3.0 license](LICENSE) and [original upstream documentation](docs/UPSTREAM_README.md).
