@@ -44,6 +44,39 @@ import XCTest
         }
     }
 
+    func testMenuBarKeepsAppAvailable() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--design-preview", "--dark"]
+        app.launch()
+        let window = app.windows["native-library"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        // Close the library, rather than hiding the app or terminating it.
+        window.buttons[XCUIIdentifierCloseWindow].click()
+        XCTAssertFalse(window.exists)
+        let item = app.menuBars.menuBarItems["Moonlight Native Glass"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5), "Menu bar icon disappeared after closing the window")
+        item.click()
+        let menu = app.menus.firstMatch
+        XCTAssertTrue(app.menuItems["Open Moonlight"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.menuItems["Settings…"].exists)
+        XCTAssertTrue(app.menuItems["Quit Moonlight Native Glass"].exists)
+        let attachment = XCTAttachment(screenshot: menu.screenshot())
+        attachment.name = "menu-bar"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        app.menuItems["Open Moonlight"].click()
+        XCTAssertTrue(window.waitForExistence(timeout: 5), "Menu bar action did not reopen the library")
+        item.click()
+        app.menuItems["Settings…"].click()
+        XCTAssertTrue(app.windows["native-settings"].waitForExistence(timeout: 5))
+        item.click()
+        app.menuItems["Quit Moonlight Native Glass"].click()
+        let quit = NSPredicate(format: "state == %d", XCUIApplication.State.notRunning.rawValue)
+        expectation(for: quit, evaluatedWith: app)
+        waitForExpectations(timeout: 10)
+    }
+
     func testAboutPanel() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

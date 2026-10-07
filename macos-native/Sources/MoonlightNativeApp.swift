@@ -19,6 +19,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if store?.streamActive == true {
             let alert = NSAlert()
@@ -37,6 +38,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
 @main struct MoonlightNativeApp: App {
     @NSApplicationDelegateAdaptor(NativeAppDelegate.self) private var delegate
     @StateObject private var store = EngineStore(preview: CommandLine.arguments.contains("--design-preview"))
+    @State private var menuBarInserted = true
     var body: some Scene {
         Window("Moonlight Native Glass", id: "library") {
             LibraryView(store: store)
@@ -62,10 +64,41 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        MenuBarExtra(isInserted: $menuBarInserted) {
+            NativeStatusMenu()
+        } label: {
+            Image(nsImage: NativeStatusMenu.icon)
+                .accessibilityLabel("Moonlight Native Glass")
+                .accessibilityIdentifier("native-status-item")
+        }
+        .menuBarExtraStyle(.menu)
         Settings {
             NativeSettingsView(store: store)
                 .frame(width: 640, height: 540)
         }
+    }
+}
+
+private struct NativeStatusMenu: View {
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+    static let icon: NSImage = {
+        let image = Bundle.main.url(forResource: "moonlight", withExtension: "icns")
+            .flatMap { NSImage(contentsOf: $0) } ?? NSImage(named: NSImage.applicationIconName) ?? NSImage()
+        image.size = NSSize(width: 18, height: 18)
+        return image
+    }()
+    var body: some View {
+        Button("Open Moonlight") {
+            openWindow(id: "library")
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        Button("Settings…") {
+            openSettings()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        Divider()
+        Button("Quit Moonlight Native Glass") { NSApp.terminate(nil) }
     }
 }
 
