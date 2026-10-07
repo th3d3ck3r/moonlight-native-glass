@@ -14,11 +14,11 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      BUILD_SHA: e96caef79fde987b495f9a62c245215e28f29057
-      BUILD_RUN: '37692872366'
-      VALIDATED_SHA: 6e88eeddea911552f0b685ea29bde893b0c31778
-      VALIDATED_RUN: '37693779148'
-      RELEASE_TAG: native-glass-6.2-preview-5
+      BUILD_SHA: f2531af7983233ec3e67ff908fb288e87f3f8338
+      BUILD_RUN: '37703084469'
+      VALIDATED_SHA: f2531af7983233ec3e67ff908fb288e87f3f8338
+      VALIDATED_RUN: '37703084469'
+      RELEASE_TAG: native-glass-6.2-preview-6
     steps:
       - uses: actions/checkout@v5
       - name: Verify the exact validated source and all required jobs
@@ -38,6 +38,7 @@ jobs:
               assert len(matches) == 1 and matches[0]['conclusion'] == 'success', name
           universal = next(j for j in build_jobs if j['name'] == 'build (universal)')
           assert any(s['name'] == 'Test actual SDL stream window hide and restore' and s['conclusion'] == 'success' for s in universal['steps']), 'SDL lifecycle check missing'
+          assert any(s['name'] == 'Test actual menu bar icon state' and s['conclusion'] == 'success' for s in universal['steps']), 'Menu bar icon check missing'
 
           PY
           # Publish the existing native-ui head only when every build input is
@@ -67,8 +68,8 @@ jobs:
       - name: Download only previously validated artifacts
         run: |
           mkdir -p release-assets capture-assets
-          gh run download "$BUILD_RUN" -n Native-Glass-Preview-5-x86_64 -D release-assets
-          gh run download "$BUILD_RUN" -n Native-Glass-Preview-5-universal -D release-assets
+          gh run download "$BUILD_RUN" -n Native-Glass-Preview-6-x86_64 -D release-assets
+          gh run download "$BUILD_RUN" -n Native-Glass-Preview-6-universal -D release-assets
           gh run download "$VALIDATED_RUN" -n Native-UI-Quick-Window-Captures -D capture-assets
           # Full-build layer images are diagnostics; publish composited XCTest images.
           rm -f release-assets/*.png
@@ -82,7 +83,7 @@ jobs:
               assert len(matches) == 1, name
               shutil.copyfile(source / matches[0]['exportedFileName'], pathlib.Path('release-assets') / (name + '.png'))
           PY
-          (cd release-assets && sha256sum Moonlight-Native-Glass-Preview-5-*.zip > SHA256SUMS.txt)
+          (cd release-assets && sha256sum Moonlight-Native-Glass-Preview-6-*.zip > SHA256SUMS.txt)
       - name: Export small visual QA captures to the job log
         run: |
           python3 - <<'PYQA'
@@ -94,6 +95,6 @@ jobs:
       - name: Publish the separately labeled preview
         run: |
           gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --prerelease \
-            --title 'Moonlight Native Glass · Qt 6.2 · Native UI Preview 5' \
-            --notes-file docs/NATIVE_PREVIEW_RELEASE.md \
+            --title 'Moonlight Native Glass · Qt 6.2 · Native UI Preview 6' \
+            --notes '' \
             release-assets/*.zip release-assets/SHA256SUMS.txt release-assets/*.png
