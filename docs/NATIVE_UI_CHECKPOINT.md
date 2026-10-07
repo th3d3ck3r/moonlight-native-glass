@@ -91,3 +91,8 @@ builds and screenshot checks provide the available evidence.
 - Final build 2 source/package revision: `aa7fe3bffee47f4ad6542871402dd9d6a541beac`; validation run `37628909463`. Full Intel/Universal jobs and all UI checks passed. The real helper Dock-policy, JSON framing, atomic settings and restart persistence checks passed; About screenshot inspected. Preview 2 publication is gated to this source and run.
 
 - `a16b0ef`, publication run `37630160986`: Preview 2 published with Intel/Universal ZIPs, checksums and composited design captures. Build inputs match validated `aa7fe3b`; Preview 1 retained. Master application code unchanged. Next: physical pairing-refresh, idle/stream Dock icons and stream focus testing on Intel Tahoe.
+
+## Build 3 preparation
+
+- About version line now reads `Native UI Preview 3 - Moonlight 6.2`, with the preview number derived from CFBundleVersion. The standard appended build suffix is suppressed. Credits and GitHub hyperlink stay fixed.
+- Build number and validation artifact names advanced to 3. Streaming engine sources unchanged. Icon concept pending selection; current shipping icon unchanged. Preview 3 is not published yet.

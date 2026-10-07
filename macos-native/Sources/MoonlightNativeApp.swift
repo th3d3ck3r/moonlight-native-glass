@@ -70,8 +70,9 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
 }
 
 // Keep these credits fixed across builds. AppKit reads the build number from
-// CFBundleVersion; release notes and validation details belong on GitHub.
+// CFBundleVersion for the preview number; release notes belong on GitHub.
 func showNativeAboutPanel() {
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "3"
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .center
     let credits = NSMutableAttributedString(
@@ -84,7 +85,8 @@ func showNativeAboutPanel() {
                           range: (credits.string as NSString).range(of: "GitHub Repository"))
     NSApp.orderFrontStandardAboutPanel(options: [
         .applicationName: "Moonlight Native Glass",
-        .applicationVersion: "Moonlight Qt 6.2.0",
+        .applicationVersion: "Native UI Preview \(build) - Moonlight 6.2",
+        .version: "",
         .credits: credits])
     NSApp.keyWindow?.setAccessibilityIdentifier("native-about")
 }
