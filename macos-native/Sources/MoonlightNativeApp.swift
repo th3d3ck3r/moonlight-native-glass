@@ -44,10 +44,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Moonlight Native Glass") {
-                    NSApp.orderFrontStandardAboutPanel(options: [
-                        .applicationName: "Moonlight Native Glass",
-                        .applicationVersion: "Native UI Preview 1 · Moonlight Qt 6.2.0",
-                        .credits: NSAttributedString(string: "SwiftUI/AppKit interface\nMoonlight Qt 6.2.0 streaming engine\nManual updates · GPL-3.0\n\nThis preview requires physical Mac streaming validation.")])
+                    showNativeAboutPanel()
                 }
             }
             CommandGroup(after: .newItem) {
@@ -67,6 +64,26 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 .frame(width: 640, height: 540)
         }
     }
+}
+
+// Keep these credits fixed across builds. AppKit reads the build number from
+// CFBundleVersion; release notes and validation details belong on GitHub.
+func showNativeAboutPanel() {
+    let paragraph = NSMutableParagraphStyle()
+    paragraph.alignment = .center
+    let credits = NSMutableAttributedString(
+        string: "SwiftUI/AppKit interface\nMoonlight Qt 6.2.0 streaming engine\nManual updates · GPL-3.0\n\nNative Glass created and maintained by Th3D3ck3r\n\nGitHub Repository",
+        attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                     .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
+    credits.addAttributes([.link: URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass")!,
+                           .foregroundColor: NSColor.linkColor,
+                           .underlineStyle: NSUnderlineStyle.single.rawValue],
+                          range: (credits.string as NSString).range(of: "GitHub Repository"))
+    NSApp.orderFrontStandardAboutPanel(options: [
+        .applicationName: "Moonlight Native Glass",
+        .applicationVersion: "Moonlight Qt 6.2.0",
+        .credits: credits])
+    NSApp.keyWindow?.setAccessibilityIdentifier("native-about")
 }
 
 extension Notification.Name { static let nativeAddComputer = Notification.Name("MoonlightNativeAddComputer") }
