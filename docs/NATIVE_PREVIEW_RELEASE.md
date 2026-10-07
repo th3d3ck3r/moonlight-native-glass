@@ -4,7 +4,7 @@ Native sidebar, toolbar, game cards, five Settings panes, pairing/address/detail
 
 The bundled Qt helper keeps the upstream streaming, networking, settings, common-c and mDNS implementations unchanged. Each stream uses the original Session/SDL video window. Preferences and pairing are isolated from stock Moonlight and Enhanced; pair again in this app.
 
-Validated source: `d746f2adf461e0dced2ef49e8c15c6e91642a198`. [All required validation jobs passed](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37589657439).
+Built source: `d746f2adf461e0dced2ef49e8c15c6e91642a198`. [All required validation jobs passed](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37589657439).
 
 Validation: full x86_64 and Universal compilation; nested architectures, signatures and dependencies; unchanged engine source; event framing; real adapter validation and preference persistence. 15 Release-mode XCTest UI captures passed; composited sample-content screenshots were inspected. Included captures are labeled design previews. They do not demonstrate host connectivity.
 
@@ -17,3 +17,5 @@ Intel Tahoe test checklist:
 - Resize, enter/exit fullscreen and switch displays; check focus and settings persistence.
 - Check light/dark mode, Reduce Transparency, Reduce Motion, increased contrast and VoiceOver.
 - Compare decode time, frame pacing, CPU/GPU and stock performance-overlay results on identical hardware/settings. Save crash reports and engine logs for failures.
+
+The release tag includes the publishing workflow and documentation added after validation. The publisher verifies that all build inputs match the tested source commit.
