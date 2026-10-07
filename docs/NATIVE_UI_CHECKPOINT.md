@@ -120,3 +120,5 @@ builds and screenshot checks provide the available evidence.
 - Menu bar lifecycle probe bdfc99f582b0e8a22ec58601d57c3c081febd2bf passed (run 37681428750): close, reopen, Settings and Quit. All 17 captures passed. Final full Intel/Universal validation follows.
 
 - Preview 4 final source: 007bbc594bacb768e1abcc31478c7d95e94ba4de. Validation run 37682529752 passed all three required jobs: full x86_64, Universal and 17 native UI captures/lifecycle checks. Protected engine source remains stock 6.2; master code unchanged. Physical Intel streaming/close-window-during-stream checks remain outstanding. Publishing verified artifacts only.
+
+- Preview 4 published successfully by run 37683717439 at publishing commit c65a603e331bc2b48a84cf345c9b139732592692. Both ZIPs, SHA-256 checksums and 11 screenshots uploaded; previous releases preserved. README updated on native-ui and master (documentation only).
