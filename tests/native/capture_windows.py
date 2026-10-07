@@ -12,7 +12,7 @@ for screen in ["empty", "offline", "unpaired", "add", "pair", "details", "settin
 for name, flags in captures:
     output = destination / f"{name}.png"
     try:
-        subprocess.run(["/usr/bin/open", "-n", "-W", str(pathlib.Path(executable).resolve().parents[2]), "--args", "--design-preview", "--settings-fixture", str(destination / "settings-fixture.json"), *flags, "--capture-preview", str(output)],
+        subprocess.run(["/usr/bin/open", "-n", "-W", str(pathlib.Path(executable).resolve().parents[2]), "--args", "--design-preview", "--settings-fixture=" + str(destination / "settings-fixture.json"), *flags, "--capture-preview=" + str(output)],
                        check=True, timeout=35)
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
         reports = pathlib.Path.home() / "Library/Logs/DiagnosticReports"
@@ -22,5 +22,7 @@ for name, flags in captures:
     if not output.is_file():
         log = pathlib.Path(str(output) + ".log")
         if log.exists(): print(log.read_text(), flush=True)
+        capture_log = pathlib.Path(str(output) + ".capture-log")
+        if capture_log.exists(): print(capture_log.read_text(), flush=True)
     assert output.is_file() and output.stat().st_size > 0
     print(f"PASS: app-rendered {name} screenshot", flush=True)

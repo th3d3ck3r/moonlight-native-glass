@@ -122,8 +122,8 @@ struct PairingRequest: Identifiable {
                         serverVersion: host.serverVersion, gpu: host.gpu, supported: true, apps: [])]
                 }
             }
-            if let i = args.firstIndex(of: "--settings-fixture"), args.indices.contains(i + 1),
-               let data = try? Data(contentsOf: URL(fileURLWithPath: args[i + 1])),
+            if let path = nativeArgument("--settings-fixture"),
+               let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
                let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 values = event["values"] as? [String: Any] ?? [:]
                 fields = (try? decodeEngineValue(event["schema"] ?? [], as: [PreferenceField].self)) ?? []

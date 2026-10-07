@@ -30,14 +30,12 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     @NSApplicationDelegateAdaptor(NativeAppDelegate.self) private var delegate
     @StateObject private var store = EngineStore(preview: CommandLine.arguments.contains("--design-preview"))
     var body: some Scene {
-        WindowGroup("Moonlight Native Glass", id: "library") {
+        Window("Moonlight Native Glass", id: "library") {
             LibraryView(store: store)
                 .frame(minWidth: 680, minHeight: 460)
                 .onAppear { delegate.store = store; store.start() }
         }
         .defaultSize(width: 1080, height: 720)
-        .defaultLaunchBehavior(.presented)
-        .restorationBehavior(store.preview ? .disabled : .automatic)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Moonlight Native Glass") {
@@ -72,8 +70,8 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
 // behind --design-preview and never runs in a normal app launch.
 @MainActor func captureDesignPreviewIfRequested() {
     let args = CommandLine.arguments
-    guard args.contains("--design-preview"), let index = args.firstIndex(of: "--capture-preview"), args.count > index + 1 else { return }
-    let logURL = URL(fileURLWithPath: args[index + 1] + ".log")
+    guard args.contains("--design-preview"), let destination = nativeArgument("--capture-preview") else { return }
+    let logURL = URL(fileURLWithPath: destination + ".log")
     func record(_ message: String) { try? (message + "\n").data(using: .utf8)?.write(to: logURL) }
     record("Capture launched; windows=\(NSApp.windows.map { $0.title })")
     if args.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
@@ -98,10 +96,14 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
             DispatchQueue.global(qos: .userInitiated).async {
                 let capture = Process()
                 capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-                capture.arguments = ["-x", "-o", "-l", String(number), args[index + 1]]
+                capture.arguments = ["-x", "-o", "-l", String(number), destination]
+                let errors = Pipe()
+                capture.standardError = errors
                 do {
                     try capture.run(); capture.waitUntilExit()
                     let status = capture.terminationStatus
+                    let diagnostic = String(data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                    try? "screencapture status=\(status) \(diagnostic)".write(toFile: destination + ".capture-log", atomically: true, encoding: .utf8)
                     DispatchQueue.main.async { if status == 0 { NSApp.terminate(nil) } else { exit(status) } }
                 } catch { print("Window capture failed: \(error)"); exit(3) }
             }
@@ -118,4 +120,11 @@ struct NativeWindowAccessor: NSViewRepresentable {
     }
     func makeNSView(context: Context) -> ObserverView { let view = ObserverView(); view.report = report; return view }
     func updateNSView(_ view: ObserverView, context: Context) { view.report = report }
+}
+
+func nativeArgument(_ name: String) -> String? {
+    let args = CommandLine.arguments
+    if let argument = args.first(where: { $0.hasPrefix(name + "=") }) { return String(argument.dropFirst(name.count + 1)) }
+    if let i = args.firstIndex(of: name), args.indices.contains(i + 1) { return args[i + 1] }
+    return nil
 }

@@ -27,7 +27,10 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate {
                     let p = Process()
                     p.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
                     p.arguments = ["-x", "-l", String(number), "/tmp/moonlight-probe-\(name).png"]
+                    let errors = Pipe(); p.standardError = errors
                     try? p.run(); p.waitUntilExit()
+                    let diagnostic = String(data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                    try? "status=\(p.terminationStatus) \(diagnostic)".write(toFile: "/tmp/moonlight-probe-\(name)-capture.log", atomically: true, encoding: .utf8)
                     DispatchQueue.main.async { NSApp.terminate(nil) }
                 }
             } else { NSApp.terminate(nil) }
