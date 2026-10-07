@@ -57,11 +57,10 @@ import XCTest
         let item = app.menuBars.menuBarItems["Moonlight Native Glass"]
         XCTAssertTrue(item.waitForExistence(timeout: 5), "Menu bar icon disappeared after closing the window")
         item.click()
-        let menu = app.menus.firstMatch
         XCTAssertTrue(app.menuItems["Open Moonlight"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.menuItems["Settings…"].exists)
         XCTAssertTrue(app.menuItems["Quit Moonlight Native Glass"].exists)
-        let attachment = XCTAttachment(screenshot: menu.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "menu-bar"
         attachment.lifetime = .keepAlways
         add(attachment)

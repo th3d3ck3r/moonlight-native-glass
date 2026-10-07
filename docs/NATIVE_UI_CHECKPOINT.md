@@ -112,3 +112,5 @@ builds and screenshot checks provide the available evidence.
 - Scope: match streaming engine Dock icon to frontend crescent, add persistent native menu bar access, plus build number 4. About wording remains fixed and automatically reads Native UI Preview 4 - Moonlight 6.2. Streaming code and settings behavior unchanged. Full final build validation pending before publication.
 
 - Added native MenuBarExtra using the same crescent ICNS at 18 pt. Closing the library leaves the app and existing helper available; menu actions reopen the single library window, open Settings and quit through existing streaming confirmation/cleanup. Normal Dock/responder behavior retained; no LSUIElement/identity or backend changes. Added actual close/reopen/Settings/Quit UI coverage and menu screenshot.
+
+- Menu bar probe at `845ac62`, run `37679491188`: app remained running after close and all menu actions were accessible. Screenshot query selected an empty menu frame; switched to composited main-screen capture so the status icon and visible menu are captured together. Remaining reopen/Settings/Quit checks rerun before publication.
