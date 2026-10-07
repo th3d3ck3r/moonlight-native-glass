@@ -266,9 +266,10 @@ bool NativeBridge::setPreferences(const QJsonObject& values) {
 
 void NativeBridge::startStream(const QStringList& args) {
     if (args.size() != 7 || args[3].isEmpty() || args[4].isEmpty()) { error("Invalid native stream arguments."); QCoreApplication::exit(1); return; }
-    bool xValid, yValid;
+    bool xValid, yValid, appValid;
+    const int appId = args[4].toInt(&appValid);
     const int x = args[5].toInt(&xValid), y = args[6].toInt(&yValid);
-    if (!xValid || !yValid) { error("Invalid display coordinates."); QCoreApplication::exit(1); return; }
+    if (!xValid || !yValid || !appValid || appId <= 0) { error("Invalid display coordinates."); QCoreApplication::exit(1); return; }
     m_Window.reset(new QQuickWindow());
     for (auto screen : QGuiApplication::screens()) {
         if (screen->geometry().contains(x, y)) { m_Window->setScreen(screen); break; }
@@ -276,7 +277,7 @@ void NativeBridge::startStream(const QStringList& args) {
     m_Window->setGeometry(x, y, 960, 640);
     // A hidden window conveys upstream's display-selection contract. It never
     // owns or wraps the SDL streaming video surface and loads no QML frontend.
-    m_Launcher = new CliStartStream::Launcher(args[3], args[4], m_Preferences, this);
+    m_Launcher = new CliStartStream::Launcher(args[3], appId, m_Preferences, this);
     connect(m_Launcher, &CliStartStream::Launcher::failed, this, [this](QString message) { error(message); QCoreApplication::exit(1); });
     connect(m_Launcher, &CliStartStream::Launcher::searchingComputer, this, [this] { send({{"event", "stage"}, {"message", "Connecting to computer…"}}); });
     connect(m_Launcher, &CliStartStream::Launcher::searchingApp, this, [this] { send({{"event", "stage"}, {"message", "Loading game…"}}); });

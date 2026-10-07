@@ -23,6 +23,9 @@ public:
     explicit Launcher(QString computer, QString app,
                       StreamingPreferences* preferences,
                       QObject *parent = nullptr);
+    // Native presentation selects by ID so duplicate titles remain distinct.
+    Launcher(QString computer, int appId, StreamingPreferences* preferences,
+             QObject* parent = nullptr);
     ~Launcher();
     Q_INVOKABLE void execute(ComputerManager *manager);
     Q_INVOKABLE void quitRunningApp();

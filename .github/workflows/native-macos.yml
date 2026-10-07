@@ -29,6 +29,7 @@ jobs:
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
       - name: Verify streaming baseline
         run: |
+          git fetch --no-tags --depth=1 origin de2467e433821664cdd2224aad8c89a625be1ad9
           git diff --exit-code de2467e433821664cdd2224aad8c89a625be1ad9 -- app/streaming app/backend app/settings moonlight-common-c qmdnsengine
           xcodebuild -version
       - name: Build app and verify bundle

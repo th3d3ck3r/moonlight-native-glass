@@ -99,6 +99,8 @@ struct LibraryView: View {
                 empty("Computer Offline", "Start the host's streaming service and check Local Network permission in System Settings.", symbol: "network.slash")
             } else if !computer.paired {
                 empty("Pair Your Computer", "Pair with Sunshine or a compatible host to see your games and apps.", symbol: "link")
+            } else if !computer.supported {
+                empty("Host Version Not Supported", "Update the streaming service on your computer, then refresh its connection.", symbol: "exclamationmark.triangle")
             } else if games.isEmpty {
                 empty(search.isEmpty ? "No Games Yet" : "No Matching Games", search.isEmpty ? "Your host's app list will appear here when available. Use Refresh to check again." : "Try a different search.", symbol: "gamecontroller")
             } else {

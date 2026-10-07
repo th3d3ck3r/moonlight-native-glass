@@ -143,7 +143,8 @@ public:
     int getAppIndex() const
     {
         for (int i = 0; i < m_Computer->appList.length(); i++) {
-            if (m_Computer->appList[i].name.toLower() == m_AppName.toLower()) {
+            if (m_AppId != 0 ? m_Computer->appList[i].id == m_AppId :
+                    m_Computer->appList[i].name.toLower() == m_AppName.toLower()) {
                 return i;
             }
         }
@@ -173,6 +174,7 @@ public:
     Launcher *q_ptr;
     QString m_ComputerName;
     QString m_AppName;
+    int m_AppId = 0;
     StreamingPreferences *m_Preferences;
     ComputerManager *m_ComputerManager;
     ComputerSeeker *m_ComputerSeeker;
@@ -195,6 +197,14 @@ Launcher::Launcher(QString computer, QString app,
     d->m_TimeoutTimer->setSingleShot(true);
     connect(d->m_TimeoutTimer, &QTimer::timeout,
             this, &Launcher::onTimeout);
+}
+
+Launcher::Launcher(QString computer, int appId,
+                   StreamingPreferences* preferences, QObject* parent)
+    : Launcher(computer, QString::number(appId), preferences, parent)
+{
+    Q_D(Launcher);
+    d->m_AppId = appId;
 }
 
 Launcher::~Launcher()

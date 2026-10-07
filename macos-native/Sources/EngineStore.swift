@@ -196,7 +196,7 @@ struct PairingRequest: Identifiable {
         let displayID = (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? CGMainDisplayID()
         let bounds = CGDisplayBounds(displayID)
         let x = Int(bounds.midX), y = Int(bounds.midY)
-        let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, game.name, String(x), String(y)])
+        let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y)])
         helper.onEvent = { [weak self] event in
             guard let self else { return }
             switch event["event"] as? String {
