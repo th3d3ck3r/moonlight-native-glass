@@ -46,6 +46,7 @@
 #include "cli/commandlineparser.h"
 #ifdef Q_OS_DARWIN
 #include "native/nativebridge.h"
+void configureNativeBackgroundApplication();
 #endif
 #include "path.h"
 #include "utils.h"
@@ -437,6 +438,9 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_DARWIN
     if (argc > 1 && QString::fromUtf8(argv[1]) == "native") {
         QCoreApplication::setApplicationName("Moonlight Native Glass");
+        if (argc < 3 || QString::fromUtf8(argv[2]) != "stream") {
+            QCoreApplication::setAttribute(Qt::AA_PluginApplication);
+        }
         signal(SIGPIPE, SIG_IGN);
         const QString testRoot = qEnvironmentVariable("MOONLIGHT_NATIVE_TEST_ROOT");
         if (!testRoot.isEmpty()) {
@@ -770,6 +774,9 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
 
 #ifdef Q_OS_DARWIN
+    if (app.arguments().value(1) == "native" && app.arguments().value(2) != "stream") {
+        configureNativeBackgroundApplication();
+    }
     // macOS defaults "Keyboard navigation" to text fields and lists only, which
     // prevents Tab (and the gamepad navigation that synthesizes it) from moving
     // focus between non-text controls on the settings page. Force Tab to reach

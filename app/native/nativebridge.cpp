@@ -17,6 +17,7 @@
 #include <QTimer>
 #include <QRegularExpression>
 #include <QReadLocker>
+#include <QWriteLocker>
 #include <fcntl.h>
 #include <unistd.h>
 #include <cerrno>
@@ -51,11 +52,23 @@ NativeBridge::NativeBridge(const QStringList& args, QObject* parent) : QObject(p
         if (!success.toBool()) error("Could not connect to this computer. Check its address, Local Network access and the host's streaming service.");
         snapshot();
     });
-    connect(m_Manager.get(), &ComputerManager::pairingCompleted, this, [this](NvComputer*, QString message) {
+    connect(m_Manager.get(), &ComputerManager::pairingCompleted, this, [this](NvComputer* computer, QString message) {
         m_Pairing = false;
+        // A successful handshake is authoritative; do not leave the UI on the
+        // pre-pairing snapshot while waiting for the next server-info poll.
+        if (message.isEmpty()) {
+            QWriteLocker guard(&computer->lock);
+            computer->pairState = NvComputer::PS_PAIRED;
+        }
+        snapshot();
         send({{"event", "paired"}, {"success", message.isEmpty()}});
         if (!message.isEmpty()) error(message);
-        snapshot();
+        // Resume normal polling after pairing, including immediate app-list
+        // retrieval with the newly pinned certificate. No manager is replaced.
+        if (!m_Polling && !m_StreamMode && !m_TestMode) {
+            m_Manager->startPolling();
+            m_Polling = true;
+        }
     });
     connect(m_Manager.get(), &ComputerManager::quitAppCompleted, this, [this](QVariant message) {
         if (!message.toString().isEmpty()) error(message.toString());
@@ -199,6 +212,9 @@ void NativeBridge::command(const QJsonObject& request) {
           if (computer->state != NvComputer::CS_ONLINE) { error("The computer must be online before pairing."); return; }
           if (computer->pairState == NvComputer::PS_PAIRED) { error("This computer is already paired."); return; }
         }
+        // Interrupt ordinary polls during the handshake and restart them on
+        // completion to fetch the app list with the new certificate.
+        if (m_Polling) { m_Manager->stopPollingAsync(); m_Polling = false; }
         m_Pairing = true;
         m_Manager->pairHost(computer, pin);
     } else if (action == "wake") {

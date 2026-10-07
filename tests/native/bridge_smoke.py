@@ -46,6 +46,12 @@ with tempfile.TemporaryDirectory() as root:
     bridge = Bridge(root)
     try:
         assert bridge.wait("ready")["protocol"] == 1
+        # Verify the real packaged helper's AppKit policy, not just plist text.
+        subprocess.run(["swift", "-e", "import AppKit; "
+                        f"guard let app = NSRunningApplication(processIdentifier: {bridge.p.pid}) "
+                        "else { fatalError(\"Helper is missing\") }; "
+                        "precondition(app.activationPolicy == .accessory, \"Background helper has a Dock icon\")"],
+                       check=True, timeout=60)
         settings = bridge.wait("settings")
         assert isinstance(settings["values"]["videoCodecConfig"], int), settings
         assert len(settings["schema"]) >= 30
