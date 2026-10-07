@@ -23,14 +23,14 @@ Liquid Glass navigation and controls on **macOS 26+**, regular native styling on
 
 ## 📦 Downloads
 
-**Native UI Preview 3 is available. Requires macOS 15 or later.**
+**Native UI Preview 4 is available. Requires macOS 15 or later.**
 
 | Your Mac | Package |
 |---|---|
-| 🖥️ **Intel** | [⬇️ Download Intel ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-3/Moonlight-Native-Glass-Preview-3-x86_64.zip) |
-| 🍎 **Intel + Apple Silicon** | [⬇️ Download Universal ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-3/Moonlight-Native-Glass-Preview-3-universal.zip) |
+| 🖥️ **Intel** | [⬇️ Download Intel ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/Moonlight-Native-Glass-Preview-4-x86_64.zip) |
+| 🍎 **Intel + Apple Silicon** | [⬇️ Download Universal ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/Moonlight-Native-Glass-Preview-4-universal.zip) |
 
-[Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-6.2-preview-3) · [SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-3/SHA256SUMS.txt) · [Validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml) · [Checkpoint](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/docs/NATIVE_UI_CHECKPOINT.md)
+[Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-6.2-preview-4) · [SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/SHA256SUMS.txt) · [Validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml) · [Checkpoint](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/docs/NATIVE_UI_CHECKPOINT.md)
 
 English interface. Manual updates only. Preview packages use verified **ad-hoc signatures**, not Developer ID signing or notarization.
 
@@ -38,7 +38,8 @@ English interface. Manual updates only. Preview packages use verified **ad-hoc s
 
 | Area | What this app provides |
 |---|---|
-| 🫧 **Native interface** | SwiftUI/AppKit sidebar, toolbar, game library, Settings and sheets; new glass crescent icon |
+| 🫧 **Native interface** | SwiftUI/AppKit sidebar, toolbar, library, Settings and sheets; matching crescent app/engine icons |
+| 🌙 **Menu bar** | Close the library and keep Moonlight available; reopen the window, open Settings or quit from the crescent icon |
 | 🌓 **Appearance** | System light/dark mode; native Liquid Glass controls on Tahoe; standard controls on macOS 15 |
 | 🖥️ **Computers** | Discovery, manual address, pairing, wake, rename, remove and connection details |
 | 🎮 **Library** | Host artwork, search, keyboard/controller navigation, game launch, hide and quit |
@@ -57,19 +58,26 @@ This is a separate project from Enhanced. Enhanced-only microphone, clipboard an
 
 | Light | Dark |
 |---|---|
-| ![Native library in light appearance](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-3/main-light.png) | ![Native library in dark appearance](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-3/main-dark.png) |
+| ![Native library in light appearance](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/main-light.png) | ![Native library in dark appearance](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/main-dark.png) |
 
 <details>
 <summary>Native Settings screenshot</summary>
 
-![Native Video Settings with sample preferences](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-3/settings-video.png)
+![Native Video Settings with sample preferences](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/settings-video.png)
 
 </details>
 
 <details>
 <summary>About and new app icon</summary>
 
-![About panel with crescent icon and creator credit](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-3/about-dark.png)
+![About panel with crescent icon and creator credit](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/about-dark.png)
+
+</details>
+
+<details>
+<summary>Menu bar access</summary>
+
+![Moonlight menu bar actions](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/menu-bar.png)
 
 </details>
 
@@ -77,10 +85,10 @@ This is a separate project from Enhanced. Enhanced-only microphone, clipboard an
 
 | Check | Verified state |
 |---|---|
-| Full Intel + Universal app builds | Passed at `904f5d1` · [validation run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37670613344) |
-| Nested binaries, architectures and signatures | Passed signature, identity, permission and dependency audits of 105 Mach-O files |
+| Full Intel + Universal app builds | Passed at `007bbc5` · [validation run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37682529752) |
+| Nested binaries, architectures and signatures | Passed signature, identity, permission and dependency audits of 105 Mach-O files; frontend/engine icons match |
 | Engine bridge and settings persistence | Passed real helper validation, including resolution transaction/restart persistence and invalid-input rejection |
-| Native UI screenshots | 16 Release-mode XCTest captures passed: light/dark/compact, loading/empty/offline/unpaired, sheets and five Settings panes; resolution selection checked and screenshots inspected |
+| Native UI screenshots | 17 Release-mode XCTest captures passed: light/dark/compact, loading/empty/offline/unpaired, sheets and five Settings panes; resolution selection and menu bar close/reopen/Settings/Quit checked; screenshots inspected |
 | Physical Intel Tahoe pairing and streaming | **Not tested for this new app** |
 | Intel CPU/GPU usage and frame pacing | **Not measured**; compilation does not prove performance parity |
 
@@ -93,6 +101,7 @@ This is a separate project from Enhanced. Enhanced-only microphone, clipboard an
 - Pair and confirm status/games appear without reopening; relaunch to check persistence.
 - Select 720p, 1080p, 1440p, 4K and Native; verify dimensions and resolution persistence, including scaled Retina and external displays.
 - Launch/resume/disconnect a game; test H.264/HEVC hardware decode, audio and controller/keyboard/mouse input.
+- Close the library and reopen it from the crescent menu bar icon; check Settings, Quit and closing the library during a stream.
 - Check resizing, fullscreen, display switching, light/dark mode, Reduce Transparency, Reduce Motion and increased contrast.
 - Compare stock 6.2.0 and this app on the same Mac, host and settings: CPU/GPU usage, decode time, frame pacing and network statistics.
 
@@ -130,7 +139,7 @@ xcodebuild -project tests/native/NativeUITests.xcodeproj \
 |---|---|
 | Native sidebar, library, Settings and sheets | Implemented |
 | Tahoe controls + macOS 15 fallback | Implemented; physical accessibility checks remain |
-| Intel + Universal preview packages | Preview 2 published · experimental |
+| Intel + Universal preview packages | Preview 4 published · experimental |
 | Physical streaming and performance comparison | Required before calling this a stable replacement |
 
 Built on [Moonlight Qt](https://github.com/moonlight-stream/moonlight-qt) and [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c). See [GPL-3.0 license](LICENSE) and [original upstream documentation](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/docs/UPSTREAM_README.md).
