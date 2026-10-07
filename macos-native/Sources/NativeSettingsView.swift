@@ -52,7 +52,7 @@ struct NativeSettingsView: View {
                         }
                     }
                 }.formStyle(.grouped)
-                    .disabled(!store.ready || store.streamActive || store.pairing != nil )
+                    .disabled(!store.ready || store.streamActive || store.pairing != nil)
             }
             Divider()
             Text(store.streamActive ? "Settings are unavailable while streaming." : "Changes save automatically. App updates are manual.")
@@ -84,7 +84,7 @@ struct NativeSettingsView: View {
         }
     }
     private func range(_ key: String) -> ClosedRange<Int> {
-        switch key { case "width": 320...16384; case "height": 240...16384; case "fps": 10...480; case "bitrateKbps": 500...500000; default: 0...500000 }
+        switch key { case "width": 320...16384; case "height": 240...16384; case "fps": 10...480; case "bitrateKbps": 500...((store.values["unlockBitrate"] as? Bool ?? false) ? 500000 : 150000); default: 0...500000 }
     }
     private func label(_ key: String) -> String {
         let names = ["width": "Resolution Width (pixels)", "height": "Resolution Height (pixels)", "fps": "Frame Rate (FPS)", "bitrateKbps": "Bitrate (Kbps)",

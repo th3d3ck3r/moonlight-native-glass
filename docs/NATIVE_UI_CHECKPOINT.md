@@ -41,6 +41,14 @@ No Qt update-checker object is instantiated by the native adapter.
   isolation, explicit window identifiers and sample screenshots of sheets,
   empty/offline/unpaired states and every settings pane.
 
+- `65a4b57`: Intel and Universal app builds and adapter checks passed again;
+  direct executable launches produced no SwiftUI windows in CI. Capture now
+  launches the application bundle through Launch Services, matching Finder.
+  A small native-only UI job provides fast feedback before full engine builds.
+  Its sample Settings fixture comes from the actual tested helper output.
+- Native bitrate controls now match the stock 150/500 Mbps range and clamp
+  behavior when higher bitrates are disabled.
+
 ## Current validation
 
 Local: shell syntax, Python syntax and whitespace checks pass.

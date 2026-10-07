@@ -12,7 +12,7 @@ for screen in ["empty", "offline", "unpaired", "add", "pair", "details", "settin
 for name, flags in captures:
     output = destination / f"{name}.png"
     try:
-        subprocess.run([executable, "--design-preview", "--settings-fixture", str(destination / "settings-fixture.json"), *flags, "--capture-preview", str(output)],
+        subprocess.run(["/usr/bin/open", "-n", "-W", str(pathlib.Path(executable).resolve().parents[2]), "--args", "--design-preview", "--settings-fixture", str(destination / "settings-fixture.json"), *flags, "--capture-preview", str(output)],
                        check=True, timeout=35)
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
         reports = pathlib.Path.home() / "Library/Logs/DiagnosticReports"

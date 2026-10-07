@@ -216,7 +216,14 @@ struct PairingRequest: Identifiable {
         pairing = PairingRequest(computer: computer, pin: pin)
         send("pair", ["host": computer.id, "pin": pin])
     }
-    func set(_ key: String, _ value: Any) { send("settings", ["values": [key: value]]) }
+    func set(_ key: String, _ value: Any) {
+        var changes: [String: Any] = [key: value]
+        // Match the stock UI: turning off higher bitrates also clamps the value.
+        if key == "unlockBitrate", value as? Bool == false {
+            changes["bitrateKbps"] = min((values["bitrateKbps"] as? NSNumber)?.intValue ?? 150000, 150000)
+        }
+        send("settings", ["values": changes])
+    }
     func startStream(_ computer: Computer, game: Game) {
         guard ready, !streamActive, pairing == nil, !addingHost, !preview else { return }
         streamActive = true; streamStarted = false; warnings = []

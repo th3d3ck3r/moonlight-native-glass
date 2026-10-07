@@ -1,0 +1,303 @@
+{
+  "event": "settings",
+  "schema": [
+    {
+      "boolean": false,
+      "choices": [],
+      "id": "width"
+    },
+    {
+      "boolean": false,
+      "choices": [],
+      "id": "height"
+    },
+    {
+      "boolean": false,
+      "choices": [],
+      "id": "fps"
+    },
+    {
+      "boolean": false,
+      "choices": [],
+      "id": "bitrateKbps"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "unlockBitrate"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "autoAdjustBitrate"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "enableVsync"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "gameOptimizations"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "playAudioOnHost"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "multiController"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "enableMdns"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "quitAppAfter"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "absoluteMouseMode"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "absoluteTouchMode"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "framePacing"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "connectionWarnings"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "configurationWarnings"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "richPresence"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "gamepadMouse"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "detectNetworkBlocking"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "showPerformanceOverlay"
+    },
+    {
+      "boolean": false,
+      "choices": [
+        {
+          "name": "AC_STEREO",
+          "value": 0
+        },
+        {
+          "name": "AC_51_SURROUND",
+          "value": 1
+        },
+        {
+          "name": "AC_71_SURROUND",
+          "value": 2
+        }
+      ],
+      "id": "audioConfig"
+    },
+    {
+      "boolean": false,
+      "choices": [
+        {
+          "name": "VCC_AUTO",
+          "value": 0
+        },
+        {
+          "name": "VCC_FORCE_H264",
+          "value": 1
+        },
+        {
+          "name": "VCC_FORCE_HEVC",
+          "value": 2
+        },
+        {
+          "name": "VCC_FORCE_AV1",
+          "value": 4
+        }
+      ],
+      "id": "videoCodecConfig"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "enableHdr"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "enableYUV444"
+    },
+    {
+      "boolean": false,
+      "choices": [
+        {
+          "name": "VDS_AUTO",
+          "value": 0
+        },
+        {
+          "name": "VDS_FORCE_HARDWARE",
+          "value": 1
+        },
+        {
+          "name": "VDS_FORCE_SOFTWARE",
+          "value": 2
+        }
+      ],
+      "id": "videoDecoderSelection"
+    },
+    {
+      "boolean": false,
+      "choices": [
+        {
+          "name": "RS_AUTO",
+          "value": 0
+        },
+        {
+          "name": "RS_VULKAN",
+          "value": 1
+        },
+        {
+          "name": "RS_METAL",
+          "value": 2
+        },
+        {
+          "name": "RS_AVSBDL",
+          "value": 3
+        }
+      ],
+      "id": "rendererSelection"
+    },
+    {
+      "boolean": false,
+      "choices": [
+        {
+          "name": "WM_FULLSCREEN",
+          "value": 0
+        },
+        {
+          "name": "WM_FULLSCREEN_DESKTOP",
+          "value": 1
+        },
+        {
+          "name": "WM_WINDOWED",
+          "value": 2
+        }
+      ],
+      "id": "windowMode"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "swapMouseButtons"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "muteOnFocusLoss"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "backgroundGamepad"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "reverseScrollDirection"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "swapFaceButtons"
+    },
+    {
+      "boolean": true,
+      "choices": [],
+      "id": "keepAwake"
+    },
+    {
+      "boolean": false,
+      "choices": [
+        {
+          "name": "CSK_OFF",
+          "value": 0
+        },
+        {
+          "name": "CSK_FULLSCREEN",
+          "value": 1
+        },
+        {
+          "name": "CSK_ALWAYS",
+          "value": 2
+        }
+      ],
+      "id": "captureSysKeysMode"
+    }
+  ],
+  "values": {
+    "absoluteMouseMode": false,
+    "absoluteTouchMode": true,
+    "audioConfig": 0,
+    "autoAdjustBitrate": true,
+    "backgroundGamepad": false,
+    "bitrateKbps": 20000,
+    "captureSysKeysMode": 0,
+    "configurationWarnings": true,
+    "connectionWarnings": true,
+    "detectNetworkBlocking": true,
+    "enableHdr": false,
+    "enableMdns": true,
+    "enableVsync": true,
+    "enableYUV444": false,
+    "fps": 60,
+    "framePacing": false,
+    "gameOptimizations": true,
+    "gamepadMouse": true,
+    "height": 1080,
+    "keepAwake": true,
+    "multiController": true,
+    "muteOnFocusLoss": false,
+    "playAudioOnHost": false,
+    "quitAppAfter": false,
+    "rendererSelection": 0,
+    "reverseScrollDirection": false,
+    "richPresence": true,
+    "showPerformanceOverlay": false,
+    "swapFaceButtons": false,
+    "swapMouseButtons": false,
+    "unlockBitrate": false,
+    "videoCodecConfig": 0,
+    "videoDecoderSelection": 0,
+    "width": 1920,
+    "windowMode": 1
+  }
+}
