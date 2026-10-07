@@ -37,7 +37,7 @@ import XCTest
         app.launchArguments = ["--design-preview", "--preview-screen=about", "--dark"]
         app.launch()
         XCTAssertTrue(app.windows["native-library"].waitForExistence(timeout: 10))
-        let about = app.windows["native-about"]
+        let about = app.dialogs["native-about"]
         XCTAssertTrue(about.waitForExistence(timeout: 5))
         XCTAssertTrue(about.links["GitHub Repository"].exists, "About GitHub link is not accessible")
         let attachment = XCTAttachment(screenshot: about.screenshot())
