@@ -77,7 +77,7 @@ This is a separate project from Enhanced. Enhanced-only microphone, clipboard an
 | Physical Intel Tahoe pairing and streaming | **Not tested for this new app** |
 | Intel CPU/GPU usage and frame pacing | **Not measured**; compilation does not prove performance parity |
 
-`master` stays at upstream Moonlight Qt **v6.2.0**, commit `de2467e433821664cdd2224aad8c89a625be1ad9`. Native work lives on `native-ui`. The earlier Enhanced repository and releases are untouched.
+`master` retains the stock Moonlight Qt **v6.2.0** application code from `de2467e433821664cdd2224aad8c89a625be1ad9`; its README presents this fork. Native development and build instructions live on [`native-ui`](https://github.com/th3d3ck3r/moonlight-native-glass/tree/native-ui). The earlier Enhanced repository and releases are untouched.
 
 <details>
 <summary>Intel Tahoe test checklist and known limits</summary>
