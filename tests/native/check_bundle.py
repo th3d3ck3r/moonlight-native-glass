@@ -13,6 +13,9 @@ for bundle, identity in [(app, "com.moonlight-stream.NativeGlass"),
     assert info["NSLocalNetworkUsageDescription"]
     assert "_nvstream._tcp" in info["NSBonjourServices"]
     assert (bundle / "Contents/MacOS" / info["CFBundleExecutable"]).is_file()
+    icon_name = info["CFBundleIconFile"]
+    icon = bundle / "Contents/Resources" / (icon_name if icon_name.endswith(".icns") else icon_name + ".icns")
+    assert icon.read_bytes() == (app / "Contents/Resources/moonlight.icns").read_bytes(), f"{bundle}: mismatched Dock icon"
 
 checked = 0
 for file in app.rglob("*"):

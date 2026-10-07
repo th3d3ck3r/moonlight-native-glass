@@ -41,6 +41,9 @@ fi
 cp macos-native/Resources/moonlight.icns "$app/Contents/Resources/moonlight.icns"
 cp macos-native/Info.plist "$app/Contents/Info.plist"
 ditto "$engine_app" "$app/Contents/Helpers/MoonlightEngine.app"
+# The active streaming process has its own Dock icon. Update the nested bundle
+# before signing, without changing its executable, identity or permissions.
+cp macos-native/Resources/moonlight.icns "$app/Contents/Helpers/MoonlightEngine.app/Contents/Resources/moonlight.icns"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.moonlight-stream.NativeGlass.Engine' "$app/Contents/Helpers/MoonlightEngine.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Moonlight Native Glass Engine' "$app/Contents/Helpers/MoonlightEngine.app/Contents/Info.plist"
 
