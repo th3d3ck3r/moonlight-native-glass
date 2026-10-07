@@ -133,3 +133,5 @@ builds and screenshot checks provide the available evidence.
 
 - Corrected UI probe 6e88eeddea911552f0b685ea29bde893b0c31778 passed in run 37693779148 (17 captures plus primary icon/right-click Settings/Quit). Build source e96caef remains identical; only UI-test query and checkpoint changed. Publisher verifies both required build jobs and SDL test plus the passing UI run and rejects any application/build-input changes between them.
 - Preview 5 is a separate download; keep Preview 4 README links and older releases intact. Physical Intel Tahoe audio/input/renderer behavior while hidden remains to be tested against a real host.
+
+- Preview 5 published successfully at tag native-glass-6.2-preview-5 via run 37694314866 and commit 43527e1ef2bf2c2a5d9dd92c379f4f6bbe608abd. Both packages, checksums and 11 composited screenshots uploaded. About/menu captures visually inspected; fixed About text and build 5 verified. Preview 4 retained. README adds separate Preview 5 links on native-ui/master; master code stays stock 6.2.
