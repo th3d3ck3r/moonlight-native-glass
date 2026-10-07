@@ -14,26 +14,42 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VALIDATED_SHA: 007bbc594bacb768e1abcc31478c7d95e94ba4de
-      VALIDATED_RUN: '37682529752'
-      RELEASE_TAG: native-glass-6.2-preview-4
+      BUILD_SHA: e96caef79fde987b495f9a62c245215e28f29057
+      BUILD_RUN: '37692872366'
+      VALIDATED_SHA: 6e88eeddea911552f0b685ea29bde893b0c31778
+      VALIDATED_RUN: '37693779148'
+      RELEASE_TAG: native-glass-6.2-preview-5
     steps:
       - uses: actions/checkout@v5
       - name: Verify the exact validated source and all required jobs
         run: |
           gh api "repos/$GH_REPO/actions/runs/$VALIDATED_RUN" > /tmp/validated-run.json
           jq -e --arg sha "$VALIDATED_SHA" '.head_sha == $sha and .head_branch == "native-ui" and .conclusion == "success" and .name == "Native macOS Validation"' /tmp/validated-run.json
+          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN" > /tmp/build-run.json
+          jq -e --arg sha "$BUILD_SHA" '.head_sha == $sha and .head_branch == "native-ui" and .status == "completed" and .name == "Native macOS Validation"' /tmp/build-run.json
+          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN/jobs?per_page=100" > /tmp/build-jobs.json
           gh api "repos/$GH_REPO/actions/runs/$VALIDATED_RUN/jobs?per_page=100" > /tmp/validated-jobs.json
           python3 - <<'PY'
           import json
-          jobs = json.load(open('/tmp/validated-jobs.json'))['jobs']
-          for name in ['build (x86_64)', 'build (universal)', 'Native UI window smoke test']:
+          build_jobs = json.load(open('/tmp/build-jobs.json'))['jobs']
+          ui_jobs = json.load(open('/tmp/validated-jobs.json'))['jobs']
+          for name, jobs in [('build (x86_64)', build_jobs), ('build (universal)', build_jobs), ('Native UI window smoke test', ui_jobs)]:
               matches = [j for j in jobs if j['name'] == name]
               assert len(matches) == 1 and matches[0]['conclusion'] == 'success', name
+          universal = next(j for j in build_jobs if j['name'] == 'build (universal)')
+          assert any(s['name'] == 'Test actual SDL stream window hide and restore' and s['conclusion'] == 'success' for s in universal['steps']), 'SDL lifecycle check missing'
+
           PY
           # Publish the existing native-ui head only when every build input is
           # identical to the validated commit; later changes must be docs/workflows.
-          git fetch --no-tags --depth=1 origin "$VALIDATED_SHA"
+          git fetch --no-tags --depth=1 origin "$BUILD_SHA" "$VALIDATED_SHA"
+          # Reuse full-build packages only when the later UI validation changes
+          # tests/docs alone. Every application/resource/build input is identical.
+          git diff --name-only "$BUILD_SHA" "$VALIDATED_SHA" > /tmp/ui-validation-changes.txt
+          python3 - <<'PYINPUTS'
+          paths = open('/tmp/ui-validation-changes.txt').read().splitlines()
+          assert all(p == 'tests/native/NativeUIScreensTests.swift' or p.startswith('docs/') for p in paths), paths
+          PYINPUTS
           git diff --name-only "$VALIDATED_SHA" "$GITHUB_SHA" > /tmp/release-changes.txt
           python3 - <<'PY'
           paths = open('/tmp/release-changes.txt').read().splitlines()
@@ -51,8 +67,8 @@ jobs:
       - name: Download only previously validated artifacts
         run: |
           mkdir -p release-assets capture-assets
-          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-4-x86_64 -D release-assets
-          gh run download "$VALIDATED_RUN" -n Native-Glass-Preview-4-universal -D release-assets
+          gh run download "$BUILD_RUN" -n Native-Glass-Preview-5-x86_64 -D release-assets
+          gh run download "$BUILD_RUN" -n Native-Glass-Preview-5-universal -D release-assets
           gh run download "$VALIDATED_RUN" -n Native-UI-Quick-Window-Captures -D capture-assets
           # Full-build layer images are diagnostics; publish composited XCTest images.
           rm -f release-assets/*.png
@@ -66,10 +82,18 @@ jobs:
               assert len(matches) == 1, name
               shutil.copyfile(source / matches[0]['exportedFileName'], pathlib.Path('release-assets') / (name + '.png'))
           PY
-          (cd release-assets && sha256sum Moonlight-Native-Glass-Preview-4-*.zip > SHA256SUMS.txt)
+          (cd release-assets && sha256sum Moonlight-Native-Glass-Preview-5-*.zip > SHA256SUMS.txt)
+      - name: Export small visual QA captures to the job log
+        run: |
+          python3 - <<'PYQA'
+          import base64, pathlib
+          for name in ['about-dark', 'menu-bar']:
+              data = (pathlib.Path('release-assets') / (name + '.png')).read_bytes()
+              print('NATIVE_UI_VISUAL_QA:' + name + ':' + base64.b64encode(data).decode('ascii'))
+          PYQA
       - name: Publish the separately labeled preview
         run: |
           gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --prerelease \
-            --title 'Moonlight Native Glass · Qt 6.2 · Native UI Preview 4' \
+            --title 'Moonlight Native Glass · Qt 6.2 · Native UI Preview 5' \
             --notes-file docs/NATIVE_PREVIEW_RELEASE.md \
             release-assets/*.zip release-assets/SHA256SUMS.txt release-assets/*.png

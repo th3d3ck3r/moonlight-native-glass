@@ -130,3 +130,6 @@ builds and screenshot checks provide the available evidence.
 - Preview 4 stays intact; Preview 5 will have a separate release/download link.
 
 - Full x86_64 and Universal builds at e96caef79fde987b495f9a62c245215e28f29057 passed in run 37692872366, including 105 Mach-O audits and the real SDL lifecycle harness. Native screenshots/primary icon click passed; XCTest Settings selection was ambiguous with the app menu. Scope the query to the secondary status menu and run a UI-only probe with identical build inputs.
+
+- Corrected UI probe 6e88eeddea911552f0b685ea29bde893b0c31778 passed in run 37693779148 (17 captures plus primary icon/right-click Settings/Quit). Build source e96caef remains identical; only UI-test query and checkpoint changed. Publisher verifies both required build jobs and SDL test plus the passing UI run and rejects any application/build-input changes between them.
+- Preview 5 is a separate download; keep Preview 4 README links and older releases intact. Physical Intel Tahoe audio/input/renderer behavior while hidden remains to be tested against a real host.

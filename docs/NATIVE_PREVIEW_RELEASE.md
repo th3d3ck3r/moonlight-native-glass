@@ -1,30 +1,24 @@
-**Native UI Preview 4 — menu bar access and matching engine icon**
+**Native UI Preview 5 — separate stream-window menu bar build**
 
-- The bundled streaming engine now uses the same blue glass crescent icon as the native frontend. Both bundle icon resources are checked for equality before release.
-- Native crescent menu bar icon keeps the app available after closing the library. Open Moonlight, Settings and Quit actions use normal macOS window behavior and existing stream cleanup.
-- Build number incremented to 4. About automatically reads “Native UI Preview 4 - Moonlight 6.2”; all other About wording and the GitHub link remain fixed.
-- Streaming, settings and resolution behavior are unchanged from Preview 3. Includes its resolution dropdown and previous pairing/Dock fixes.
+This is a separate download; Preview 4 and its release remain available.
 
-Experimental SwiftUI/AppKit frontend for the Moonlight Qt 6.2.0 engine.
+- Closing an already opened **windowed** stream hides the original SDL window instead of disconnecting. Click the crescent status icon to restore the same window.
+- The icon chooses the stream only after its window has actually opened, independently of connection/stream-active flags. While connecting with no stream window, or after the window has ended, it opens the regular app.
+- Right-click (or Control-click) the icon for Open Moonlight or Stream, Settings and Quit. Explicit Quit retains the existing streaming confirmation and cleanup. Disconnect shortcuts remain unchanged.
+- Build number 5; all other About wording, credit, GitHub link, icon assets, settings, permissions, bundle identities and signing behavior stay fixed.
 
-Native sidebar, toolbar, game cards, five Settings panes, pairing/address/details sheets and system light/dark appearance. Uses native Liquid Glass controls on macOS 26+ and regular native controls on macOS 15. The frontend uses its new crescent icon, SF Symbols and host-provided box art. Updates remain manual.
+The macOS presentation adapter forwards the existing SDL Cocoa window delegate. Only windowed close is intercepted. Normal fullscreen behavior, SDL window destruction, focus/input callbacks and resize handling remain with SDL. Restore uses a per-process-launch token and the native main run loop while Session suspends Qt processing. No per-frame UI polling is added. The upstream streaming/backend/settings/common-c/mDNS source remains unchanged.
 
-The bundled Qt helper keeps the upstream streaming, networking, settings, common-c and mDNS implementations unchanged. Each stream uses the original Session/SDL video window. Preferences and pairing are isolated from stock Moonlight and Enhanced; pair again in this app.
+Built source: `e96caef79fde987b495f9a62c245215e28f29057`. [Required validation](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37692872366): full x86_64 and Universal builds; nested architecture/signature/dependency/icon audits; protocol framing; actual helper persistence; native UI captures ([UI validation revision `6e88eed`](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37693779148)); real SDL window lifecycle harness. The harness checks close/hide without session-quit events, repeated cross-process restore/focus with no Qt loop, wrong-token isolation, resize forwarding and absent/destroyed-window safety. It does **not** connect to a host or decode video. Captures use sample content.
 
-Built source: `007bbc594bacb768e1abcc31478c7d95e94ba4de`. [All required validation jobs passed](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37682529752).
+Requires macOS 15+. Native Liquid Glass controls on macOS 26+, standard native controls on macOS 15; system light/dark appearance. Manual updates. Ad-hoc signed, not Developer ID signed or notarized. The bundled stock Moonlight Qt 6.2.0 engine remains responsible for streaming. Enhanced-only microphone, clipboard and AWDL features are not included.
 
-Validation: full x86_64 and Universal compilation; nested architectures, signatures, dependencies and matching frontend/engine icons; unchanged engine source; event framing; real adapter validation and resolution persistence across restart. 17 Release-mode XCTest UI captures passed, including close/reopen/Settings/Quit menu bar actions and resolution dropdown interaction, the About panel and accessible GitHub link; composited sample-content screenshots were inspected. Included captures are labeled design previews. They do not demonstrate host connectivity.
+Physical Intel Tahoe checklist:
+- Before opening a stream window, close the library and click the crescent; confirm the regular app opens, including while connection startup has not created a window.
+- Open a windowed stream, click its red close button, then click the crescent. Confirm the same session resumes visibly without relaunching the host game. Repeat and verify audio, keyboard, mouse/controller input and focus.
+- Disconnect normally; click the icon again and confirm it returns to the regular app. Test right-click Settings, Quit and Cancel while a stream window is hidden.
+- Test fullscreen transitions, minimize/restore, moving between displays, resizing and host/network failure while hidden.
+- Check pairing/settings persistence, H.264/HEVC hardware decode, optional HDR, light/dark appearance and accessibility.
+- Compare CPU/GPU, decode time and frame pacing against stock 6.2.0 on identical hardware/settings; no Intel runtime/performance claim is made from compilation or window tests.
 
-These packages require macOS 15+. They are ad-hoc signed, not Developer ID signed or notarized. Physical Intel/Tahoe validation of this revision remains outstanding: discovery, Local Network approval, pairing, streaming, controller input, multi-display behavior and CPU/GPU/frame pacing. No performance improvement or parity is claimed. Enhanced-only microphone, clipboard and AWDL features are not included.
-
-Intel Tahoe test checklist:
-- Launch from Finder, allow Local Network access, discover/add and pair a host; verify paired status and games appear without reopening, then quit/relaunch to check persistence. Confirm no windowless helper Dock icon.
-- Compare the same 1080p60 H.264 and HEVC sessions against stock 6.2.0; verify hardware decode, audio, mouse, keyboard and controller.
-- Launch/resume/quit games and disconnect with Control–Option–Shift–Q or Start + Select + L1 + R1.
-- Select each resolution preset and Native; confirm Retina/native dimensions and save/relaunch persistence. Move Settings between displays and verify Native dimensions refresh.
-- Close the library and reopen it from the crescent menu bar icon; open Settings and quit. Check closing the library during streaming leaves the stream connected, and Quit retains confirmation.
-- Resize, enter/exit fullscreen and switch displays; check focus and settings persistence.
-- Check light/dark mode, Reduce Transparency, Reduce Motion, increased contrast and VoiceOver.
-- Compare decode time, frame pacing, CPU/GPU and stock performance-overlay results on identical hardware/settings. Save crash reports and engine logs for failures.
-
-The release tag includes the publishing workflow and documentation added after validation. The publisher verifies that all build inputs match the tested source commit.
+The release tag includes documentation/workflow changes after validation; the publisher verifies that the UI validation revision changes only tests/docs and that all packaged build inputs still match the full-build source.
