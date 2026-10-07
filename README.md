@@ -70,7 +70,7 @@ This is a separate project from Enhanced. Enhanced-only microphone, clipboard an
 
 | Check | Verified state |
 |---|---|
-| Full Intel + Universal app builds | Passed at `d746f2a` · [validation run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37628909463) |
+| Full Intel + Universal app builds | Passed at `aa7fe3b` · [validation run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37628909463) |
 | Nested binaries, architectures and signatures | Passed signature, identity, permission and dependency audits of 105 Mach-O files |
 | Engine bridge and settings persistence | Passed real helper validation, including restart persistence and invalid-input rejection |
 | Native UI screenshots | 16 Release-mode XCTest captures passed: light/dark/compact, loading/empty/offline/unpaired, sheets and five Settings panes; screenshots inspected |
