@@ -59,17 +59,18 @@ import XCTest
         item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         XCTAssertTrue(window.waitForExistence(timeout: 5), "Primary status click did not reopen the library without a stream window")
         item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
-        XCTAssertTrue(app.menuItems["Open Moonlight or Stream"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.menuItems["Settings…"].exists)
-        XCTAssertTrue(app.menuItems["Quit Moonlight Native Glass"].exists)
+        let menu = app.menus.containing(.menuItem, identifier: "Open Moonlight or Stream").firstMatch
+        XCTAssertTrue(menu.menuItems["Open Moonlight or Stream"].waitForExistence(timeout: 5))
+        XCTAssertTrue(menu.menuItems["Settings…"].exists)
+        XCTAssertTrue(menu.menuItems["Quit Moonlight Native Glass"].exists)
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "menu-bar"
         attachment.lifetime = .keepAlways
         add(attachment)
-        app.menuItems["Settings…"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        menu.menuItems["Settings…"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         XCTAssertTrue(app.windows["native-settings"].waitForExistence(timeout: 5))
         item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
-        app.menuItems["Quit Moonlight Native Glass"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        menu.menuItems["Quit Moonlight Native Glass"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         let quit = NSPredicate(format: "state == %d", XCUIApplication.State.notRunning.rawValue)
         expectation(for: quit, evaluatedWith: app)
         waitForExpectations(timeout: 10)

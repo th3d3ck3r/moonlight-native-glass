@@ -128,3 +128,5 @@ builds and screenshot checks provide the available evidence.
 - macOS-only presentation adapter forwards SDL's existing window delegate; no changes under upstream streaming/backend/settings. Window availability comes from actual opened SDL Cocoa windows, separately from stream-active/starting flags. Restore uses a per-launch token and the macOS main run loop because Session suspends Qt processing.
 - Add a real SDL lifecycle harness (no host/video) for close/hide without SDL_QUIT, repeated cross-process restore/focus, wrong-token isolation, resize forwarding, absent/destroyed windows and cleanup. Require it with full builds/UI checks before publishing.
 - Preview 4 stays intact; Preview 5 will have a separate release/download link.
+
+- Full x86_64 and Universal builds at e96caef79fde987b495f9a62c245215e28f29057 passed in run 37692872366, including 105 Mach-O audits and the real SDL lifecycle harness. Native screenshots/primary icon click passed; XCTest Settings selection was ambiguous with the app menu. Scope the query to the secondary status menu and run a UI-only probe with identical build inputs.
