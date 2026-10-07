@@ -25,4 +25,5 @@ for name, flags in captures:
         capture_log = pathlib.Path(str(output) + ".capture-log")
         if capture_log.exists(): print(capture_log.read_text(), flush=True)
     assert output.is_file() and output.stat().st_size > 0
-    print(f"PASS: app-rendered {name} screenshot", flush=True)
+    method = pathlib.Path(str(output) + ".capture-method.txt")
+    print(f"PASS: native {name} layout capture" if method.exists() else f"PASS: native {name} WindowServer screenshot", flush=True)

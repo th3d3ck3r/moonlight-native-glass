@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import QuartzCore
 
 final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     weak var store: EngineStore?
@@ -104,7 +105,15 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
                     let status = capture.terminationStatus
                     let diagnostic = String(data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
                     try? "screencapture status=\(status) \(diagnostic)".write(toFile: destination + ".capture-log", atomically: true, encoding: .utf8)
-                    DispatchQueue.main.async { if status == 0 { NSApp.terminate(nil) } else { exit(status) } }
+                    DispatchQueue.main.async {
+                        if status == 0 { NSApp.terminate(nil) }
+                        else {
+                            // CI may create windows without permitting WindowServer
+                            // screenshots. Render only our own UI for layout review;
+                            // this does not reproduce composited glass materials.
+                            captureNativeLayout(window: window, destination: destination)
+                        }
+                    }
                 } catch { print("Window capture failed: \(error)"); exit(3) }
             }
         }
@@ -127,4 +136,29 @@ func nativeArgument(_ name: String) -> String? {
     if let argument = args.first(where: { $0.hasPrefix(name + "=") }) { return String(argument.dropFirst(name.count + 1)) }
     if let i = args.firstIndex(of: name), args.indices.contains(i + 1) { return args[i + 1] }
     return nil
+}
+
+@MainActor private func captureNativeLayout(window: NSWindow, destination: String) {
+    guard let view = window.contentView?.superview ?? window.contentView else { exit(4) }
+    view.wantsLayer = true
+    view.displayIfNeeded()
+    let scale: CGFloat = 2
+    let width = Int(view.bounds.width * scale), height = Int(view.bounds.height * scale)
+    guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+        let context = NSGraphicsContext(bitmapImageRep: bitmap)?.cgContext,
+        let layer = view.layer else { exit(5) }
+    context.scaleBy(x: scale, y: scale)
+    window.effectiveAppearance.performAsCurrentDrawingAppearance {
+        context.setFillColor(NSColor.windowBackgroundColor.cgColor)
+        context.fill(view.bounds)
+        layer.render(in: context)
+    }
+    guard let data = bitmap.representation(using: .png, properties: [:]) else { exit(6) }
+    do {
+        try data.write(to: URL(fileURLWithPath: destination))
+        try "App-layer layout capture with sample content. WindowServer glass appearance requires a physical Mac screenshot.".write(toFile: destination + ".capture-method.txt", atomically: true, encoding: .utf8)
+        NSApp.terminate(nil)
+    } catch { exit(7) }
 }
