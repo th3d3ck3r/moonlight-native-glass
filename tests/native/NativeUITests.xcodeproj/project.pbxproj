@@ -23,10 +23,10 @@
 000000000000000000000015 = {isa = PBXGroup; children = (000000000000000000000013,000000000000000000000014,); name = Products; sourceTree = "<group>";};
 000000000000000000000016 = {isa = PBXGroup; children = (000000000000000000000001,000000000000000000000003,000000000000000000000005,000000000000000000000007,000000000000000000000009,00000000000000000000000B,00000000000000000000000D,00000000000000000000000F,000000000000000000000011,000000000000000000000015,); sourceTree = "<group>";};
 000000000000000000000017 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000002,000000000000000000000004,000000000000000000000006,000000000000000000000008,00000000000000000000000A,00000000000000000000000C,00000000000000000000000E,); runOnlyForDeploymentPostprocessing = 0;};
-000000000000000000000018 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (,); runOnlyForDeploymentPostprocessing = 0;};
-000000000000000000000019 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (,); runOnlyForDeploymentPostprocessing = 0;};
+000000000000000000000018 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+000000000000000000000019 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
 00000000000000000000001A = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000010,); runOnlyForDeploymentPostprocessing = 0;};
-00000000000000000000001B = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (,); runOnlyForDeploymentPostprocessing = 0;};
+00000000000000000000001B = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
 00000000000000000000001C = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000012,); runOnlyForDeploymentPostprocessing = 0;};
 00000000000000000000001D = {isa = XCBuildConfiguration; buildSettings = {SDKROOT = macosx; MACOSX_DEPLOYMENT_TARGET = 15.0; SWIFT_VERSION = 5.0; CODE_SIGN_IDENTITY = "-"; CODE_SIGN_STYLE = Manual; ENABLE_HARDENED_RUNTIME = NO;}; name = Debug;};
 00000000000000000000001E = {isa = XCBuildConfiguration; buildSettings = {SDKROOT = macosx; MACOSX_DEPLOYMENT_TARGET = 15.0; SWIFT_VERSION = 5.0; CODE_SIGN_IDENTITY = "-"; CODE_SIGN_STYLE = Manual; ENABLE_HARDENED_RUNTIME = NO;}; name = Release;};
