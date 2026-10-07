@@ -118,3 +118,5 @@ builds and screenshot checks provide the available evidence.
 - Follow-up probe `d908f4d` selected the left application menu by its title. Captured screen/AX hierarchy confirms the crescent status item exists as StatusItem `native-status-item`. Test now targets that item and its own menu descendants, using their observed frames for mouse clicks. No application code changes required for the test correction.
 
 - Menu bar lifecycle probe bdfc99f582b0e8a22ec58601d57c3c081febd2bf passed (run 37681428750): close, reopen, Settings and Quit. All 17 captures passed. Final full Intel/Universal validation follows.
+
+- Preview 4 final source: 007bbc594bacb768e1abcc31478c7d95e94ba4de. Validation run 37682529752 passed all three required jobs: full x86_64, Universal and 17 native UI captures/lifecycle checks. Protected engine source remains stock 6.2; master code unchanged. Physical Intel streaming/close-window-during-stream checks remain outstanding. Publishing verified artifacts only.
