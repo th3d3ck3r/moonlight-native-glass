@@ -3,6 +3,7 @@ import SwiftUI
 
 final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     weak var store: EngineStore?
+    var statusMenu: NativeStatusMenu?
     func applicationDidFinishLaunching(_ notification: Notification) {
         if CommandLine.arguments.contains("--design-preview") {
             if CommandLine.arguments.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
@@ -38,11 +39,11 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
 @main struct MoonlightNativeApp: App {
     @NSApplicationDelegateAdaptor(NativeAppDelegate.self) private var delegate
     @StateObject private var store = EngineStore(preview: CommandLine.arguments.contains("--design-preview"))
-    @State private var menuBarInserted = true
     var body: some Scene {
         Window("Moonlight Native Glass", id: "library") {
             LibraryView(store: store)
                 .frame(minWidth: 680, minHeight: 460)
+                .background(NativeStatusActions(store: store, delegate: delegate))
                 .onAppear { delegate.store = store; store.start() }
         }
         .defaultSize(width: 1080, height: 720)
@@ -64,14 +65,6 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
-        MenuBarExtra(isInserted: $menuBarInserted) {
-            NativeStatusMenu()
-        } label: {
-            Image(nsImage: NativeStatusMenu.icon)
-                .accessibilityLabel("Moonlight Native Glass")
-                .accessibilityIdentifier("native-status-item")
-        }
-        .menuBarExtraStyle(.menu)
         Settings {
             NativeSettingsView(store: store)
                 .frame(width: 640, height: 540)
@@ -79,27 +72,63 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-private struct NativeStatusMenu: View {
+// Keep window routing in SwiftUI; the AppKit status button provides a direct
+// primary click and a secondary-click menu without changing app activation policy.
+private struct NativeStatusActions: View {
+    let store: EngineStore
+    let delegate: NativeAppDelegate
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
-    static let icon: NSImage = {
-        let image = Bundle.main.url(forResource: "moonlight", withExtension: "icns")
-            .flatMap { NSImage(contentsOf: $0) } ?? NSImage(named: NSImage.applicationIconName) ?? NSImage()
-        image.size = NSSize(width: 18, height: 18)
-        return image
-    }()
     var body: some View {
-        Button("Open Moonlight") {
-            openWindow(id: "library")
-            NSApp.activate(ignoringOtherApps: true)
+        Color.clear.frame(width: 0, height: 0).onAppear {
+            if delegate.statusMenu == nil { delegate.statusMenu = NativeStatusMenu() }
+            delegate.statusMenu?.open = {
+                if store.streamWindowExists { store.restoreStreamWindow() }
+                else { openWindow(id: "library"); NSApp.activate(ignoringOtherApps: true) }
+            }
+            delegate.statusMenu?.settings = {
+                openSettings(); NSApp.activate(ignoringOtherApps: true)
+            }
         }
-        Button("Settings…") {
-            openSettings()
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        Divider()
-        Button("Quit Moonlight Native Glass") { NSApp.terminate(nil) }
     }
+}
+
+@MainActor final class NativeStatusMenu: NSObject {
+    private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    var open: (() -> Void)?
+    var settings: (() -> Void)?
+    override init() {
+        super.init()
+        if let url = Bundle.main.url(forResource: "moonlight", withExtension: "icns"),
+           let image = NSImage(contentsOf: url) {
+            image.size = NSSize(width: 18, height: 18)
+            item.button?.image = image
+        }
+        item.button?.setAccessibilityLabel("Moonlight Native Glass")
+        item.button?.setAccessibilityIdentifier("native-status-item")
+        item.button?.toolTip = "Restore the stream window or open Moonlight. Right-click for Settings and Quit."
+        item.button?.target = self
+        item.button?.action = #selector(clicked)
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+    @objc private func clicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp || NSApp.currentEvent?.modifierFlags.contains(.control) == true {
+            guard let button = item.button else { return }
+            let menu = NSMenu()
+            for (title, action) in [("Open Moonlight or Stream", #selector(openFromMenu)),
+                                    ("Settings…", #selector(settingsFromMenu))] {
+                let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
+                entry.target = self; menu.addItem(entry)
+            }
+            menu.addItem(.separator())
+            let quit = NSMenuItem(title: "Quit Moonlight Native Glass", action: #selector(quitFromMenu), keyEquivalent: "")
+            quit.target = self; menu.addItem(quit)
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
+        } else { open?() }
+    }
+    @objc private func openFromMenu() { open?() }
+    @objc private func settingsFromMenu() { settings?() }
+    @objc private func quitFromMenu() { NSApp.terminate(nil) }
 }
 
 // Keep these credits fixed across builds. AppKit reads the build number from

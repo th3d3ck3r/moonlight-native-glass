@@ -85,6 +85,8 @@ struct PairingRequest: Identifiable {
     @Published var pairing: PairingRequest?
     @Published var testingConnection = false
     @Published var addingHost = false
+    @Published var streamWindowExists = false
+    private var streamWindowToken: String?
     @Published var streamActive = false
     @Published var streamStarted = false
     @Published var quitRequired: String?
@@ -241,11 +243,16 @@ struct PairingRequest: Identifiable {
         let displayID = (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? CGMainDisplayID()
         let bounds = CGDisplayBounds(displayID)
         let x = Int(bounds.midX), y = Int(bounds.midY)
-        let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y)])
+        let token = UUID().uuidString
+        streamWindowToken = token
+        streamWindowExists = false
+        let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y), token])
         helper.onEvent = { [weak self] event in
             guard let self else { return }
             switch event["event"] as? String {
             case "stage": self.status = event["message"] as? String ?? "Starting stream…"
+            case "windowOpened": self.streamWindowExists = true
+            case "windowClosed": self.streamWindowExists = false
             case "streaming": self.streamStarted = true; self.status = "Streaming \(game.name)"
             case "warning": self.warnings.append(event["message"] as? String ?? "")
             case "quitRequired": self.quitRequired = event["app"] as? String
@@ -255,6 +262,7 @@ struct PairingRequest: Identifiable {
         }
         helper.onExit = { [weak self, weak helper] code in
             guard let self, self.stream === helper else { return }
+            self.streamWindowExists = false; self.streamWindowToken = nil
             self.stream = nil; self.streamActive = false; self.streamStarted = false; self.quitRequired = nil
             self.status = "Stream ended"
             self.send("resume")
@@ -262,6 +270,12 @@ struct PairingRequest: Identifiable {
         }
         stream = helper
         do { try helper.start() } catch { stream = nil; streamActive = false; send("resume"); fail(error.localizedDescription) }
+    }
+    func restoreStreamWindow() {
+        guard streamWindowExists, let token = streamWindowToken else { return }
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("com.moonlight-stream.NativeGlass.restoreStreamWindow"),
+            object: token, userInfo: nil, deliverImmediately: true)
     }
     func confirmQuit() {
         quitRequired = nil

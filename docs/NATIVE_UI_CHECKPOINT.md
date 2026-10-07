@@ -122,3 +122,9 @@ builds and screenshot checks provide the available evidence.
 - Preview 4 final source: 007bbc594bacb768e1abcc31478c7d95e94ba4de. Validation run 37682529752 passed all three required jobs: full x86_64, Universal and 17 native UI captures/lifecycle checks. Protected engine source remains stock 6.2; master code unchanged. Physical Intel streaming/close-window-during-stream checks remain outstanding. Publishing verified artifacts only.
 
 - Preview 4 published successfully by run 37683717439 at publishing commit c65a603e331bc2b48a84cf345c9b139732592692. Both ZIPs, SHA-256 checksums and 11 screenshots uploaded; previous releases preserved. README updated on native-ui and master (documentation only).
+
+## Preview 5: separate stream-window behavior build
+- Requested: only restore a stream window after it actually opened; close hides that window instead of disconnecting. If no stream window exists, primary status click opens the regular library. Right-click retains Settings/Quit.
+- macOS-only presentation adapter forwards SDL's existing window delegate; no changes under upstream streaming/backend/settings. Window availability comes from actual opened SDL Cocoa windows, separately from stream-active/starting flags. Restore uses a per-launch token and the macOS main run loop because Session suspends Qt processing.
+- Add a real SDL lifecycle harness (no host/video) for close/hide without SDL_QUIT, repeated cross-process restore/focus, wrong-token isolation, resize forwarding, absent/destroyed windows and cleanup. Require it with full builds/UI checks before publishing.
+- Preview 4 stays intact; Preview 5 will have a separate release/download link.

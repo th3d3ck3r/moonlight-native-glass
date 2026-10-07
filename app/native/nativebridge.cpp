@@ -24,6 +24,9 @@
 #include <cstdio>
 #include <cmath>
 
+void configureNativeStreamWindow(const char* token);
+void stopNativeStreamWindow();
+
 namespace {
 QString artKey(const QString& uuid, int id) { return uuid + ':' + QString::number(id); }
 bool editable(const QMetaProperty& p) {
@@ -86,7 +89,7 @@ NativeBridge::NativeBridge(const QStringList& args, QObject* parent) : QObject(p
     });
 }
 
-NativeBridge::~NativeBridge() = default;
+NativeBridge::~NativeBridge() { if (m_StreamMode) stopNativeStreamWindow(); }
 
 void NativeBridge::send(QJsonObject event) {
     const QByteArray data = QJsonDocument(event).toJson(QJsonDocument::Compact) + '\n';
@@ -318,11 +321,12 @@ bool NativeBridge::setPreferences(const QJsonObject& values) {
 }
 
 void NativeBridge::startStream(const QStringList& args) {
-    if (args.size() != 7 || args[3].isEmpty() || args[4].isEmpty()) { error("Invalid native stream arguments."); QCoreApplication::exit(1); return; }
+    if (args.size() != 8 || args[3].isEmpty() || args[4].isEmpty() || !QRegularExpression("^[0-9A-Fa-f-]{36}$").match(args[7]).hasMatch()) { error("Invalid native stream arguments."); QCoreApplication::exit(1); return; }
     bool xValid, yValid, appValid;
     const int appId = args[4].toInt(&appValid);
     const int x = args[5].toInt(&xValid), y = args[6].toInt(&yValid);
     if (!xValid || !yValid || !appValid || appId <= 0) { error("Invalid display coordinates."); QCoreApplication::exit(1); return; }
+    configureNativeStreamWindow(args[7].toUtf8().constData());
     m_Window.reset(new QQuickWindow());
     QScreen* selectedScreen = QGuiApplication::primaryScreen();
     for (auto screen : QGuiApplication::screens()) {

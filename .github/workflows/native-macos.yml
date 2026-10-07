@@ -48,15 +48,23 @@ jobs:
         run: |
           mkdir -p build/previews
           python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
+      - name: Test actual SDL stream window hide and restore
+        if: matrix.architecture == 'universal'
+        run: |
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 \
+            app/native/nativeapplication.mm tests/native/StreamWindowTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
+          build/stream-window-tests
       - name: Package preview artifact
         run: |
-          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-4-${{ matrix.architecture }}.zip'
-          shasum -a 256 'build/Moonlight-Native-Glass-Preview-4-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
+          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-5-${{ matrix.architecture }}.zip'
+          shasum -a 256 'build/Moonlight-Native-Glass-Preview-5-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
       - uses: actions/upload-artifact@v6
         with:
-          name: Native-Glass-Preview-4-${{ matrix.architecture }}
+          name: Native-Glass-Preview-5-${{ matrix.architecture }}
           path: |
-            build/Moonlight-Native-Glass-Preview-4-${{ matrix.architecture }}.zip
+            build/Moonlight-Native-Glass-Preview-5-${{ matrix.architecture }}.zip
             build/SHA256-${{ matrix.architecture }}.txt
           if-no-files-found: error
 
