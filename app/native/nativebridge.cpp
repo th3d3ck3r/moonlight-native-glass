@@ -2,6 +2,7 @@
 #include "backend/computermanager.h"
 #include "backend/boxartmanager.h"
 #include "cli/startstream.h"
+#include "gui/computermodel.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/session.h"
 #include <QCoreApplication>
@@ -130,6 +131,15 @@ void NativeBridge::command(const QJsonObject& request) {
         return;
     }
     if (m_TestMode) { error("Network operations are disabled in test mode."); return; }
+    if (action == "testConnection") {
+        auto model = new ComputerModel(this);
+        connect(model, &ComputerModel::connectionTestCompleted, this, [this, model](int result, QString ports) {
+            send({{"event", "connectionTest"}, {"result", result}, {"ports", ports}});
+            model->deleteLater();
+        });
+        model->testConnectionForComputer(0);
+        return;
+    }
     if (action == "pause") {
         if (m_Polling) { m_Manager->stopPollingAsync(); m_Polling = false; }
         send({{"event", "paused"}}); return;
@@ -149,6 +159,38 @@ void NativeBridge::command(const QJsonObject& request) {
     }
     auto computer = findComputer(request["host"].toString());
     if (!computer) { error("This computer is no longer available."); return; }
+    if (action == "artwork") {
+        if (!m_Polling) return;
+        QReadLocker guard(&computer->lock);
+        if (computer->state != NvComputer::CS_ONLINE || computer->pairState != NvComputer::PS_PAIRED) return;
+        const int id = request["app"].toInt();
+        for (auto app : computer->appList) {
+            if (app.id != id) continue;
+            const QString key = artKey(computer->uuid, id);
+            if (!m_ArtworkRequested.contains(key)) {
+                m_ArtworkRequested.insert(key);
+                auto url = m_Artwork->loadBoxArt(computer, app);
+                if (url.isLocalFile()) {
+                    m_ArtworkUrls[key] = url.toString();
+                    send({{"event", "artwork"}, {"host", computer->uuid}, {"app", id}, {"url", url.toString()}});
+                }
+            }
+            return;
+        }
+        return;
+    }
+    if (action == "hideGame") {
+        if (!request["hidden"].isBool()) { error("Invalid visibility setting."); return; }
+        bool found = false;
+        { QWriteLocker guard(&computer->lock);
+          for (auto& app : computer->appList) {
+              if (app.id == request["app"].toInt()) { app.hidden = request["hidden"].toBool(); found = true; break; }
+          }
+        }
+        if (found) { m_Manager->clientSideAttributeUpdated(computer); snapshot(); }
+        else error("This game is no longer available.");
+        return;
+    }
     if (action == "pair") {
         const QString pin = request["pin"].toString();
         if (m_Pairing) { error("A pairing request is already in progress."); return; }
@@ -198,11 +240,6 @@ void NativeBridge::snapshot() {
         QJsonArray apps;
         for (auto app : computer->appList) {
             const QString key = artKey(computer->uuid, app.id);
-            if (!m_TestMode && computer->state == NvComputer::CS_ONLINE && computer->pairState == NvComputer::PS_PAIRED && !m_ArtworkRequested.contains(key)) {
-                m_ArtworkRequested.insert(key);
-                auto url = m_Artwork->loadBoxArt(computer, app);
-                if (url.isLocalFile()) m_ArtworkUrls[key] = url.toString();
-            }
             apps.append(QJsonObject{{"id", app.id}, {"name", app.name}, {"hdr", app.hdrSupported}, {"hidden", app.hidden}, {"artwork", m_ArtworkUrls.value(key)}});
         }
         hosts.append(QJsonObject{{"id", computer->uuid}, {"name", computer->name},
@@ -271,10 +308,16 @@ void NativeBridge::startStream(const QStringList& args) {
     const int x = args[5].toInt(&xValid), y = args[6].toInt(&yValid);
     if (!xValid || !yValid || !appValid || appId <= 0) { error("Invalid display coordinates."); QCoreApplication::exit(1); return; }
     m_Window.reset(new QQuickWindow());
+    QScreen* selectedScreen = QGuiApplication::primaryScreen();
     for (auto screen : QGuiApplication::screens()) {
-        if (screen->geometry().contains(x, y)) { m_Window->setScreen(screen); break; }
+        if (screen->geometry().contains(x, y)) { selectedScreen = screen; break; }
     }
-    m_Window->setGeometry(x, y, 960, 640);
+    if (selectedScreen) {
+        m_Window->setScreen(selectedScreen);
+        const QRect bounds = selectedScreen->geometry();
+        m_Window->setGeometry(bounds.x() + 20, bounds.y() + 20,
+                              qMin(960, bounds.width() - 40), qMin(640, bounds.height() - 40));
+    }
     // A hidden window conveys upstream's display-selection contract. It never
     // owns or wraps the SDL streaming video surface and loads no QML frontend.
     m_Launcher = new CliStartStream::Launcher(args[3], appId, m_Preferences, this);

@@ -15,6 +15,7 @@ jobs:
       matrix:
         architecture: [x86_64, universal]
     runs-on: macos-26
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
         with:
@@ -46,12 +47,16 @@ jobs:
         run: |
           mkdir -p build/previews
           app='build/native-universal/Moonlight Native Glass.app/Contents/MacOS/MoonlightNative'
-          "$app" --design-preview --light --capture-preview "$PWD/build/previews/main-light.png"
-          "$app" --design-preview --dark --capture-preview "$PWD/build/previews/main-dark.png"
-          "$app" --design-preview --compact --dark --capture-preview "$PWD/build/previews/main-compact.png"
+          python3 tests/native/capture_windows.py "$app" "$PWD/build/previews"
           test -s build/previews/main-light.png
           test -s build/previews/main-dark.png
           test -s build/previews/main-compact.png
+      - uses: actions/upload-artifact@v6
+        if: always() && matrix.architecture == 'universal'
+        with:
+          name: Native-UI-Window-Captures
+          path: build/previews/*
+          if-no-files-found: warn
       - name: Package preview artifact
         run: |
           ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-1-${{ matrix.architecture }}.zip'

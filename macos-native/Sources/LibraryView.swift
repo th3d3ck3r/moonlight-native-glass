@@ -4,6 +4,7 @@ import SwiftUI
 struct LibraryView: View {
     @ObservedObject var store: EngineStore
     @State private var search = ""
+    @State private var showHidden = false
     @State private var addPresented = false
     @State private var details: Computer?
     @State private var removal: Computer?
@@ -14,9 +15,9 @@ struct LibraryView: View {
     @State private var columnCount = 4
 
     private var games: [Game] {
-        (store.selected?.apps ?? []).filter { !$0.hidden && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) }
+        (store.selected?.apps ?? []).filter { (showHidden || !$0.hidden || $0.id == store.selected?.runningApp) && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) }
     }
-    private var controlsEnabled: Bool { store.ready && !store.streamActive && store.pairing == nil && !store.addingHost }
+    private var controlsEnabled: Bool { store.ready && !store.streamActive && store.pairing == nil && !store.addingHost && !store.testingConnection }
 
     var body: some View {
         NavigationSplitView {
@@ -53,6 +54,10 @@ struct LibraryView: View {
                         Button { details = computer } label: { Label("Computer Details", systemImage: "info.circle") }
                             .help("Show computer details")
                     }
+                    Menu {
+                        Toggle("Show Hidden Games", isOn: $showHidden)
+                    } label: { Label("Library Options", systemImage: "line.3.horizontal.decrease.circle") }
+                    .help("Game library options")
                     SettingsLink { Label("Settings", systemImage: "gearshape") }.help("Streaming settings")
                 }
             }
@@ -61,7 +66,8 @@ struct LibraryView: View {
         .sheet(item: $store.pairing) { request in PairingSheet(request: request).interactiveDismissDisabled() }
         .sheet(item: $details) { ComputerDetailsSheet(computer: $0) }
         .sheet(item: $rename) { RenameComputerSheet(store: store, computer: $0) }
-        .alert(item: $store.message) { message in Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK"))) }
+        .background(NativeWindowAccessor { store.libraryWindow = $0 }.frame(width: 0, height: 0))
+        .alert(item: Binding(get: { store.message?.settingsScene == false ? store.message : nil }, set: { store.message = $0 })) { message in Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK"))) }
         .confirmationDialog("Remove \(removal?.name ?? "computer")?", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } }), titleVisibility: .visible) {
             if let computer = removal { Button("Remove Computer", role: .destructive) { store.send("remove", ["host": computer.id]) } }
         } message: { Text("This removes the saved computer and pairing from this app.") }
@@ -110,14 +116,20 @@ struct LibraryView: View {
                             ForEach(games) { game in
                                 Button { store.startStream(computer, game: game) } label: {
                                     GameCard(game: game, running: computer.runningApp == game.id)
+                                        .padding(4)
+                                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(focusedGame == game.id ? Color.accentColor : .clear, lineWidth: 2))
                                 }
                                 .buttonStyle(.plain)
                                 .focused($focusedGame, equals: game.id)
                                 .onMoveCommand { moveGames($0) }
                                 .help("Stream \(game.name)")
+                                .onAppear { store.requestArtwork(computer, game: game) }
                                 .disabled(!controlsEnabled || !computer.supported)
                                 .contextMenu {
                                     Button("Stream \(game.name)") { store.startStream(computer, game: game) }.disabled(!controlsEnabled)
+                                    Button(game.hidden ? "Show Game" : "Hide Game") {
+                                        store.send("hideGame", ["host": computer.id, "app": game.id, "hidden": !game.hidden])
+                                    }.disabled(!controlsEnabled)
                                     if computer.runningApp == game.id { Button("Quit App…", role: .destructive) { quitApp = computer }.disabled(!controlsEnabled) }
                                 }
                             }
@@ -197,12 +209,12 @@ struct LibraryView: View {
     }
     private func configureController() {
         guard !store.streamActive else { return }
-        controller.start(move: { direction in moveGames(direction) }, select: {
-            guard controlsEnabled, let computer = store.selected else { return }
+        controller.start(move: { direction in if store.libraryWindow?.isKeyWindow == true { moveGames(direction) } }, select: {
+            guard controlsEnabled, store.libraryWindow?.isKeyWindow == true, let computer = store.selected else { return }
             if !computer.paired && computer.online { store.pair(computer) }
             else if let game = games.first(where: { $0.id == focusedGame }) ?? games.first { store.startStream(computer, game: game) }
         }, changeComputer: { delta in
-            guard !store.computers.isEmpty else { return }
+            guard store.libraryWindow?.isKeyWindow == true, !store.computers.isEmpty else { return }
             let index = store.computers.firstIndex { $0.id == store.selectedID } ?? 0
             store.selectedID = store.computers[min(max(0, index + delta), store.computers.count - 1)].id
         })
@@ -255,6 +267,7 @@ struct GameCard: View {
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(hover ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: hover ? 2 : 0.5))
             Text(game.name).font(.headline).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
             if running { Label("Running", systemImage: "play.fill").font(.caption).foregroundStyle(.secondary) }
+            else if game.hidden { Label("Hidden", systemImage: "eye.slash").font(.caption).foregroundStyle(.secondary) }
             else if game.hdr { Text("HDR supported").font(.caption).foregroundStyle(.secondary) }
         }
         .contentShape(Rectangle())

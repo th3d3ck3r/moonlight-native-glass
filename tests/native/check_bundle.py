@@ -23,6 +23,30 @@ for file in app.rglob("*"):
         continue
     slices = set(subprocess.check_output(["lipo", "-archs", str(file)], text=True).split())
     assert required <= slices, f"{file}: missing {required - slices}"
+    dependencies = subprocess.check_output(["otool", "-L", str(file)], text=True)
+    nearest_app = next(parent for parent in file.parents if parent.suffix == ".app")
+    frameworks = nearest_app / "Contents/Frameworks"
+    for line in dependencies.splitlines():
+        if not line.startswith("\t"):
+            continue
+        dependency = line.strip().split(" (", 1)[0]
+        if dependency.startswith(("/System/Library/", "/usr/lib/", "/Library/Apple/System/Library/")):
+            continue  # Apple libraries may live only in the dyld shared cache.
+        if dependency.startswith("@rpath/libswift"):
+            continue  # Swift runtime is supplied by supported macOS versions.
+        if dependency.startswith("@rpath/"):
+            candidate = frameworks / dependency[len("@rpath/"):]
+            assert candidate.exists(), f"{file}: unresolved bundled dependency {dependency}"
+        elif dependency.startswith("@loader_path/"):
+            candidate = file.parent / dependency[len("@loader_path/"):]
+            assert candidate.exists(), f"{file}: unresolved loader dependency {dependency}"
+        elif dependency.startswith("@executable_path/"):
+            candidate = nearest_app / "Contents/MacOS" / dependency[len("@executable_path/"):]
+            assert candidate.exists(), f"{file}: unresolved executable dependency {dependency}"
+        else:
+            # Mach-O dylib IDs are also listed by otool -L; a relative ID can
+            # name this file itself. Absolute SDK/Homebrew links are rejected.
+            assert not dependency.startswith("/"), f"{file}: external dependency {dependency}"
     checked += 1
 assert checked >= 2, "No native app and engine found"
-print(f"Validated bundle permissions, identities and {checked} Mach-O files: {sorted(required)}")
+print(f"Validated bundle permissions, identities, library dependencies and {checked} Mach-O files: {sorted(required)}")

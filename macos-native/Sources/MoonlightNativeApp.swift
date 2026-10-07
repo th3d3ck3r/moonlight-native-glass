@@ -3,6 +3,14 @@ import SwiftUI
 
 final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     weak var store: EngineStore?
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async {
+            NSApp.windows.first(where: { $0.contentView != nil })?.makeKeyAndOrderFront(nil)
+            captureDesignPreviewIfRequested()
+        }
+    }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if store?.streamActive == true {
             let alert = NSAlert()
@@ -25,7 +33,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         Window("Moonlight Native Glass", id: "library") {
             LibraryView(store: store)
                 .frame(minWidth: 680, minHeight: 460)
-                .onAppear { delegate.store = store; store.start(); captureDesignPreviewIfRequested() }
+                .onAppear { delegate.store = store; store.start() }
         }
         .defaultSize(width: 1080, height: 720)
         .commands {
@@ -66,11 +74,7 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
     if args.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
     if args.contains("--light") { NSApp.appearance = NSAppearance(named: .aqua) }
     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }), let view = window.contentView else { exit(2) }
-        for size in [NSSize(width: 1080, height: 720), NSSize(width: 680, height: 460), NSSize(width: 1280, height: 800)] {
-            window.setContentSize(size)
-            for _ in 0..<50 { view.needsLayout = true; view.layoutSubtreeIfNeeded() }
-        }
+        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }), let view = window.contentView else { exit(2) }
         window.setContentSize(NSSize(width: args.contains("--compact") ? 680 : 1080, height: args.contains("--compact") ? 460 : 720))
         view.layoutSubtreeIfNeeded()
         guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(3) }
@@ -78,4 +82,14 @@ extension Notification.Name { static let nativeAddComputer = Notification.Name("
         guard let data = bitmap.representation(using: .png, properties: [:]) else { exit(4) }
         do { try data.write(to: URL(fileURLWithPath: args[index + 1])); NSApp.terminate(nil) } catch { exit(5) }
     }
+}
+
+struct NativeWindowAccessor: NSViewRepresentable {
+    let report: (NSWindow?) -> Void
+    final class ObserverView: NSView {
+        var report: ((NSWindow?) -> Void)?
+        override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); report?(window) }
+    }
+    func makeNSView(context: Context) -> ObserverView { let view = ObserverView(); view.report = report; return view }
+    func updateNSView(_ view: ObserverView, context: Context) { view.report = report }
 }

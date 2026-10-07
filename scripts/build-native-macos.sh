@@ -20,7 +20,10 @@ export CFLAGS=-flto=thin CXXFLAGS=-flto=thin LDFLAGS=-flto=thin
     make -j"$(sysctl -n hw.logicalcpu)" release
 )
 engine_app="$build_root/engine/app/Moonlight.app"
-macdeployqt "$engine_app" -qmldir="$source_root/app/gui" -appstore-compliant
+macdeployqt "$engine_app" -qmldir="$source_root/app/gui" -appstore-compliant -no-codesign
+# Qt's optional Mimer SQL driver references an unavailable proprietary client
+# library. Moonlight does not use Mimer; ship no broken optional driver.
+rm -f "$engine_app/Contents/PlugIns/sqldrivers/libqsqlmimer.dylib"
 sdk=$(xcrun --sdk macosx --show-sdk-path)
 for cpu in "${native_archs[@]}"; do
     xcrun swiftc -swift-version 5 -parse-as-library -O -sdk "$sdk" \

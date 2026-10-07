@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 private enum SettingsPane: String, CaseIterable, Identifiable {
@@ -41,6 +42,8 @@ struct NativeSettingsView: View {
                     }
                     if pane == .network {
                         Section {
+                            Button(store.testingConnection ? "Testing Internet Streaming Ports…" : "Test Internet Streaming Ports") { store.testConnection() }
+                                .disabled(store.testingConnection)
                             Button("Open Local Network Settings") {
                                 if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_LocalNetwork") { NSWorkspace.shared.open(url) }
                             }
@@ -53,6 +56,10 @@ struct NativeSettingsView: View {
             Divider()
             Text(store.streamActive ? "Settings are unavailable while streaming." : "Changes save automatically. App updates are manual.")
                 .font(.caption).foregroundStyle(.secondary).padding(12)
+        }
+        .background(NativeWindowAccessor { store.settingsWindow = $0 }.frame(width: 0, height: 0))
+        .alert(item: Binding(get: { store.message?.settingsScene == true ? store.message : nil }, set: { store.message = $0 })) { message in
+            Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK")))
         }
     }
     @ViewBuilder private func preference(_ field: PreferenceField) -> some View {

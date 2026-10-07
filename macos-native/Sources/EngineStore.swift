@@ -67,6 +67,7 @@ struct NativeMessage: Identifiable {
     let id = UUID()
     let title: String
     let detail: String
+    var settingsScene = false
 }
 struct PairingRequest: Identifiable {
     let id = UUID()
@@ -82,12 +83,15 @@ struct PairingRequest: Identifiable {
     @Published var status = "Starting streaming engine…"
     @Published var message: NativeMessage?
     @Published var pairing: PairingRequest?
+    @Published var testingConnection = false
     @Published var addingHost = false
     @Published var streamActive = false
     @Published var streamStarted = false
     @Published var quitRequired: String?
     @Published var warnings: [String] = []
     @Published var selectedID: String?
+    weak var settingsWindow: NSWindow?
+    weak var libraryWindow: NSWindow?
     let preview: Bool
     private var channel: EngineChannel?
     private var stream: EngineChannel?
@@ -150,6 +154,11 @@ struct PairingRequest: Identifiable {
                 }
             case "hostAdded": addingHost = false; hostDeadline?.cancel()
             case "paired": pairing = nil
+            case "connectionTest":
+                testingConnection = false
+                let result = event["result"] as? Int ?? -1
+                let detail = result == 0 ? "Internet streaming ports are reachable. This test does not check your local host or its firewall." : result == -1 ? "The Internet streaming port test was inconclusive. Check your network connection and try again." : "These Internet streaming ports appear blocked: \(event["ports"] as? String ?? "Not reported")."
+                message = NativeMessage(title: "Connection Test", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true)
             case "paused":
                 if let request = pendingStream { pendingStream = nil; runStream(request.0, game: request.1) }
             case "error": addingHost = false; hostDeadline?.cancel(); pairing = nil; fail(event["message"] as? String ?? "The engine could not complete this request.")
@@ -163,6 +172,15 @@ struct PairingRequest: Identifiable {
         var request = data; request["command"] = action
         do { guard let channel else { throw CocoaError(.fileWriteUnknown) }; try channel.send(request); return true }
         catch { fail("Could not send the request to the engine. Use Refresh to reconnect."); return false }
+    }
+    func requestArtwork(_ computer: Computer, game: Game) {
+        guard !streamActive, !preview, game.artwork.isEmpty else { return }
+        send("artwork", ["host": computer.id, "app": game.id])
+    }
+    func testConnection() {
+        guard !testingConnection else { return }
+        testingConnection = true
+        if !send("testConnection") { testingConnection = false }
     }
     func refresh() { if channel == nil { start() } else { send("snapshot") } }
     func add(_ address: String) {
@@ -223,7 +241,7 @@ struct PairingRequest: Identifiable {
         do { try stream?.send(["command": "confirmQuit"]) } catch { fail(error.localizedDescription) }
     }
     func cancelLaunch() { quitRequired = nil; pendingStream = nil; stream?.stop(); if stream == nil { streamActive = false; send("resume") } }
-    func fail(_ detail: String) { message = NativeMessage(title: "Moonlight Native Glass", detail: detail) }
+    func fail(_ detail: String) { message = NativeMessage(title: "Moonlight Native Glass", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true) }
     func shutdown() {
         shuttingDown = true; hostDeadline?.cancel(); channel?.stop(); stream?.stop()
     }

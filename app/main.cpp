@@ -874,7 +874,10 @@ int main(int argc, char *argv[])
     }
 
     // Apply the initial translation based on user preference
-    StreamingPreferences::get()->retranslate();
+#ifdef Q_OS_DARWIN
+    if (commandLineParserResult != GlobalCommandLineParser::NativeRequested)
+#endif
+        StreamingPreferences::get()->retranslate();
 
     // Trickily declare the translation for dialog buttons
     QCoreApplication::translate("QPlatformTheme", "&Yes");

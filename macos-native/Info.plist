@@ -4,6 +4,8 @@
     <key>CFBundleExecutable</key><string>MoonlightNative</string>
     <key>CFBundleIdentifier</key><string>com.moonlight-stream.NativeGlass</string>
     <key>CFBundleDisplayName</key><string>Moonlight Native Glass</string>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleLocalizations</key><array><string>en</string></array>
     <key>CFBundleName</key><string>Moonlight Native Glass</string>
     <key>CFBundleIconFile</key><string>moonlight</string>
     <key>CFBundlePackageType</key><string>APPL</string>
