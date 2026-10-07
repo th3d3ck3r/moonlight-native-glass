@@ -34,6 +34,26 @@ Liquid Glass navigation and controls on **macOS 26+**, regular native styling on
 
 English interface. Manual updates only. Preview packages use verified **ad-hoc signatures**, not Developer ID signing or notarization.
 
+### 🌙 Separate stream-window build — Preview 5
+
+**Optional build with close-to-menu-bar stream windows.** Closing an already opened windowed stream hides its existing window and keeps the session connected. Click the crescent to restore it. If no stream window has opened, the icon opens the regular app. Right-click for Settings and Quit.
+
+| Your Mac | Separate package |
+|---|---|
+| 🖥️ **Intel** | [⬇️ Preview 5 Intel ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-5/Moonlight-Native-Glass-Preview-5-x86_64.zip) |
+| 🍎 **Intel + Apple Silicon** | [⬇️ Preview 5 Universal ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-5/Moonlight-Native-Glass-Preview-5-universal.zip) |
+
+[Preview 5 release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-6.2-preview-5) · [Checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-5/SHA256SUMS.txt) · [Build checks `e96caef`](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37692872366) · [UI checks](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37693779148)
+
+Full Intel/Universal builds, native UI checks and a real SDL window lifecycle test passed. Live host streaming, audio/input after hide/restore and physical Intel Tahoe behavior still need testing. Preview 4 downloads above remain available.
+
+<details>
+<summary>Preview 5 menu bar screenshot</summary>
+
+![Preview 5 secondary-click menu — sample-content app](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-5/menu-bar.png)
+
+</details>
+
 ## ✨ Features
 
 | Area | What this app provides |
