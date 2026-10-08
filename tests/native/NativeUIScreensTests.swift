@@ -8,9 +8,11 @@ import XCTest
         app.launch()
         let window = app.windows["native-settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        let label = window.staticTexts["Choose and Order Buttons"]
-        for _ in 0..<8 { if label.isHittable { break }; window.scrollViews.firstMatch.swipeUp() }
-        XCTAssertTrue(label.exists, "Control bar customization missing")
+        let customization = window.descendants(matching: .any)["overlay-button-customization"].firstMatch
+        for _ in 0..<8 { if customization.isHittable { break }; window.scrollViews.firstMatch.swipeUp() }
+        XCTAssertTrue(customization.exists, "Control bar customization missing")
+        customization.click()
+        XCTAssertTrue(window.descendants(matching: .any)["Add Button"].firstMatch.waitForExistence(timeout: 5), "Control bar customization must expand")
         let shot = XCTAttachment(screenshot: window.screenshot()); shot.name = "settings-overlay"; shot.lifetime = .keepAlways; add(shot)
         app.terminate()
     }

@@ -33,6 +33,27 @@ static NSWindow* cocoa(SDL_Window* window) {
     check(SDL_GetWindowWMInfo(window, &info), "SDL Cocoa window info unavailable");
     return info.info.cocoa.window;
 }
+static void checkRelativeMotion(SDL_Window* window) {
+    SDL_FlushEvent(SDL_MOUSEMOTION);
+    // Route actual native motion through SDL's Cocoa event handler. The first
+    // event after enabling relative mode is intentionally discarded by SDL.
+    for (int i=0; i<2; ++i) {
+        CGEventRef current=CGEventCreate(nullptr);
+        CGEventRef motion=CGEventCreateMouseEvent(nullptr,kCGEventMouseMoved,
+            CGEventGetLocation(current),kCGMouseButtonLeft);
+        CGEventSetIntegerValueField(motion,kCGMouseEventDeltaX,13);
+        CGEventSetIntegerValueField(motion,kCGMouseEventDeltaY,-7);
+        [NSApp postEvent:[NSEvent eventWithCGEvent:motion] atStart:NO];
+        CFRelease(motion); CFRelease(current);
+        pump();
+    }
+    SDL_Event event; bool routed=false;
+    while (SDL_PollEvent(&event)) {
+        if (event.type==SDL_MOUSEMOTION && event.motion.windowID==SDL_GetWindowID(window)
+            && event.motion.xrel==13 && event.motion.yrel==-7) routed=true;
+    }
+    check(routed,"Relative motion must reach the original SDL stream after native controls");
+}
 int main(int argc, char** argv) {
     @autoreleasepool {
         if (argc == 3 && std::string(argv[1]) == "--restore") {
@@ -126,6 +147,11 @@ int main(int argc, char** argv) {
         for (Uint32 mode : {Uint32(0), Uint32(SDL_WINDOW_FULLSCREEN_DESKTOP), Uint32(SDL_WINDOW_FULLSCREEN)}) {
             check(SDL_SetWindowFullscreen(window,mode)==0,"Fullscreen title-bar transition"); pump(1.0);
             check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
+            nativeOverlayRestoreStreamFocus(window);
+            check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Fresh relative capture must work before controls");
+            pump();
+            const NSRect freshRelativeRect=cocoa(window).mouseConfinementRect;
+            checkRelativeMotion(window);
             SDL_SetRelativeMouseMode(SDL_FALSE); SDL_ShowCursor(SDL_DISABLE);
             SDL_SetWindowMouseGrab(window,SDL_FALSE);
             nativeOverlayBeginControlsInput(window); nativeOverlaySetControlsVisible(true); pump();
@@ -145,7 +171,12 @@ int main(int argc, char** argv) {
             check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Relative capture must still work after controls");
             pump();
             check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Capture must survive the native event queue after Done");
-            check(!NSIsEmptyRect(cocoa(window).mouseConfinementRect),"Cocoa confinement must survive Done, not only SDL's capture indicator");
+            // SDL 2.30.5 disassociates the system cursor in relative mode;
+            // without an explicit grab its Cocoa confinement rect is empty.
+            // Compare against fresh capture and verify real event routing,
+            // while keeping the nonempty-rect assertion for visible controls.
+            check(NSEqualRects(cocoa(window).mouseConfinementRect,freshRelativeRect),"Done must restore the same Cocoa pointer state as fresh relative capture");
+            checkRelativeMotion(window);
             SDL_SetRelativeMouseMode(SDL_FALSE); SDL_ShowCursor(SDL_ENABLE);
             [other orderOut:nil]; [other release];
             SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);

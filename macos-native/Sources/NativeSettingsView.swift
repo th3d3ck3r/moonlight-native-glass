@@ -203,6 +203,7 @@ private struct OverlaySettings: View {
                 }
                 Menu("Add Button") { ForEach((0..<11).filter { !buttons.contains($0) }, id: \.self) { id in Button(names[id]) { buttons.append(id); saveButtons() } } }
             }
+            .accessibilityIdentifier("overlay-button-customization")
             Button("Restore Overlay Defaults") {
                 scale = 1; position = "topLeft"; buttons = [2,3,1,6,7]
                 saveButtons(); notify()
