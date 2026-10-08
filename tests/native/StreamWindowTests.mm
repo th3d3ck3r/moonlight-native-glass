@@ -103,6 +103,7 @@ int main(int argc, char** argv) {
         for (NSToolbarItem* item in nativeWindow.toolbar.items)
             if ([item.itemIdentifier isEqual:@"NativeHost"]) hostButton=(NSButton*)item.view;
         check(hostButton!=nil,"Missing computer-name Control Center entry");
+        check([NSStringFromClass(hostButton.class) isEqualToString:@"MLStreamToolbarButton"],"Title-bar controls must return tracked mouse-up to SDL");
         // Unlike performClick:, these events exercise AppKit's button tracking
         // loop and SDL's title-bar focus-click bookkeeping.
         NSPoint click=[hostButton convertPoint:NSMakePoint(NSMidX(hostButton.bounds),NSMidY(hostButton.bounds)) toView:nil];
@@ -122,6 +123,7 @@ int main(int argc, char** argv) {
             SDL_SetWindowMouseGrab(window,SDL_FALSE);
             nativeOverlayBeginControlsInput(window); nativeOverlaySetControlsVisible(true); pump();
             check(SDL_ShowCursor(SDL_QUERY)==SDL_ENABLE && SDL_GetWindowMouseGrab(window),"Controls pointer must be visible and confined in every window mode");
+            check(!NSIsEmptyRect(cocoa(window).mouseConfinementRect),"Cocoa must actually confine the controls pointer, not only report SDL grab enabled");
             check(SDL_GetKeyboardFocus()==window,"Controls must preserve SDL keyboard focus");
             nativeOverlaySetControlsVisible(false); nativeOverlayEndControlsInput();
             check(!SDL_GetWindowMouseGrab(window) && SDL_ShowCursor(SDL_QUERY)==SDL_DISABLE,"Controls dismissal must restore the prior pointer state");
@@ -136,6 +138,7 @@ int main(int argc, char** argv) {
             check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Relative capture must still work after controls");
             pump();
             check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Capture must survive the native event queue after Done");
+            check(!NSIsEmptyRect(cocoa(window).mouseConfinementRect),"Cocoa confinement must survive Done, not only SDL's capture indicator");
             SDL_SetRelativeMouseMode(SDL_FALSE); SDL_ShowCursor(SDL_ENABLE);
             [other orderOut:nil]; [other release];
             SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);
