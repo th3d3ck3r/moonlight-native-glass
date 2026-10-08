@@ -19,6 +19,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     nativeOverlayAttach(window,"overlay-test"); check(nativeOverlayEventType()!=SDL_USEREVENT,"Must not consume upstream SDL user events");
     const char* sample="Video stream: 1920x1080 60 FPS\nVideo codec: H.264\nIncoming frame rate: 59.98 FPS\nRendering frame rate: 59.98 FPS\nFrames dropped by network: 0.00%\nAverage network latency: 2 ms\nAverage decoding time: 1.2 ms\nAverage frame queue delay: 0.4 ms\nAverage rendering time: 0.8 ms";
     check(nativeOverlayPresent(0,true,sample),"Native statistics ownership"); check(nativeOverlayPresent(1,true,"Design preview · Sample values"),"Status ownership"); pump();
+    fprintf(stderr,"Overlay children=%lu visible=%d configured=%d\n",(unsigned long)window.childWindows.count,window.visible,nativeOverlayConfigured());
     check(window.childWindows.count==2,"Passive surfaces only; controls hidden by default");
     for (NSWindow* panel in window.childWindows) check(panel.ignoresMouseEvents,"Statistics/status must pass through input");
     check(NSApp.keyWindow==window,"Passive overlay must not steal focus");
@@ -26,6 +27,12 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(nativeOverlayShortcut(&key)==11,"Default controls shortcut");
     for (int i=0;i<12;i++) { key.keysym.sym="qzxsmcdvleko"[i]; check(nativeOverlayShortcut(&key)==i,"Every existing shortcut is retained"); }
     key.keysym.mod=KMOD_LCTRL; check(nativeOverlayShortcut(&key)==-1,"Normal host keys must not be consumed");
+    [defaults setObject:@{@"11":@{@"key":@"p",@"modifiers":@3}} forKey:@"shortcuts"]; [defaults synchronize];
+    [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
+    key.keysym.sym=SDLK_p; key.keysym.mod=KMOD_LCTRL|KMOD_LALT; check(nativeOverlayShortcut(&key)==11,"Customized controls shortcut");
+    key.keysym.sym=SDLK_o; key.keysym.mod|=KMOD_LSHIFT; check(nativeOverlayShortcut(&key)==-1,"Old custom binding must be removed");
+    [defaults removeObjectForKey:@"shortcuts"]; [defaults synchronize];
+    [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
     NSString* out=argc>1 ? [NSString stringWithUTF8String:argv[1]] : @"/tmp";
     [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]]; pump(); capture([out stringByAppendingPathComponent:@"overlay-dark.png"]);
     nativeOverlaySetControlsVisible(true); pump(); check(window.childWindows.count==3,"Separate controls surface"); capture([out stringByAppendingPathComponent:@"overlay-controls-dark.png"]);

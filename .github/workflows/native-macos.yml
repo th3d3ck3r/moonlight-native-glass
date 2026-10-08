@@ -70,6 +70,11 @@ jobs:
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/overlay-tests
           build/overlay-tests build/overlay-previews
+          python3 - <<'PYQA'
+          import pathlib, base64
+          for name in ['overlay-dark', 'overlay-controls-dark', 'overlay-compact-large', 'overlay-light']:
+              print('OVERLAY_VISUAL_QA:' + name + ':' + base64.b64encode((pathlib.Path('build/overlay-previews') / (name + '.png')).read_bytes()).decode())
+          PYQA
       - uses: actions/upload-artifact@v6
         if: matrix.architecture == 'universal'
         with:

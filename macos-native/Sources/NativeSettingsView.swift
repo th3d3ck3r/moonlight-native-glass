@@ -3,10 +3,10 @@ import SwiftUI
 import IOKit
 
 private enum SettingsPane: String, CaseIterable, Identifiable {
-    case video = "Video", audio = "Audio", input = "Input", network = "Network", advanced = "Advanced"
+    case video = "Video", audio = "Audio", input = "Input", network = "Network", advanced = "Advanced", overlay = "Overlay"
     var id: String { rawValue }
     var symbol: String {
-        switch self { case .video: "display"; case .audio: "speaker.wave.2"; case .input: "gamecontroller"; case .network: "network"; case .advanced: "slider.horizontal.3" }
+        switch self { case .video: "display"; case .audio: "speaker.wave.2"; case .input: "gamecontroller"; case .network: "network"; case .advanced: "slider.horizontal.3"; case .overlay: "rectangle.on.rectangle" }
     }
     var keys: [String] {
         switch self {
@@ -14,6 +14,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         case .audio: ["audioConfig", "playAudioOnHost", "muteOnFocusLoss"]
         case .input: ["multiController", "gamepadMouse", "backgroundGamepad", "swapFaceButtons", "absoluteMouseMode", "absoluteTouchMode", "swapMouseButtons", "reverseScrollDirection", "captureSysKeysMode"]
         case .network: ["enableMdns", "detectNetworkBlocking", "connectionWarnings"]
+        case .overlay: []
         case .advanced: ["gameOptimizations", "quitAppAfter", "configurationWarnings", "showPerformanceOverlay", "keepAwake", "unlockBitrate", "richPresence"]
         }
     }
@@ -29,23 +30,25 @@ struct NativeSettingsView: View {
             if store.preview { Label("Design preview · Sample settings", systemImage: "photo").font(.caption).foregroundStyle(.secondary).padding(.top, 10) }
             Picker("Settings", selection: $pane) { ForEach(SettingsPane.allCases) { Label($0.rawValue, systemImage: $0.symbol).tag($0) } }
                 .pickerStyle(.segmented).padding(20)
-            if store.fields.isEmpty {
+            if store.fields.isEmpty && pane != .overlay {
                 ContentUnavailableView("Settings Unavailable", systemImage: "gearshape", description: Text("Open the main window and connect to the streaming engine first."))
             } else {
                 Form {
-                    Section(pane.rawValue) {
-                        if pane == .video { resolutionPicker }
-                        ForEach(pane.keys.compactMap { key in store.fields.first { $0.id == key } }) { field in preference(field) }
+                    if pane != .overlay {
+                        Section(pane.rawValue) {
+                            if pane == .video { resolutionPicker }
+                            ForEach(pane.keys.compactMap { key in store.fields.first { $0.id == key } }) { field in preference(field) }
+                        }
+                        .disabled(!store.ready || store.streamActive || store.pairing != nil)
                     }
-                    .disabled(!store.ready || store.streamActive || store.pairing != nil)
-                    if pane == .advanced { OverlaySettings() }
+                    if pane == .overlay { OverlaySettings() }
                     if pane == .video {
                         Section {
                             Text("Automatic selections use Moonlight Qt's normal capability checks. HDR and codecs depend on your Mac, display and host.").font(.callout).foregroundStyle(.secondary)
                         }
                     }
                     if pane == .input {
-                        Section { Text("Disconnect a stream with Control–Option–Shift–Q or Start + Select + L1 + R1. In the library, use the D-pad to select games, A to launch, and shoulder buttons to switch computers.").foregroundStyle(.secondary) }
+                        Section { Text("Disconnect a stream with its configured shortcut (Control–Option–Shift–Q by default) or Start + Select + L1 + R1. In the library, use the D-pad to select games, A to launch, and shoulder buttons to switch computers.").foregroundStyle(.secondary) }
                     }
                     if pane == .network {
                         Section {
@@ -56,6 +59,7 @@ struct NativeSettingsView: View {
                             }
                             Text("Allow Moonlight Native Glass to access your local network. Host networking and pairing are handled by the Moonlight Qt engine.").foregroundStyle(.secondary)
                         }
+                        .disabled(!store.ready || store.streamActive || store.pairing != nil)
                     }
                 }.formStyle(.grouped)
             }
@@ -73,7 +77,7 @@ struct NativeSettingsView: View {
             refreshNativeResolution()
             guard store.preview, let screen = nativeArgument("--preview-screen") else { return }
             let name = screen.replacingOccurrences(of: "settings-", with: "").capitalized
-            pane = screen == "settings-overlay" ? .advanced : (SettingsPane(rawValue: name) ?? .video)
+            pane = screen == "settings-overlay" ? .overlay : (SettingsPane(rawValue: name) ?? .video)
         }
         .alert(item: Binding(get: { store.message?.settingsScene == true ? store.message : nil }, set: { store.message = $0 })) { message in
             Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK")))
@@ -169,7 +173,13 @@ private struct OverlaySettings: View {
     @AppStorage("scale", store: Self.defaults) private var scale = 1.0
     @AppStorage("position", store: Self.defaults) private var position = "topLeft"
     @AppStorage("controlsEnabled", store: Self.defaults) private var enabled = false
-    @State private var buttons = (Self.defaults.array(forKey: "buttons") as? [Int]) ?? [2,3,1,6,7]
+    @State private var buttons = Self.savedButtons()
+    private static func savedButtons() -> [Int] {
+        guard let saved = defaults.array(forKey: "buttons") as? [Int] else { return [2,3,1,6,7] }
+        var result: [Int] = []
+        for id in saved where (0..<11).contains(id) && !result.contains(id) { result.append(id) }
+        return result
+    }
     @State private var shortcuts = (Self.defaults.dictionary(forKey: "shortcuts") as? [String: [String: Any]]) ?? [:]
     @State private var shortcutError: String?
     private let names = ["Disconnect", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls"]

@@ -34,6 +34,7 @@ static void pushAction(int code) { if (actionEvent == (Uint32)-1) return; SDL_Ev
 @property(nonatomic, retain) NSUserDefaults* defaults;
 @property(nonatomic, copy) NSString* token;
 @property(nonatomic, assign) BOOL showingControls;
+@property(nonatomic, assign) BOOL layingOut;
 - (void)refresh;
 - (void)layoutPanels;
 @end
@@ -59,7 +60,8 @@ static MLOverlayController* controller;
     NSPanel* panel = [[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,300,100) styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO] autorelease];
     panel.releasedWhenClosed = NO; panel.opaque = NO; panel.backgroundColor = NSColor.clearColor;
     panel.hasShadow = YES; panel.ignoresMouseEvents = field != nullptr;
-    panel.collectionBehavior = NSWindowCollectionBehaviorFullScreenAuxiliary;
+    panel.collectionBehavior = NSWindowCollectionBehaviorFullScreenAuxiliary | NSWindowCollectionBehaviorIgnoresCycle;
+    panel.becomesKeyOnlyIfNeeded = YES;
     NSVisualEffectView* material = [[[NSVisualEffectView alloc] initWithFrame:panel.contentView.bounds] autorelease];
     material.material = NSVisualEffectMaterialHUDWindow; material.blendingMode = NSVisualEffectBlendingModeBehindWindow; material.state = NSVisualEffectStateActive;
     material.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable; material.wantsLayer = YES; material.layer.cornerRadius = 12; material.layer.masksToBounds = YES;
@@ -79,7 +81,6 @@ static MLOverlayController* controller;
         label.textColor = NSColor.labelColor; label.selectable = NO;
         [container addSubview:label]; *field = label;
     }
-    [self.parent addChildWindow:panel ordered:NSWindowAbove];
     return panel;
 }
 - (void)windowChanged:(NSNotification*)n { if (n.object == self.parent) [self layoutPanels]; }
@@ -92,10 +93,11 @@ static MLOverlayController* controller;
     NSDictionary* custom = [self.defaults dictionaryForKey:@"shortcuts"];
     { std::lock_guard<std::mutex> lock(bindingMutex);
       for (int i=0;i<12;i++) {
-          NSDictionary* b = custom[[NSString stringWithFormat:@"%d",i]];
-          NSString* key = b[@"key"];
+          id stored = custom[[NSString stringWithFormat:@"%d",i]];
+          NSDictionary* b = [stored isKindOfClass:NSDictionary.class] ? stored : nil;
+          NSString* key = [b[@"key"] isKindOfClass:NSString.class] ? b[@"key"] : nil;
           SDL_Keycode code = key.length == 1 ? (SDL_Keycode)[key.lowercaseString characterAtIndex:0] : defaultKeys[i];
-          int mods = b ? [b[@"modifiers"] intValue] : 7;
+          int mods = [b[@"modifiers"] isKindOfClass:NSNumber.class] ? [b[@"modifiers"] intValue] : 7;
           if (code < 'a' || code > 'z' || (mods != 3 && mods != 7 && mods != 10 && mods != 14)) { code=defaultKeys[i]; mods=7; }
           bindings[i] = {code, (SDL_Keymod)(((mods & 1) ? KMOD_CTRL : 0) | ((mods & 2) ? KMOD_ALT : 0) | ((mods & 4) ? KMOD_SHIFT : 0) | ((mods & 8) ? KMOD_GUI : 0))};
       }
@@ -115,6 +117,7 @@ static MLOverlayController* controller;
         CGFloat available = MAX(160,self.parent.frame.size.width - 40);
         NSMenu* overflow = [[[NSMenu alloc] initWithTitle:@"More Stream Controls"] autorelease];
         for (NSNumber* action in actions) {
+            if (![action isKindOfClass:NSNumber.class]) continue;
             NSInteger i = action.integerValue; if (i<0 || i>10) continue;
             if (x + 88 > available) { NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:names[i] action:@selector(action:) keyEquivalent:@""] autorelease]; item.target=self; item.tag=i; [overflow addItem:item]; continue; }
             NSButton* button = [NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:names[i]] target:self action:@selector(action:)];
@@ -127,8 +130,20 @@ static MLOverlayController* controller;
     }
     [self layoutPanels];
 }
+- (void)setPanel:(NSPanel*)panel visible:(BOOL)visible {
+    if (!panel) return;
+    if (visible) {
+        if (panel.parentWindow != self.parent) [self.parent addChildWindow:panel ordered:NSWindowAbove];
+        if (!panel.visible) [panel orderFront:nil];
+    } else {
+        if (panel.parentWindow) [panel.parentWindow removeChildWindow:panel];
+        if (panel.visible) [panel orderOut:nil];
+    }
+}
 - (void)layoutPanels {
-    if (!self.parent) return;
+    if (!self.parent || self.layingOut) return;
+    self.layingOut=YES;
+    @try {
     Snapshot copy[2]; { std::lock_guard<std::mutex> lock(snapshotMutex); copy[0]=snapshots[0]; copy[1]=snapshots[1]; }
     double savedScale = [self.defaults doubleForKey:@"scale"]; CGFloat scale = savedScale > 0 ? MAX(.8,MIN(1.5,savedScale)) : 1;
     NSRect bounds = [self.parent convertRectToScreen:[self.parent.contentView bounds]];
@@ -154,13 +169,14 @@ static MLOverlayController* controller;
         NSRect frame=NSMakeRect(x,y,width,height);
         if (!NSEqualRects(panel.frame,frame)) [panel setFrame:frame display:NO];
         BOOL visible=copy[i].enabled && copy[i].text[0] && self.parent.visible && !self.parent.miniaturized;
-        if (visible) [panel orderFront:nil]; else [panel orderOut:nil];
+        [self setPanel:panel visible:visible];
         NSVisualEffectView* material=(NSVisualEffectView*)panel.contentView;
         material.material=NSVisualEffectMaterialHUDWindow;
         if ([NSWorkspace sharedWorkspace].accessibilityDisplayShouldReduceTransparency) { material.state=NSVisualEffectStateInactive; panel.backgroundColor=NSColor.windowBackgroundColor; }
         else { material.state=NSVisualEffectStateActive; panel.backgroundColor=NSColor.clearColor; }
     }
-    if (self.controls) { NSRect frame=self.controls.frame; frame.origin=NSMakePoint(NSMidX(bounds)-frame.size.width/2,NSMinY(bounds)+12); [self.controls setFrame:frame display:NO]; if (self.parent.visible && !self.parent.miniaturized) [self.controls orderFront:nil]; else [self.controls orderOut:nil]; }
+    if (self.controls) { NSRect frame=self.controls.frame; frame.origin=NSMakePoint(NSMidX(bounds)-frame.size.width/2,NSMinY(bounds)+12); [self.controls setFrame:frame display:NO]; [self setPanel:self.controls visible:self.parent.visible && !self.parent.miniaturized]; }
+    } @finally { self.layingOut=NO; }
 }
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self]; [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
@@ -191,7 +207,8 @@ void nativeOverlayAttach(void* window, const char* token) {
     nativeOverlayDetach();
     if (actionEvent==(Uint32)-1) { Uint32 base=SDL_RegisterEvents(2); actionEvent=base == (Uint32)-1 ? base : base+1; }
     controller=[[MLOverlayController alloc] init]; controller.parent=(NSWindow*)window; controller.token=[NSString stringWithUTF8String:token];
-    [controller refresh]; configured=true;
+    @try { [controller refresh]; configured=true; }
+    @catch (NSException* error) { SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Native overlay unavailable: %s", error.reason.UTF8String); nativeOverlayDetach(); }
 }
 void nativeOverlayDetach() {
     configured=false; { std::lock_guard<std::mutex> lock(snapshotMutex); generation++; updatePending=false; snapshots[0]={}; snapshots[1]={}; }
