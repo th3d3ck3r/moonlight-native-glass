@@ -162,6 +162,14 @@ int main(int argc, char** argv) {
         check(opened,"Real title-bar click must queue Control Center");
         for (Uint32 mode : {Uint32(0), Uint32(SDL_WINDOW_FULLSCREEN_DESKTOP), Uint32(SDL_WINDOW_FULLSCREEN)}) {
             std::printf("MODE: 0x%x\n",mode); std::fflush(stdout);
+            // Session selects a supported display mode before entering exclusive
+            // fullscreen. Keep the fixture's floating 640x360 size from being
+            // mistaken for a physical monitor mode by sdl2-compat.
+            if (mode==SDL_WINDOW_FULLSCREEN) {
+                SDL_DisplayMode desktop;
+                check(SDL_GetDesktopDisplayMode(SDL_GetWindowDisplayIndex(window),&desktop)==0,"Exclusive fixture desktop mode unavailable");
+                check(SDL_SetWindowDisplayMode(window,&desktop)==0,"Exclusive fixture display mode selection failed");
+            }
             check(SDL_SetWindowFullscreen(window,mode)==0,"Fullscreen title-bar transition"); pump(1.0);
             check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
             nativeOverlayRestoreStreamFocus(window);
