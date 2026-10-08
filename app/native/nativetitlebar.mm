@@ -73,6 +73,7 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 - (void)closeDetails;
 - (void)perform:(NSString*)identifier anchor:(NSView*)anchor;
 - (void)readControllers;
+- (void)updateWindowToolbar;
 - (void)invalidate;
 @end
 static MLStreamTitlebar* titlebar;
@@ -126,11 +127,23 @@ static MLStreamTitlebar* titlebar;
     // desktop fullscreen has no titled mask; native fullscreen has FullScreen.
     dispatch_async(dispatch_get_main_queue(), ^{
         if (!self.window) return;
-        NSWindowStyleMask style=self.window.styleMask;
-        BOOL fullscreen=(style & NSWindowStyleMaskFullScreen) || !(style & NSWindowStyleMaskTitled);
-        if (fullscreen && self.window.toolbar==self.toolbar) self.window.toolbar=nil;
-        else if (!fullscreen && !self.window.toolbar) self.window.toolbar=self.toolbar;
+        [self updateWindowToolbar];
     });
+}
+- (void)updateWindowToolbar {
+    if (!self.window) return;
+    NSWindowStyleMask style=self.window.styleMask;
+    BOOL fullscreen=(style & NSWindowStyleMaskFullScreen) || !(style & NSWindowStyleMaskTitled);
+    // Attaching a toolbar changes the Cocoa content geometry. In particular,
+    // never install it on SDL's already-borderless initial fullscreen window,
+    // even briefly before a deferred resize callback removes it again.
+    if (fullscreen) {
+        if (self.window.toolbar==self.toolbar) self.window.toolbar=nil;
+    } else if (!self.window.toolbar) {
+        self.window.titleVisibility=NSWindowTitleHidden;
+        self.window.toolbarStyle=NSWindowToolbarStyleUnifiedCompact;
+        self.window.toolbar=self.toolbar;
+    }
 }
 - (void)overflowClicked:(NSMenuItem*)sender { [self perform:sender.representedObject anchor:nil]; }
 - (void)clicked:(NSButton*)sender {
@@ -275,9 +288,7 @@ void nativeTitlebarAttach(void* window) {
     titlebar.toolbar.allowsUserCustomization=NO; titlebar.toolbar.autosavesConfiguration=NO;
     if (@available(macOS 15.0, *)) titlebar.toolbar.centeredItemIdentifiers=[NSSet setWithObject:hostID];
     else titlebar.toolbar.centeredItemIdentifier=hostID;
-    titlebar.window.titleVisibility=NSWindowTitleHidden; titlebar.window.toolbarStyle=NSWindowToolbarStyleUnifiedCompact;
-    titlebar.window.toolbar=titlebar.toolbar; [titlebar readControllers];
-    [titlebar windowChanged:[NSNotification notificationWithName:NSWindowDidResizeNotification object:titlebar.window]];
+    [titlebar updateWindowToolbar]; [titlebar readControllers];
 }
 void nativeTitlebarDetach() {
     { std::lock_guard<std::mutex> lock(stateMutex); epoch++; pending=false; }

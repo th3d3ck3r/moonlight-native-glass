@@ -66,6 +66,21 @@ jobs:
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
           build/stream-window-tests
+      - name: Test fullscreen startup, Metal presentation and captured hide/restore
+        if: matrix.architecture == 'universal'
+        run: |
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
+            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/FullscreenWindowTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore -framework Metal \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/fullscreen-window-tests
+          build/fullscreen-window-tests 0 build/fullscreen-previews/fullscreen
+          build/fullscreen-window-tests 1 build/fullscreen-previews/borderless
+      - uses: actions/upload-artifact@v6
+        if: always() && matrix.architecture == 'universal'
+        with:
+          name: Native-Fullscreen-Previews
+          path: build/fullscreen-previews/**/*.png
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v6
         if: matrix.architecture == 'universal'
         with:
