@@ -8,9 +8,9 @@ import XCTest
         app.launch()
         let window = app.windows["native-settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        let label = window.staticTexts["Enable Optional Control Bar"]
+        let label = window.disclosureGroups["Choose and Order Buttons"]
         for _ in 0..<8 { if label.isHittable { break }; window.scrollViews.firstMatch.swipeUp() }
-        XCTAssertTrue(label.exists, "Optional controls setting missing")
+        XCTAssertTrue(label.exists, "Control bar customization missing")
         let shot = XCTAttachment(screenshot: window.screenshot()); shot.name = "settings-overlay"; shot.lifetime = .keepAlways; add(shot)
         app.terminate()
     }
@@ -50,7 +50,7 @@ import XCTest
             }
             if screen == "settings-shortcuts" {
                 XCTAssertTrue(window.staticTexts["Close Stream Window"].exists, "Shortcut bindings missing")
-                XCTAssertFalse(window.staticTexts["Enable Optional Control Bar"].exists, "Overlay controls must have their own tab")
+                XCTAssertFalse(window.disclosureGroups["Choose and Order Buttons"].exists, "Overlay controls must have their own tab")
             }
             // XCTest captures the composited UI, including system-owned glass.
             let screenshot = target.screenshot()
