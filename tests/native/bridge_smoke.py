@@ -55,6 +55,31 @@ with tempfile.TemporaryDirectory() as root:
         settings = bridge.wait("settings")
         assert isinstance(settings["values"]["videoCodecConfig"], int), settings
         assert len(settings["schema"]) >= 30
+        original = settings["values"]
+        schema = settings["schema"]
+        assert len({item["id"] for item in schema}) == len(schema), "Duplicate setting IDs"
+        assert {item["id"] for item in schema} == set(original), "Schema/value mismatch"
+        for item in schema:
+            key = item["id"]
+            assert type(original[key]) is (bool if item["boolean"] else int), key
+            # Every writable preference must reject the wrong JSON type and
+            # leave the complete settings transaction unchanged.
+            bridge.send({"command": "settings", "values": {key: "invalid"}})
+            bridge.wait("error")
+            bridge.send({"command": "snapshot"})
+            assert bridge.wait("settings")["values"] == original, key
+            for choice in item["choices"]:
+                bridge.send({"command": "settings", "values": {key: choice["value"]}})
+                assert bridge.wait("settings")["values"][key] == choice["value"], (key, choice)
+            if item["choices"]:
+                bridge.send({"command": "settings", "values": {key: original[key]}})
+                bridge.wait("settings")
+        toggled = {item["id"]: not original[item["id"]] for item in schema if item["boolean"]}
+        bridge.send({"command": "settings", "values": toggled})
+        changed = bridge.wait("settings")["values"]
+        assert all(changed[key] == value for key, value in toggled.items()), "Boolean settings roundtrip"
+        bridge.send({"command": "settings", "values": original})
+        assert bridge.wait("settings")["values"] == original, "Settings restoration"
         if len(sys.argv) > 2:
             pathlib.Path(sys.argv[2]).write_text(json.dumps(settings))
         before = settings["values"]["configurationWarnings"]
@@ -91,6 +116,18 @@ with tempfile.TemporaryDirectory() as root:
         live.wait("ready")
         assert live.wait("settings")["values"]["enableMdns"] is False
         assert live.wait("hosts")["hosts"] == []
+        # Invalid addresses must be rejected before any network operation.
+        for address in ["", "bad host", "https://example.invalid", "x" * 254]:
+            live.send({"command": "addHost", "address": address})
+            live.wait("error")
+        # Stale host actions must recover without changing the host list or
+        # leaving the ordinary helper unusable; no real host is contacted.
+        for action in ["pair", "wake", "rename", "remove", "hideGame", "artwork", "quitApp"]:
+            live.send({"command": action, "host": "missing-host", "pin": "1234", "name": "Test", "app": 1, "hidden": True})
+            live.wait("error")
+            live.send({"command": "snapshot"})
+            assert live.wait("hosts")["hosts"] == [], action
+            assert live.wait("settings")["values"]["enableMdns"] is False, action
         for request_id in ["cancelled-launch", "replacement-launch"]:
             live.send({"command": "pause", "requestID": request_id})
             assert live.wait("paused")["requestID"] == request_id, "Pause reply lost its launch identity"
@@ -98,4 +135,4 @@ with tempfile.TemporaryDirectory() as root:
             assert live.wait("hosts")["hosts"] == []
     finally:
         live.close()
-print("PASS: adapter startup, JSON/settings validation, persistence, correlated pause/resume replies")
+print("PASS: adapter startup, every setting schema/type, enum choices, Boolean roundtrip, atomic validation, persistence, invalid address/stale host recovery, correlated pause/resume replies")
