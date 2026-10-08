@@ -22,10 +22,10 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        guard let openPrimaryWindow else { return true }
+        // Keep SwiftUI's launch/restoration behavior when there is no stream.
+        // Intercept only an existing stream, so the library cannot cover it.
+        guard store?.streamWindowExists == true, let openPrimaryWindow else { return true }
         openPrimaryWindow()
-        // We already routed to the existing stream or library. Avoid SwiftUI's
-        // default reopening also raising a library window over the stream.
         return false
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
