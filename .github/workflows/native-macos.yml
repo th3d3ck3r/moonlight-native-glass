@@ -47,6 +47,14 @@ jobs:
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/overlay-tests
           build/overlay-tests build/overlay-previews
+      - name: Test actual SDL stream window hide and restore
+        if: matrix.architecture == 'universal'
+        run: |
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
+            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
+          build/stream-window-tests
       - uses: actions/upload-artifact@v6
         if: matrix.architecture == 'universal'
         with:
@@ -69,14 +77,6 @@ jobs:
         run: |
           mkdir -p build/previews
           python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
-      - name: Test actual SDL stream window hide and restore
-        if: matrix.architecture == 'universal'
-        run: |
-          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
-            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
-            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
-            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
-          build/stream-window-tests
       - name: Test actual menu bar icon state
         if: matrix.architecture == 'universal'
         run: |
