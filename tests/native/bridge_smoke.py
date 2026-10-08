@@ -14,6 +14,8 @@ executable = sys.argv[1]
 class Bridge:
     def __init__(self, root, test_mode=True):
         self.events = queue.Queue()
+        self.root = root
+        self.test_mode = test_mode
         self.diagnostics = tempfile.TemporaryFile(mode="w+t")
         self.p = subprocess.Popen([executable, "native"] + (["test"] if test_mode else []), stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, stderr=self.diagnostics,
@@ -62,6 +64,21 @@ class Bridge:
                 if found:
                     break
                 time.sleep(1)
+            # Hosted macOS runners may suppress DiagnosticReports. Reproduce
+            # immediate shutdown under LLDB so a remaining teardown crash has
+            # a symbolized stack rather than only a negative return code.
+            commands = pathlib.Path(self.root) / "shutdown-debug.jsonl"
+            commands.write_text(json.dumps({"command": "shutdown"}) + "\n")
+            for attempt in range(3):
+                result = subprocess.run(["lldb", "--batch", "-o", "settings set target.disable-aslr false",
+                    "-o", "process launch --stdin " + str(commands),
+                    "-k", "thread backtrace all", "-k", "process kill", "--", executable,
+                    "native"] + (["test"] if self.test_mode else []),
+                    env={**os.environ, "MOONLIGHT_NATIVE_TEST_ROOT": self.root},
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=60)
+                print("HELPER LLDB SHUTDOWN:", result.stdout, flush=True)
+                if "EXC_BAD_ACCESS" in result.stdout or "SIGSEGV" in result.stdout:
+                    break
         self.diagnostics.close()
         assert self.p.returncode == 0, self.p.returncode
 
