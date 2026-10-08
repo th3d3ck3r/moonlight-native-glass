@@ -56,6 +56,9 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         }
         .defaultSize(width: 1080, height: 720)
         .defaultLaunchBehavior(.presented)
+        // The library is an app entry point, rather than a restorable document.
+        // A previous close-to-menu-bar must not restore a windowless launch.
+        .restorationBehavior(.disabled)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Moonlight Native Glass") {
