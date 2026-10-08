@@ -121,6 +121,8 @@ int main(int argc, char** argv) { @autoreleasepool {
         check(nativeHideStreamWindow(window),"Native close-window shortcut failed"); pump(1);
         check(!cocoa(window).visible && SDL_GetWindowFromID(id)==window,"Hide destroyed or retained a visible stream window");
         check(nativeStreamWindowHasHiddenFullscreen(window),"Hidden fullscreen capture intent was lost");
+        nativeOverlayRestoreStreamFocus(window);
+        check(!cocoa(window).visible,"Control focus restoration must not reopen a deliberately hidden stream");
         SDL_Event event;
         while (SDL_PollEvent(&event)) check(event.type!=SDL_QUIT && !(event.type==SDL_WINDOWEVENT
             && event.window.event==SDL_WINDOWEVENT_CLOSE),"Hide queued session termination");

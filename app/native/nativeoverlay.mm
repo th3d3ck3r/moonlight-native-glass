@@ -295,6 +295,9 @@ void nativeOverlayEndControlsInput() {
 }
 void nativeOverlayRestoreStreamFocus(SDL_Window* window) {
     if (!window || (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN)) return;
+    // Exclusive fullscreen can minimize itself on focus loss. Restore through
+    // SDL before raising; a deliberately hidden stream still returns above.
+    if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) SDL_RestoreWindow(window);
     SDL_SysWMinfo info; SDL_VERSION(&info.version);
     if (!SDL_GetWindowWMInfo(window,&info)) return;
     [NSApp activateIgnoringOtherApps:YES];
