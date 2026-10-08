@@ -85,10 +85,16 @@ import XCTest
         attachment.name = "menu-bar"
         attachment.lifetime = .keepAlways
         add(attachment)
-        menu.menuItems["Settings…"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        // Type-to-select exercises native menu keyboard navigation and avoids
+        // coordinates for a menu that AppKit may scroll near the screen edge.
+        menu.typeKey("s", modifierFlags: [])
+        menu.typeKey("e", modifierFlags: [])
+        menu.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(app.windows["native-settings"].waitForExistence(timeout: 5))
         item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
-        menu.menuItems["Quit Moonlight Native Glass"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        XCTAssertTrue(menu.menuItems["Quit Moonlight Native Glass"].waitForExistence(timeout: 5))
+        menu.typeKey("q", modifierFlags: [])
+        menu.typeKey(.return, modifierFlags: [])
         let quit = NSPredicate(format: "state == %d", XCUIApplication.State.notRunning.rawValue)
         expectation(for: quit, evaluatedWith: app)
         waitForExpectations(timeout: 10)
