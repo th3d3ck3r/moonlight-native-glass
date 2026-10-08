@@ -193,7 +193,7 @@ private struct OverlaySettings: View {
         }
         Section("Stream Controls") {
             Toggle("Enable Optional Control Bar", isOn: $enabled)
-            Text("Set its show/hide binding in Shortcuts, or use the Moonlight menu bar menu. Showing controls temporarily releases captured input; Done restores it.").font(.caption).foregroundStyle(.secondary)
+            Text("Set its show/hide binding in Shortcuts, or use the Moonlight menu bar menu. The visible pointer stays inside the stream window while controls are open. Done restores input; Disconnect ends the stream.").font(.caption).foregroundStyle(.secondary)
             DisclosureGroup("Choose and Order Buttons") {
                 ForEach(buttons, id: \.self) { id in
                     HStack {

@@ -6,6 +6,9 @@ void nativeOverlayAttach(void* window, const char* token);
 void nativeOverlayDetach();
 Uint32 nativeOverlayEventType();
 void nativeOverlaySetControlsVisible(bool visible);
+// Temporary local cursor ownership while Control Center is open.
+void nativeOverlayBeginControlsInput(SDL_Window* window);
+void nativeOverlayEndControlsInput();
 bool nativeOverlayConfigured();
 int nativeOverlayShortcut(const SDL_KeyboardEvent* event);
 bool nativeOverlayControlsEnabled();

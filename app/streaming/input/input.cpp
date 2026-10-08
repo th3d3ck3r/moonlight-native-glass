@@ -8,6 +8,7 @@
 #include <QtGlobal>
 #ifdef Q_OS_MACOS
 #include "native/nativetitlebar.h"
+#include "native/nativeoverlay.h"
 #endif
 #include <QDir>
 #include <QGuiApplication>
@@ -221,6 +222,9 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
 
 SdlInputHandler::~SdlInputHandler()
 {
+#ifdef Q_OS_MACOS
+    nativeOverlayEndControlsInput();
+#endif
     for (int i = 0; i < MAX_GAMEPADS; i++) {
         if (m_GamepadState[i].mouseEmulationTimer != 0) {
             Session::get()->notifyMouseEmulationMode(false);
@@ -355,6 +359,10 @@ bool SdlInputHandler::isSystemKeyCaptureActive()
 
 void SdlInputHandler::setCaptureActive(bool active)
 {
+#ifdef Q_OS_MACOS
+    // Window/decoder events must not hide or recapture the local control cursor.
+    if (active && m_NativeControlsVisible) return;
+#endif
     if (active) {
         // If we're in relative mode, try to activate SDL's relative mouse mode
         if (m_AbsoluteMouseMode || SDL_SetRelativeMouseMode(SDL_TRUE) < 0) {

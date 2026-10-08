@@ -28,6 +28,11 @@ void SdlInputHandler::notifyMouseLeave()
 
 void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
 {
+#ifdef Q_OS_MACOS
+    // A click behind the native controls must not recapture the pointer or
+    // reach the host before Control Center has been dismissed.
+    if (m_NativeControlsVisible) return;
+#endif
     int button;
 
     if (event->which == SDL_TOUCH_MOUSEID) {

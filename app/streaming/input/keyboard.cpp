@@ -196,10 +196,15 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
         if (action != 102 && !m_NativeControlsVisible && !nativeOverlayControlsEnabled()) return;
         if (!m_NativeControlsVisible) {
             m_NativeCaptureBeforeControls = isCaptureActive();
+            // Release held host buttons before local overlay interaction.
+            for (int button : {BUTTON_LEFT, BUTTON_MIDDLE, BUTTON_RIGHT, BUTTON_X1, BUTTON_X2})
+                LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, button);
             setCaptureActive(false); raiseAllKeys();
             m_NativeControlsVisible = true;
+            nativeOverlayBeginControlsInput(m_Window);
         } else {
             m_NativeControlsVisible = false;
+            nativeOverlayEndControlsInput();
             setCaptureActive(m_NativeCaptureBeforeControls);
         }
         nativeOverlaySetControlsVisible(m_NativeControlsVisible);
@@ -208,6 +213,7 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
     if (m_NativeControlsVisible) {
         m_NativeControlsVisible = false;
         nativeOverlaySetControlsVisible(false);
+        nativeOverlayEndControlsInput();
         setCaptureActive(m_NativeCaptureBeforeControls);
     }
     if (action == KeyComboQuit && m_SpecialKeyCombos[action].enabled) {

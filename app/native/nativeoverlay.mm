@@ -21,16 +21,22 @@ struct Binding { SDL_Keycode key; SDL_Keymod modifiers; };
 static std::mutex bindingMutex;
 static std::array<Binding, 12> bindings;
 static const char* defaultKeys = "qzxsmcdvleko";
+static SDL_Window* controlsWindow = nullptr;
+static Uint32 controlsWindowID = 0;
+static SDL_bool previousMouseGrab = SDL_FALSE;
+static int previousCursor = SDL_ENABLE;
+static SDL_Rect previousMouseRect = {};
+static bool hadMouseRect = false;
 static NSArray* titles() { return @[@"Close Stream Window", @"Release / Capture Input", @"Full Screen", @"Statistics", @"Mouse Mode", @"Cursor Visibility", @"Minimize", @"Paste Clipboard", @"Pointer Region Lock", @"Disconnect and Exit", @"Keyboard Capture", @"Show / Hide Controls"]; }
 // Index 9 is the existing quit-and-exit action, not a host-game termination.
 static void pushAction(int code) { if (actionEvent == (Uint32)-1) return; SDL_Event e = {}; e.type = actionEvent; e.user.code = code; SDL_PushEvent(&e); }
 
-// Passive surfaces must never become keyboard or main windows. Controls may
-// accept keyboard focus when explicitly clicked, without replacing the stream.
+// Keep keyboard focus and SDL cursor confinement on the stream. Native buttons
+// remain clickable, and all actions retain their configurable SDL shortcuts.
 @interface MLOverlayPanel : NSPanel
 @end
 @implementation MLOverlayPanel
-- (BOOL)canBecomeKeyWindow { return !self.ignoresMouseEvents; }
+- (BOOL)canBecomeKeyWindow { return NO; }
 - (BOOL)canBecomeMainWindow { return NO; }
 @end
 
@@ -137,13 +143,18 @@ static MLOverlayController* controller;
         for (NSNumber* action in actions) {
             if (![action isKindOfClass:NSNumber.class]) continue;
             NSInteger i = action.integerValue; if (i<0 || i>10) continue;
-            // Reserve the overflow menu and Done button before adding a button.
-            if (x + 40 + 114 > available) { NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:names[i] action:@selector(action:) keyEquivalent:@""] autorelease]; item.target=self; item.tag=i; [overflow addItem:item]; continue; }
+            if (i==9) continue; // Disconnect is always directly available below.
+            // Reserve overflow, the always-visible Disconnect button and Done.
+            if (x + 40 + 154 > available) { NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:names[i] action:@selector(action:) keyEquivalent:@""] autorelease]; item.target=self; item.tag=i; [overflow addItem:item]; continue; }
             NSButton* button = [NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:names[i]] target:self action:@selector(action:)];
             button.bezelStyle=NSBezelStyleRounded; button.tag=i; button.toolTip=names[i]; [button setAccessibilityLabel:names[i]];
             button.frame=NSMakeRect(x,8,34,30); [content addSubview:button]; x+=40;
         }
         if (overflow.numberOfItems) { NSPopUpButton* more = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(x,8,40,30) pullsDown:YES] autorelease]; [more addItemWithTitle:@"…"]; for (NSMenuItem* item in overflow.itemArray) [more.menu addItem:[[item copy] autorelease]]; [more setAccessibilityLabel:@"More Stream Controls"]; [content addSubview:more]; x+=46; }
+        NSButton* disconnect = [NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"power" accessibilityDescription:@"Disconnect"] target:self action:@selector(action:)];
+        disconnect.bezelStyle=NSBezelStyleRounded; disconnect.tag=9;
+        disconnect.toolTip=@"Disconnect from this stream"; [disconnect setAccessibilityLabel:@"Disconnect"];
+        disconnect.frame=NSMakeRect(x,8,34,30); [content addSubview:disconnect]; x+=40;
         NSButton* close = [NSButton buttonWithTitle:@"Done" target:self action:@selector(dismiss:)]; close.frame=NSMakeRect(x,8,58,30); [content addSubview:close];
         [self.controls setContentSize:NSMakeSize(x+68,46)];
     }
@@ -251,6 +262,7 @@ void nativeOverlayAttach(void* window, const char* token) {
     @catch (NSException* error) { SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Native overlay unavailable: %s", error.reason.UTF8String); nativeOverlayDetach(); }
 }
 void nativeOverlayDetach() {
+    nativeOverlayEndControlsInput();
     nativeTitlebarDetach();
     configured=false; { std::lock_guard<std::mutex> lock(snapshotMutex); generation++; updatePending=false; snapshots[0]={}; snapshots[1]={}; }
     if (actionEvent != (Uint32)-1) SDL_FlushEvent(actionEvent);
@@ -259,3 +271,25 @@ void nativeOverlayDetach() {
     [controller invalidate]; [controller release]; controller=nil;
 }
 void nativeOverlaySetControlsVisible(bool visible) { controller.showingControls=visible; [controller refresh]; }
+void nativeOverlayBeginControlsInput(SDL_Window* window) {
+    if (!window || controlsWindow) return;
+    controlsWindow=window; controlsWindowID=SDL_GetWindowID(window);
+    previousMouseGrab=SDL_GetWindowMouseGrab(window);
+    previousCursor=SDL_ShowCursor(SDL_QUERY);
+    const SDL_Rect* rect=SDL_GetWindowMouseRect(window);
+    hadMouseRect=rect!=nullptr; if (rect) previousMouseRect=*rect;
+    // Capture has already been released by the input handler. Confine the
+    // visible local cursor to the whole stream, including its control panel.
+    SDL_SetWindowMouseRect(window,nullptr);
+    SDL_SetWindowMouseGrab(window,SDL_TRUE);
+    SDL_ShowCursor(SDL_ENABLE);
+}
+void nativeOverlayEndControlsInput() {
+    if (!controlsWindow) return;
+    if (SDL_GetWindowFromID(controlsWindowID)==controlsWindow) {
+        SDL_SetWindowMouseGrab(controlsWindow,previousMouseGrab);
+        SDL_SetWindowMouseRect(controlsWindow,hadMouseRect ? &previousMouseRect : nullptr);
+        SDL_ShowCursor(previousCursor);
+    }
+    controlsWindow=nullptr; controlsWindowID=0;
+}

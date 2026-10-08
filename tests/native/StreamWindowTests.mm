@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <string>
 #include "nativeapplication.h"
+#include "nativeoverlay.h"
 
 void configureNativeBackgroundApplication();
 void configureNativeStreamWindow(const char* token);
@@ -101,6 +102,15 @@ int main(int argc, char** argv) {
         for (Uint32 mode : {Uint32(0), Uint32(SDL_WINDOW_FULLSCREEN_DESKTOP), Uint32(SDL_WINDOW_FULLSCREEN)}) {
             check(SDL_SetWindowFullscreen(window,mode)==0,"Fullscreen title-bar transition"); pump(1.0);
             check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
+            SDL_SetRelativeMouseMode(SDL_FALSE); SDL_ShowCursor(SDL_DISABLE);
+            SDL_SetWindowMouseGrab(window,SDL_FALSE);
+            nativeOverlayBeginControlsInput(window); nativeOverlaySetControlsVisible(true); pump();
+            check(SDL_ShowCursor(SDL_QUERY)==SDL_ENABLE && SDL_GetWindowMouseGrab(window),"Controls pointer must be visible and confined in every window mode");
+            check(SDL_GetKeyboardFocus()==window,"Controls must preserve SDL keyboard focus");
+            nativeOverlaySetControlsVisible(false); nativeOverlayEndControlsInput();
+            check(!SDL_GetWindowMouseGrab(window) && SDL_ShowCursor(SDL_QUERY)==SDL_DISABLE,"Controls dismissal must restore the prior pointer state");
+            check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Relative capture must still work after controls");
+            SDL_SetRelativeMouseMode(SDL_FALSE); SDL_ShowCursor(SDL_ENABLE);
             SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);
             check(nativeHideStreamWindow(window),"Close shortcut could not hide the existing stream window"); pump(1.0);
             check(!cocoa(window).visible && SDL_GetWindowFromID(windowID)==window,"Close shortcut must hide rather than destroy the stream window");

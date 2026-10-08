@@ -21,6 +21,11 @@ static bool takeAction(int code) {
     while (SDL_PollEvent(&event)) if (event.type==nativeOverlayEventType() && event.user.code==code) found=true;
     return found;
 }
+static NSButton* buttonWithTag(NSView* view, NSInteger tag) {
+    if ([view isKindOfClass:NSButton.class] && view.tag==tag) return (NSButton*)view;
+    for (NSView* child in view.subviews) if (NSButton* button=buttonWithTag(child,tag)) return button;
+    return nil;
+}
 static void capture(NSString* path) { pump(); NSTask* task=[[[NSTask alloc] init] autorelease]; task.launchPath=@"/usr/sbin/screencapture"; task.arguments=@[@"-x",path]; [task launch]; [task waitUntilExit]; check(task.terminationStatus==0,"Composited capture failed"); }
 int main(int argc,char** argv) { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching];
@@ -103,6 +108,24 @@ int main(int argc,char** argv) { @autoreleasepool {
     NSString* out=argc>1 ? [NSString stringWithUTF8String:argv[1]] : @"/tmp";
     [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]]; pump(); capture([out stringByAppendingPathComponent:@"overlay-dark.png"]);
     nativeOverlaySetControlsVisible(true); pump(); check(window.childWindows.count==3,"Separate controls surface");
+    NSWindow* controls=nil;
+    for (NSWindow* panel in window.childWindows) if (!panel.ignoresMouseEvents) controls=panel;
+    NSButton* disconnect=buttonWithTag(controls.contentView,9);
+    check(disconnect!=nil && [disconnect.accessibilityLabel isEqual:@"Disconnect"],"Default controls must expose Disconnect");
+    [disconnect performClick:nil]; check(takeAction(9),"Disconnect must use the existing customizable disconnect action, not close/hide");
+    check(NSApp.keyWindow==window && !controls.canBecomeKeyWindow,"Control buttons must preserve stream keyboard focus and cursor confinement");
+    SDL_ShowCursor(SDL_DISABLE);
+    SDL_SetWindowMouseGrab(stream,SDL_FALSE);
+    SDL_Rect restricted={20,20,400,300}; SDL_SetWindowMouseRect(stream,&restricted);
+    nativeOverlayBeginControlsInput(stream);
+    check(SDL_ShowCursor(SDL_QUERY)==SDL_ENABLE && SDL_GetWindowMouseGrab(stream),"Controls must show and confine the local pointer");
+    check(SDL_GetWindowMouseRect(stream)==nullptr,"Controls must allow the entire stream window, not just the video region");
+    nativeOverlayBeginControlsInput(stream);
+    nativeOverlayEndControlsInput();
+    const SDL_Rect* restored=SDL_GetWindowMouseRect(stream);
+    check(SDL_ShowCursor(SDL_QUERY)==SDL_DISABLE && !SDL_GetWindowMouseGrab(stream),"Dismissal must restore pointer visibility and grab state");
+    check(restored && restored->x==20 && restored->y==20 && restored->w==400 && restored->h==300,"Dismissal must restore the previous pointer region");
+    SDL_SetWindowMouseRect(stream,nullptr); SDL_ShowCursor(SDL_ENABLE);
     for (NSWindow* panel in window.childWindows) check(panel.visible && (panel.occlusionState & NSWindowOcclusionStateVisible),"Showing controls must keep all overlays unobscured");
     capture([out stringByAppendingPathComponent:@"overlay-controls-dark.png"]);
     [batteryButton performClick:nil]; pump(); capture([out stringByAppendingPathComponent:@"titlebar-controller-details.png"]);
@@ -124,6 +147,8 @@ int main(int argc,char** argv) { @autoreleasepool {
     [window setContentSize:NSMakeSize(320,300)]; pump();
     bounds=[window convertRectToScreen:window.contentView.bounds];
     for (NSWindow* panel in window.childWindows) check(NSContainsRect(bounds,panel.frame),"Every panel must fit after controls shrink with all actions selected");
+    controls=nil; for (NSWindow* panel in window.childWindows) if (!panel.ignoresMouseEvents) controls=panel;
+    check(buttonWithTag(controls.contentView,9)!=nil,"Disconnect must remain directly visible in compact controls");
     nativeOverlayDetach(); check(window.toolbar==nil && window.titleVisibility==NSWindowTitleVisible,"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
     nativeOverlayAttach(window,"next-session"); check(nativeOverlayConfigured(),"Repeated session attachment"); nativeOverlayDetach();
     if (previous) [defaults setPersistentDomain:previous forName:@"com.moonlight-stream.NativeGlass.Overlay"]; else [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [previous release]; [defaults synchronize];
