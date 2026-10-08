@@ -1,10 +1,11 @@
 #import <AppKit/AppKit.h>
 #import <SDL.h>
+#import <SDL_syswm.h>
 #include "nativeoverlay.h"
 #include <cstdio>
 #include <cstdlib>
 static void check(bool okay,const char* message) { if (!okay) { fprintf(stderr,"FAIL: %s\n",message); exit(1); } }
-static void pump() { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:.2]; while (end.timeIntervalSinceNow>0) [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; }
+static void pump() { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:.2]; while (end.timeIntervalSinceNow>0) { SDL_PumpEvents(); [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; } }
 static void capture(NSString* path) { pump(); NSTask* task=[[[NSTask alloc] init] autorelease]; task.launchPath=@"/usr/sbin/screencapture"; task.arguments=@[@"-x",path]; [task launch]; [task waitUntilExit]; check(task.terminationStatus==0,"Composited capture failed"); }
 int main(int argc,char** argv) { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching];
@@ -12,7 +13,11 @@ int main(int argc,char** argv) { @autoreleasepool {
     NSUserDefaults* defaults=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
     NSDictionary* previous=[[defaults persistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"] retain];
     [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [defaults setBool:YES forKey:@"controlsEnabled"]; [defaults synchronize];
-    NSWindow* window=[[[NSWindow alloc] initWithContentRect:NSMakeRect(60,120,960,540) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO] autorelease];
+    SDL_Window* stream = SDL_CreateWindow("Native overlay preview — sample statistics, no live stream",60,120,960,540,SDL_WINDOW_SHOWN|SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
+    check(stream != nullptr,"SDL stream window creation");
+    SDL_SysWMinfo info; SDL_VERSION(&info.version);
+    check(SDL_GetWindowWMInfo(stream,&info),"SDL Cocoa window info");
+    NSWindow* window=info.info.cocoa.window;
     window.title=@"Native overlay preview — sample statistics, no live stream"; window.releasedWhenClosed=NO;
     window.backgroundColor=[NSColor colorWithSRGBRed:.06 green:.10 blue:.16 alpha:1];
     [window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
@@ -53,5 +58,5 @@ int main(int argc,char** argv) { @autoreleasepool {
     nativeOverlayDetach(); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
     nativeOverlayAttach(window,"next-session"); check(nativeOverlayConfigured(),"Repeated session attachment"); nativeOverlayDetach();
     if (previous) [defaults setPersistentDomain:previous forName:@"com.moonlight-stream.NativeGlass.Overlay"]; else [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [previous release]; [defaults synchronize];
-    [window close]; SDL_Quit(); puts("Native overlay state, all shortcuts, layout, focus, teardown and preview checks passed"); return 0;
+    SDL_DestroyWindow(stream); SDL_Quit(); puts("Native overlay state, all shortcuts, layout, focus, teardown and preview checks passed"); return 0;
 } }
