@@ -1,6 +1,7 @@
 #include "streaming/session.h"
 #ifdef Q_OS_MACOS
 #include "native/nativeoverlay.h"
+#include "native/nativeapplication.h"
 #endif
 
 
@@ -208,6 +209,13 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
         m_NativeControlsVisible = false;
         nativeOverlaySetControlsVisible(false);
         setCaptureActive(m_NativeCaptureBeforeControls);
+    }
+    if (action == KeyComboQuit && m_SpecialKeyCombos[action].enabled) {
+        // The native close-window binding matches the red button. Ordinary Qt
+        // quit shortcuts and explicit disconnect-and-exit retain their behavior.
+        raiseAllKeys();
+        nativeHideStreamWindow(m_Window);
+        return;
     }
     if (action >= 0 && action < KeyComboMax && m_SpecialKeyCombos[action].enabled) {
         raiseAllKeys();

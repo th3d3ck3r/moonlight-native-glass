@@ -14,6 +14,7 @@ void configureNativeBackgroundApplication()
 #include <cstdio>
 #include "nativeoverlay.h"
 #include "nativetitlebar.h"
+#include "nativeapplication.h"
 
 static NSString* const MLRestoreStreamWindow = @"com.moonlight-stream.NativeGlass.restoreStreamWindow";
 
@@ -30,6 +31,14 @@ static void sendWindowEvent(const char* event)
     // Lifecycle only, on the main thread; no frame callbacks or polling.
     std::fprintf(stdout, "{\"event\":\"%s\"}\n", event);
     std::fflush(stdout);
+}
+
+static bool hideStreamWindow(SDL_Window* window)
+{
+    if (!window || !nativeSDLWindow(window)) return false;
+    SDL_HideWindow(window);
+    sendWindowEvent("windowHidden");
+    return true;
 }
 
 // Preserve SDL's delegate and forward every other responder/window callback.
@@ -50,8 +59,7 @@ static void sendWindowEvent(const char* event)
 {
     SDL_Window* window = SDL_GetWindowFromID(self.windowID);
     if (nativeSDLWindow(window) == sender && !(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)) {
-        SDL_HideWindow(window);
-        sendWindowEvent("windowHidden");
+        hideStreamWindow(window);
         return NO;
     }
     return [self.original respondsToSelector:_cmd] ? [self.original windowShouldClose:sender] : YES;
@@ -65,6 +73,13 @@ static void sendWindowEvent(const char* event)
 }
 - (void)dealloc { [_original release]; [super dealloc]; }
 @end
+
+bool nativeHideStreamWindow(SDL_Window* window)
+{
+    NSWindow* nativeWindow = nativeSDLWindow(window);
+    if (!nativeWindow || ![nativeWindow.delegate isKindOfClass:[MLStreamWindowDelegate class]]) return false;
+    return hideStreamWindow(window);
+}
 
 @interface MLStreamWindowAccess : NSObject
 @property(nonatomic, retain) MLStreamWindowDelegate* windowDelegate;

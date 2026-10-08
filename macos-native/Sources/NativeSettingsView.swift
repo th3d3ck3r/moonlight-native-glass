@@ -49,7 +49,7 @@ struct NativeSettingsView: View {
                         }
                     }
                     if pane == .input {
-                        Section { Text("Disconnect a stream with its configured shortcut (Control–Option–Shift–Q by default) or Start + Select + L1 + R1. In the library, use the D-pad to select games, A to launch, and shoulder buttons to switch computers.").foregroundStyle(.secondary) }
+                        Section { Text("Hide the stream window with Close Stream Window (Control–Option–Shift–Q by default). Disconnect with Disconnect and Exit or Start + Select + L1 + R1. In the library, use the D-pad to select games, A to launch, and shoulder buttons to switch computers.").foregroundStyle(.secondary) }
                     }
                     if pane == .network {
                         Section {
@@ -181,7 +181,7 @@ private struct OverlaySettings: View {
         for id in saved where (0..<11).contains(id) && !result.contains(id) { result.append(id) }
         return result
     }
-    private let names = ["Disconnect", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls"]
+    private let names = ["Close Stream Window", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls"]
     var body: some View {
         Section("Statistics Overlay") {
             HStack { Text("Size"); Slider(value: $scale, in: 0.8...1.5, step: 0.05); Text("\(Int(scale * 100))%").monospacedDigit().frame(width: 46) }
@@ -229,7 +229,7 @@ private struct ShortcutSettings: View {
     private static let defaults = UserDefaults(suiteName: "com.moonlight-stream.NativeGlass.Overlay")!
     @State private var shortcuts = (Self.defaults.dictionary(forKey: "shortcuts") as? [String: [String: Any]]) ?? [:]
     @State private var shortcutError: String?
-    private let names = ["Disconnect", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls"]
+    private let names = ["Close Stream Window", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls"]
     private let defaultKeys = Array("qzxsmcdvleko").map(String.init)
     var body: some View {
         Section("Stream Shortcuts") {

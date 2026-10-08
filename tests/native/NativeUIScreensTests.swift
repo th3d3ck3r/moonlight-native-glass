@@ -49,7 +49,7 @@ import XCTest
                 XCTAssertEqual(resolution.value as? String, "1080p")
             }
             if screen == "settings-shortcuts" {
-                XCTAssertTrue(window.staticTexts["Disconnect"].exists, "Shortcut bindings missing")
+                XCTAssertTrue(window.staticTexts["Close Stream Window"].exists, "Shortcut bindings missing")
                 XCTAssertFalse(window.staticTexts["Enable Optional Control Bar"].exists, "Overlay controls must have their own tab")
             }
             // XCTest captures the composited UI, including system-owned glass.

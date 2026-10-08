@@ -21,7 +21,7 @@ struct Binding { SDL_Keycode key; SDL_Keymod modifiers; };
 static std::mutex bindingMutex;
 static std::array<Binding, 12> bindings;
 static const char* defaultKeys = "qzxsmcdvleko";
-static NSArray* titles() { return @[@"Disconnect", @"Release / Capture Input", @"Full Screen", @"Statistics", @"Mouse Mode", @"Cursor Visibility", @"Minimize", @"Paste Clipboard", @"Pointer Region Lock", @"Disconnect and Exit", @"Keyboard Capture", @"Show / Hide Controls"]; }
+static NSArray* titles() { return @[@"Close Stream Window", @"Release / Capture Input", @"Full Screen", @"Statistics", @"Mouse Mode", @"Cursor Visibility", @"Minimize", @"Paste Clipboard", @"Pointer Region Lock", @"Disconnect and Exit", @"Keyboard Capture", @"Show / Hide Controls"]; }
 // Index 9 is the existing quit-and-exit action, not a host-game termination.
 static void pushAction(int code) { if (actionEvent == (Uint32)-1) return; SDL_Event e = {}; e.type = actionEvent; e.user.code = code; SDL_PushEvent(&e); }
 

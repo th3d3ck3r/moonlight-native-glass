@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include "nativeapplication.h"
 
 void configureNativeBackgroundApplication();
 void configureNativeStreamWindow(const char* token);
@@ -100,7 +101,15 @@ int main(int argc, char** argv) {
         for (Uint32 mode : {Uint32(0), Uint32(SDL_WINDOW_FULLSCREEN_DESKTOP), Uint32(SDL_WINDOW_FULLSCREEN)}) {
             check(SDL_SetWindowFullscreen(window,mode)==0,"Fullscreen title-bar transition"); pump(1.0);
             check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
-
+            SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);
+            check(nativeHideStreamWindow(window),"Close shortcut could not hide the existing stream window"); pump(1.0);
+            check(!cocoa(window).visible && SDL_GetWindowFromID(windowID)==window,"Close shortcut must hide rather than destroy the stream window");
+            SDL_Event closeEvent;
+            while (SDL_PollEvent(&closeEvent)) {
+                check(closeEvent.type!=SDL_QUIT && !(closeEvent.type==SDL_WINDOWEVENT && closeEvent.window.event==SDL_WINDOWEVENT_CLOSE),"Close shortcut queued disconnect");
+            }
+            [[NSDistributedNotificationCenter defaultCenter] postNotificationName:restoreName object:[NSString stringWithUTF8String:token] userInfo:nil deliverImmediately:YES]; pump(1.0);
+            check(cocoa(window).visible && SDL_GetKeyboardFocus()==window,"Moon restore after close shortcut failed");
         }
         check(SDL_SetWindowFullscreen(window,0)==0,"Return to windowed stream"); pump(1.0);
         // Resizing must still reach SDL's original window delegate.
