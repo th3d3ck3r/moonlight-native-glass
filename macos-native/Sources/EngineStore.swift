@@ -166,7 +166,7 @@ struct PairingRequest: Identifiable {
                 ready = true; status = "Discovering computers on your local network…"
             case "hosts":
                 computers = try decodeEngineValue(event["hosts"] ?? [], as: [Computer].self).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-                if selectedID == nil { selectedID = computers.first?.id }
+                if !computers.contains(where: { $0.id == selectedID }) { selectedID = computers.first?.id }
                 status = computers.isEmpty ? "Looking for computers…" : "\(computers.count) computer\(computers.count == 1 ? "" : "s")"
             case "settings":
                 values = event["values"] as? [String: Any] ?? [:]

@@ -23,6 +23,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <cmath>
+#include <algorithm>
 
 void configureNativeStreamWindow(const char* token);
 void stopNativeStreamWindow();
@@ -124,8 +125,22 @@ void NativeBridge::readInput() {
     }
 }
 
+QVector<NvComputer*> NativeBridge::availableComputers() {
+    auto computers = m_Manager->getComputers();
+    // deleteHost transfers lifetime to a worker. Never dereference its pointer
+    // again, including snapshots emitted before it leaves the manager's list.
+    for (auto it = m_DeletingComputers.begin(); it != m_DeletingComputers.end();) {
+        if (!computers.contains(*it)) it = m_DeletingComputers.erase(it);
+        else ++it;
+    }
+    computers.erase(std::remove_if(computers.begin(), computers.end(), [this](NvComputer* computer) {
+        return m_DeletingComputers.contains(computer);
+    }), computers.end());
+    return computers;
+}
+
 NvComputer* NativeBridge::findComputer(QString uuid) {
-    for (auto computer : m_Manager->getComputers()) {
+    for (auto computer : availableComputers()) {
         QReadLocker guard(&computer->lock);
         if (computer->uuid == uuid) return computer;
     }
@@ -233,6 +248,7 @@ void NativeBridge::command(const QJsonObject& request) {
         // Upstream artwork tasks retain the host pointer. Drain them before
         // deleting it, and disconnect queued artwork completions with their owner.
         m_Artwork.reset();
+        m_DeletingComputers.insert(computer);
         m_Manager->deleteHost(computer);
         m_ArtworkRequested.clear();
         m_ArtworkUrls.clear();
@@ -254,7 +270,7 @@ void NativeBridge::createArtworkManager() {
 void NativeBridge::snapshot() {
     if (m_StreamMode) return;
     QJsonArray hosts;
-    for (auto computer : m_Manager->getComputers()) {
+    for (auto computer : availableComputers()) {
         QReadLocker guard(&computer->lock);
         QJsonArray apps;
         for (auto app : computer->appList) {

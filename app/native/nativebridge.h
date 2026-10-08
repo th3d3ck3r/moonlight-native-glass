@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QHash>
 #include <QSet>
+#include <QVector>
 #include <memory>
 
 class ComputerManager;
@@ -33,6 +34,7 @@ private:
     bool setPreferences(const QJsonObject& values);
     void createArtworkManager();
     NvComputer* findComputer(QString uuid);
+    QVector<NvComputer*> availableComputers();
     void startStream(const QStringList& arguments);
 
     StreamingPreferences* m_Preferences;
@@ -44,6 +46,7 @@ private:
     QByteArray m_Buffer;
     QHash<QString, QString> m_ArtworkUrls;
     QSet<QString> m_ArtworkRequested;
+    QSet<NvComputer*> m_DeletingComputers;
     bool m_Polling = false;
     bool m_StreamMode = false;
     bool m_TestMode = false;
