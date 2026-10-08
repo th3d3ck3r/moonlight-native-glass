@@ -1,9 +1,11 @@
 #import <AppKit/AppKit.h>
+#import <SDL.h>
 
-// Only the windowless adapter calls this. The stock Session/SDL process keeps
-// its ordinary activation policy, menu bar and keyboard focus.
+// Native helpers stay out of the Dock, while their SDL windows can still
+// activate and receive input. Ordinary Qt launches never call this.
 void configureNativeBackgroundApplication()
 {
+    SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "1");
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
 }
 
@@ -117,6 +119,7 @@ static void sendWindowEvent(const char* event)
 static MLStreamWindowAccess* streamWindowAccess;
 void configureNativeStreamWindow(const char* token)
 {
+    configureNativeBackgroundApplication();
     nativeTitlebarSetCapture(false);
     nativeTitlebarSetStatistics(false);
     nativeTitlebarSetConnection(NativeConnectionState::Connecting);

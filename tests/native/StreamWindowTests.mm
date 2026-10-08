@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <string>
 
+void configureNativeBackgroundApplication();
 void configureNativeStreamWindow(const char* token);
 void stopNativeStreamWindow();
 static NSString* const restoreName = @"com.moonlight-stream.NativeGlass.restoreStreamWindow";
@@ -33,8 +34,11 @@ int main(int argc, char** argv) {
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
         [NSApp finishLaunching];
+        configureNativeBackgroundApplication();
+        check(NSApp.activationPolicy==NSApplicationActivationPolicyAccessory,"Engine must stay out of Dock before SDL init");
         SDL_SetMainReady();
         check(SDL_Init(SDL_INIT_VIDEO) == 0, "SDL initialization failed");
+        check(NSApp.activationPolicy==NSApplicationActivationPolicyAccessory,"SDL must not promote engine back into Dock");
         const char* token = "91A001FA-8C16-4321-AC12-508590128641";
         configureNativeStreamWindow(token);
         // No stream window exists: a restore request must create nothing.
@@ -73,8 +77,25 @@ int main(int argc, char** argv) {
             check([sender launchAndReturnError:nullptr], "Restore sender failed");
             [sender waitUntilExit]; [sender release];
             pump(1.0);
+            check(NSApp.activationPolicy==NSApplicationActivationPolicyAccessory,"Stream restoration must not create another Dock icon");
             check(nativeWindow.visible && SDL_GetKeyboardFocus() == window, "Cross-process restore did not show and focus the original SDL window");
         }
+        SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);
+        NSEvent* keyDown=[NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:0 timestamp:0 windowNumber:nativeWindow.windowNumber context:nil characters:@"a" charactersIgnoringModifiers:@"a" isARepeat:NO keyCode:0];
+        NSEvent* keyUp=[NSEvent keyEventWithType:NSEventTypeKeyUp location:NSZeroPoint modifierFlags:0 timestamp:0 windowNumber:nativeWindow.windowNumber context:nil characters:@"a" charactersIgnoringModifiers:@"a" isARepeat:NO keyCode:0];
+        [NSApp postEvent:keyDown atStart:NO]; [NSApp postEvent:keyUp atStart:NO]; pump();
+        bool pressed=false,released=false; SDL_Event input;
+        while (SDL_PollEvent(&input)) {
+            if (input.type==SDL_KEYDOWN && input.key.keysym.sym==SDLK_a) pressed=true;
+            if (input.type==SDL_KEYUP && input.key.keysym.sym==SDLK_a) released=true;
+        }
+        check(pressed && released,"Accessory stream must still receive SDL keyboard input");
+        check(SDL_SetWindowFullscreen(window,SDL_WINDOW_FULLSCREEN_DESKTOP)==0,"Accessory fullscreen entry"); pump(1.0);
+        check(NSApp.activationPolicy==NSApplicationActivationPolicyAccessory,"Fullscreen must not promote engine to Dock");
+        check(SDL_SetWindowFullscreen(window,0)==0,"Accessory fullscreen exit"); pump(1.0);
+        nativeWindow=cocoa(window);
+        // Keep the title toolbar and customizable overlays in an accessory app.
+        check(nativeWindow.toolbar!=nil,"Single-Dock engine lost title-bar controls");
         // Resizing must still reach SDL's original window delegate.
         [nativeWindow setContentSize:NSMakeSize(720, 400)];
         pump();

@@ -47,6 +47,9 @@ ditto "$engine_app" "$app/Contents/Helpers/MoonlightEngine.app"
 cp macos-native/Resources/moonlight.icns "$app/Contents/Helpers/MoonlightEngine.app/Contents/Resources/moonlight.icns"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.moonlight-stream.NativeGlass.Engine' "$app/Contents/Helpers/MoonlightEngine.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Moonlight Native Glass Engine' "$app/Contents/Helpers/MoonlightEngine.app/Contents/Info.plist"
+# The frontend owns the sole application Dock icon. Set this before signing so
+# neither helper briefly registers a second icon before its activation setup.
+/usr/libexec/PlistBuddy -c 'Add :LSUIElement bool true' "$app/Contents/Helpers/MoonlightEngine.app/Contents/Info.plist"
 
 # Ad-hoc signatures make all nested code verifiable and retain one bundle
 # identity. This is not Developer ID signing or notarization. Verify all code;

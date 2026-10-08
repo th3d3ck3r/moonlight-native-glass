@@ -10,6 +10,7 @@ for bundle, identity in [(app, "com.moonlight-stream.NativeGlass"),
                          (app / "Contents/Helpers/MoonlightEngine.app", "com.moonlight-stream.NativeGlass.Engine")]:
     info = plistlib.loads((bundle / "Contents/Info.plist").read_bytes())
     assert info["CFBundleIdentifier"] == identity
+    assert bool(info.get("LSUIElement", False)) == (bundle != app), "Only the frontend may own a Dock application icon"
     assert info["NSLocalNetworkUsageDescription"]
     assert "_nvstream._tcp" in info["NSBonjourServices"]
     assert (bundle / "Contents/MacOS" / info["CFBundleExecutable"]).is_file()

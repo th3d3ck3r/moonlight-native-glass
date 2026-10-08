@@ -4,6 +4,7 @@ import SwiftUI
 final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     weak var store: EngineStore?
     var statusMenu: NativeStatusMenu?
+    var openPrimaryWindow: (() -> Void)?
     func applicationDidFinishLaunching(_ notification: Notification) {
         if CommandLine.arguments.contains("--design-preview") {
             if CommandLine.arguments.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
@@ -19,6 +20,13 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 showNativeAboutPanel()
             }
         }
+    }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard let openPrimaryWindow else { return true }
+        openPrimaryWindow()
+        // We already routed to the existing stream or library. Avoid SwiftUI's
+        // default reopening also raising a library window over the stream.
+        return false
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -83,10 +91,19 @@ private struct NativeStatusActions: View {
         Color.clear.frame(width: 0, height: 0).onAppear {
             if delegate.statusMenu == nil { delegate.statusMenu = NativeStatusMenu() }
             delegate.statusMenu?.bind(to: store.$streamWindowExists)
-            delegate.statusMenu?.open = {
+            let openPrimaryWindow: () -> Void = {
                 if store.streamWindowExists { store.restoreStreamWindow() }
-                else { openWindow(id: "library"); NSApp.activate(ignoringOtherApps: true) }
+                else {
+                    openWindow(id: "library")
+                    if let window = store.libraryWindow {
+                        if window.isMiniaturized { window.deminiaturize(nil) }
+                        window.makeKeyAndOrderFront(nil)
+                    }
+                    NSApp.activate(ignoringOtherApps: true)
+                }
             }
+            delegate.openPrimaryWindow = openPrimaryWindow
+            delegate.statusMenu?.open = openPrimaryWindow
             delegate.statusMenu?.controls = { store.showStreamControls() }
             delegate.statusMenu?.settings = {
                 openSettings(); NSApp.activate(ignoringOtherApps: true)

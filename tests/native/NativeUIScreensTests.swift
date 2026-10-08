@@ -100,6 +100,23 @@ import XCTest
         waitForExpectations(timeout: 10)
     }
 
+    func testDockReopensLibrary() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--design-preview", "--dark"]
+        app.launch()
+        let window = app.windows["native-library"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        window.buttons[XCUIIdentifierCloseWindow].click()
+        XCTAssertFalse(window.exists)
+        let dock = XCUIApplication(bundleIdentifier: "com.apple.dock")
+        let icon = dock.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Moonlight")).firstMatch
+        XCTAssertTrue(icon.waitForExistence(timeout: 5), "Frontend Dock icon missing")
+        icon.click()
+        XCTAssertTrue(window.waitForExistence(timeout: 5), "Dock click must reopen the library when no stream window exists")
+        app.terminate()
+    }
+
     func testAboutPanel() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
