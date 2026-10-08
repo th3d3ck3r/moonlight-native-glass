@@ -230,3 +230,33 @@ Failure diagnostics retain stderr and try the matching macOS crash report,
 then immediate-shutdown LLDB reproduction if hosted macOS suppresses reports.
 The UI job's timeout is increased from five to ten minutes because all five
 tests passed before its old limit cancelled screenshot export.
+
+
+## Final Preview 15 acceptance result
+
+[Run 37795784286](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37795784286)
+passed all three jobs for exact application/test source
+`7202a71c8f6224ea5cdad29c7e8e58434d9e66ac`. Documentation-only followups leave
+that validated application unchanged. All eight immediate startup/shutdown
+cycles completed with exit code zero after native helper ownership was moved
+before Qt teardown. The expanded schema/type/enum/Boolean, atomic validation,
+persistence and invalid/stale-host recovery checks passed against the real
+built helper. Both fullscreen known-color presentation/hide/restore fixtures,
+native keyboard/mouse/motion lifecycle tests, all shortcut/overlay checks,
+frontend helper-failure/cancellation checks, all five native UI tests and both
+rounded icon states at 1x/2x passed. Both Intel and Universal bundle audits
+verified identities, permissions, dependencies, signatures and 105 Mach-O files.
+The existing code-boundary check passes. The earlier shutdown failure did not
+recur in the expanded suite after the cleanup-order change.
+
+Artifacts: [Intel](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37795784286/artifacts/11558374986),
+[Universal](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37795784286/artifacts/11559362612).
+These supersede earlier Preview 15 artifacts. No claim of complete live-host or
+physical Intel certification; the physical acceptance items above still apply.
+No streaming performance benchmark, release/tag publication or Xcode ZIP was
+performed. README/master and stock backend implementations remain unchanged.
+
+Distribution references for the RC recommendation:
+[Apple Developer ID distribution](https://developer.apple.com/macos/distribution/),
+[Apple notarization requirements](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution),
+[GitHub pre-release designation](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository).

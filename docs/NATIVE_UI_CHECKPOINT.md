@@ -177,18 +177,19 @@ builds and screenshot checks provide the available evidence.
   Runs `37792252998` and `37793963298` exposed SIGSEGV on helper shutdown.
   The second run completed all broad settings/host checks before a repeated exit
   failed. Crash reports were unavailable on that runner; LLDB failure fallback
-  is now included. This is an unresolved release-candidate blocker until the fix
-  below passes. Do not report the entire app certified or publish a release.
+  is now included. This was a release-candidate blocker; the cleanup fix below has now passed
+  the expanded regression suite. Physical acceptance remains outstanding.
 - New application change `977dea4f` scopes NativeBridge and destroys it after
   event-loop/worker completion but before Qt platform/logger teardown. This
   addresses a cleanup-order risk without changing stock manager/decoder code.
   Latest source/test revision `7202a71c8f6224ea5cdad29c7e8e58434d9e66ac`.
   [Run 37795784286](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37795784286)
-  currently has UI SUCCESS; both build jobs are queued for macOS runners.
+  completed with SUCCESS in all three jobs: Intel, Universal and native UI.
   UI timeout is now 10 minutes after the old 5-minute limit cancelled screenshot
-  export despite all five tests passing. Next step: wait for both build jobs,
-  inspect repeated-shutdown result/diagnostics, fix any remaining native lifecycle
-  defect, and update this checkpoint with final verified artifacts.
+  export despite all five tests passing. Every setting/host rejection test, all eight immediate startup/shutdown
+  cycles, both actual macOS fullscreen fixtures, native focus/motion/lifecycle,
+  icon pixels, all five UI tests and both 105-Mach-O bundle audits passed.
+  The shutdown crash did not recur after the ownership change.
 - No README/master/release/tag changes, no Xcode project ZIP (user explicitly
   said not to create it). Preserve stream core, decoding, network, bitrate and
   settings policy. Existing source-boundary check passes; changes in Session
@@ -201,3 +202,12 @@ builds and screenshot checks provide the available evidence.
   macOS distribution should use Developer ID signing and notarization; current
   previews are ad-hoc signed. GitHub RC publication should be a pre-release,
   with known limitations and separate UI/engine version numbers.
+
+
+Final Preview 15 artifacts for validated source `7202a71c`:
+[Intel x86_64](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37795784286/artifacts/11558374986)
+and [Universal](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37795784286/artifacts/11559362612).
+Later checkpoint/audit commits contain documentation only. Next step is physical
+Intel/live-host acceptance; no release is published by this task. Fullscreen
+and icon captures are attached to the same successful run. Both icon states at
+standard and Retina sizes were visually reviewed in addition to pixel checks.
