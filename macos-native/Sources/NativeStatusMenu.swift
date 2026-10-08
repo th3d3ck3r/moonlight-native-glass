@@ -12,8 +12,16 @@ import Combine
 
     init(resourceURL: URL? = Bundle.main.resourceURL) {
         func load(_ name: String) -> NSImage? {
-            guard let url = resourceURL?.appendingPathComponent(name), let image = NSImage(contentsOf: url) else { return nil }
-            image.size = NSSize(width: 18, height: 18)
+            guard let url = resourceURL?.appendingPathComponent(name), let source = NSImage(contentsOf: url) else { return nil }
+            let size = NSSize(width: 18, height: 18)
+            // Dock icons receive macOS's rounded mask. Status items render the
+            // raw resource, so clip both cached states to the same rounded shape.
+            let image = NSImage(size: size, flipped: false) { bounds in
+                NSBezierPath(roundedRect: bounds, xRadius: 4, yRadius: 4).addClip()
+                source.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1)
+                return true
+            }
+            image.isTemplate = false
             return image
         }
         crescent = load("moonlight.icns")

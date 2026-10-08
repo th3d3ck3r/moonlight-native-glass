@@ -33,6 +33,17 @@ static NSWindow* cocoa(SDL_Window* window) {
     check(SDL_GetWindowWMInfo(window, &info), "SDL Cocoa window info unavailable");
     return info.info.cocoa.window;
 }
+static bool fixtureFullscreenTransition(SDL_Window* window, Uint32 flags) {
+    const Uint32 previous=SDL_GetWindowFlags(window)&SDL_WINDOW_FULLSCREEN_DESKTOP;
+    if (SDL_SetWindowFullscreen(window,flags)!=0) return false;
+    // Session's existing macOS exclusive-mode workaround is part of the
+    // transition callback contract. This standalone fixture has no Session.
+    if (!flags && previous==SDL_WINDOW_FULLSCREEN) {
+        SDL_SetWindowSize(window,640,360);
+        SDL_SetWindowPosition(window,100,100);
+    }
+    return true;
+}
 static void checkRelativeMotion(SDL_Window* window) {
     SDL_FlushEvent(SDL_MOUSEMOTION);
     // Route actual native motion through SDL's Cocoa event handler. The first
@@ -71,6 +82,7 @@ int main(int argc, char** argv) {
         check(NSApp.activationPolicy==NSApplicationActivationPolicyAccessory,"SDL must not promote engine back into Dock");
         const char* token = "91A001FA-8C16-4321-AC12-508590128641";
         configureNativeStreamWindow(token);
+        nativeSetStreamFullscreenTransition(fixtureFullscreenTransition);
         // No stream window exists: a restore request must create nothing.
         NSUInteger before = NSApp.windows.count;
         [[NSDistributedNotificationCenter defaultCenter] postNotificationName:restoreName
@@ -145,6 +157,7 @@ int main(int argc, char** argv) {
             if (nativeAction.type==nativeOverlayEventType() && nativeAction.user.code==102) opened=true;
         check(opened,"Real title-bar click must queue Control Center");
         for (Uint32 mode : {Uint32(0), Uint32(SDL_WINDOW_FULLSCREEN_DESKTOP), Uint32(SDL_WINDOW_FULLSCREEN)}) {
+            std::printf("MODE: 0x%x\n",mode); std::fflush(stdout);
             check(SDL_SetWindowFullscreen(window,mode)==0,"Fullscreen title-bar transition"); pump(1.0);
             check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
             nativeOverlayRestoreStreamFocus(window);
@@ -200,6 +213,7 @@ int main(int argc, char** argv) {
         [[NSDistributedNotificationCenter defaultCenter] postNotificationName:restoreName
             object:[NSString stringWithUTF8String:token] userInfo:nil deliverImmediately:YES];
         pump();
+        nativeSetStreamFullscreenTransition(nullptr);
         stopNativeStreamWindow();
         SDL_Quit();
         std::puts("PASS: real SDL close/hide, repeat restore/focus, cross-process routing, no-window fallback, delegate forwarding and cleanup (no host/video test)");

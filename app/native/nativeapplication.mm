@@ -146,6 +146,7 @@ bool nativeHideStreamWindow(SDL_Window* window)
     NSWindow* nativeWindow = nativeSDLWindow(window);
     if (!nativeWindow || self.windowDelegate.changingVisibility) return;
     self.windowDelegate.changingVisibility = YES;
+    [NSApp activateIgnoringOtherApps:YES];
     SDL_ShowWindow(window);
     if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) SDL_RestoreWindow(window);
     if (self.windowDelegate.hiddenFullscreenFlags) {
@@ -153,7 +154,6 @@ bool nativeHideStreamWindow(SDL_Window* window)
             self.windowDelegate.hiddenFullscreenFlags = 0;
         else SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Native fullscreen restore transition failed: %s", SDL_GetError());
     }
-    [NSApp activateIgnoringOtherApps:YES];
     SDL_RaiseWindow(window);
     [nativeWindow makeKeyAndOrderFront:nil];
     self.windowDelegate.changingVisibility = NO;

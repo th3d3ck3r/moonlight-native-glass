@@ -12,6 +12,11 @@
 
 void configureNativeStreamWindow(const char* token);
 void stopNativeStreamWindow();
+static int fullscreenExits, fullscreenRestores;
+static bool fixtureTransition(SDL_Window* window, Uint32 flags) {
+    if (flags) ++fullscreenRestores; else ++fullscreenExits;
+    return SDL_SetWindowFullscreen(window, flags)==0;
+}
 static void check(bool okay, const char* message) {
     if (!okay) { std::fprintf(stderr,"FAIL: %s (SDL: %s)\n",message,SDL_GetError()); std::exit(1); }
 }
@@ -72,6 +77,7 @@ int main(int argc, char** argv) { @autoreleasepool {
     // Spaces; Borderless Full Screen enables Spaces, before SDL video init.
     SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES,spaces ? "1" : "0");
     configureNativeStreamWindow("fullscreen-start-fixture");
+    nativeSetStreamFullscreenTransition(fixtureTransition);
     check(SDL_Init(SDL_INIT_VIDEO)==0,"SDL initialization failed");
     NSWindow* desktop=[[[NSWindow alloc] initWithContentRect:NSScreen.mainScreen.frame
         styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO] autorelease];
@@ -122,9 +128,11 @@ int main(int argc, char** argv) { @autoreleasepool {
         capture(directory,[NSString stringWithFormat:@"restored-%d.png",attempt],true);
         SDL_SetRelativeMouseMode(SDL_FALSE); SDL_SetWindowKeyboardGrab(window,SDL_FALSE);
     }
+    check(fullscreenExits==2 && fullscreenRestores==2,"Hide/restore must route every fullscreen change through the supplied Session transition");
     check(SDL_SetWindowFullscreen(window,0)==0,"Return to windowed failed"); pump(1);
     check(cocoa(window).toolbar!=nil,"Returning to windowed lost the native title controls");
     [queue release]; SDL_Metal_DestroyView(view); SDL_DestroyWindow(window); pump();
+    nativeSetStreamFullscreenTransition(nullptr);
     stopNativeStreamWindow(); [desktop orderOut:nil]; SDL_Quit();
     std::printf("PASS: %s startup, composited Metal output, captured hide/desktop/restore and windowed return (no host/decode test)\n",
         spaces ? "Borderless Full Screen" : "Full Screen");

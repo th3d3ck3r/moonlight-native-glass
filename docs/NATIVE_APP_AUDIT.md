@@ -121,3 +121,47 @@ Also stress cancellation/retry and host removal while network operations finish.
 The fixes and regression checks reduce recurrence risk. They cannot guarantee
 that no future bug occurs. No release publication or README update is part of
 this audit.
+
+## Fullscreen regression follow-up — Preview 15
+
+The October 8 recording reported broken Full Screen and Borderless Full Screen,
+including Control–Option–Shift–Q in each mode. The previous SDL lifecycle tests
+entered fullscreen after an already-open window, released capture before hiding,
+and asserted only window visibility/focus. They did not assert the visible
+screen contents or reproduce Session's two macOS fullscreen configurations.
+
+`FullscreenWindowTests.mm` now initializes separate processes with Session's
+actual `SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES` values: Full Screen uses `0`,
+Borderless Full Screen uses `1`; both normally use desktop fullscreen on macOS.
+It enters fullscreen before creating the Metal view, verifies native attachment
+preserves its geometry and has no toolbar, presents known Metal pixels, then
+hides with relative mouse and keyboard capture active. Composited screenshots
+assert the underlying desktop fixture is visible, followed by two successful
+fullscreen restore/presentation cycles and a return to windowed title controls.
+The test also verifies all hide/restore transitions use the supplied callback.
+
+Run `37781278549` reproduced the black-Space failure in Borderless Full Screen:
+initial presentation succeeded, but the first hide captured black pixels. Full
+Screen passed initial presentation and both hide/restore cycles. The shipped
+v19 dependency set uses SDL3 through sdl2-compat, whose hide operation orders out
+a fullscreen Cocoa window without first exiting its fullscreen Space. A hidden
+window alone is therefore insufficient evidence of a successful desktop return.
+
+The native adapter now saves the requested fullscreen flags, exits fullscreen
+before hiding, and restores the requested mode on reopen. Its production callback
+uses Session's existing `toggleFullscreen()` and its existing platform safety;
+no decoder implementation, network, timing, bitrate or settings policy changes.
+The small Session callback registration/cleanup is reviewed as a presentation
+hook in the protected-source check. Native titlebar attachment also avoids ever
+installing a toolbar on an already-fullscreen window, or restoring title styling
+that it never installed. The black-output-at-startup report remains subject to
+physical Intel/host validation: a known-color Metal fixture is not a live decode
+or frame-pacing test.
+
+About uses native UI build 15 separately from the bundled engine's actual short
+version. Existing credits remain unchanged except the engine version number.
+Both cached menu bar icon states use the same rounded mask; source artwork stays
+unchanged. Rendered pixel checks cover transparent corners, opaque edges and
+original color at standard and Retina sizes, in addition to existing state,
+cache, accessibility and observation tests. README and release publication stay
+outside this work.

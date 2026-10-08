@@ -58,14 +58,6 @@ jobs:
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/overlay-tests
           build/overlay-tests build/overlay-previews
-      - name: Test actual SDL stream window hide and restore
-        if: matrix.architecture == 'universal'
-        run: |
-          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
-            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
-            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
-            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
-          build/stream-window-tests
       - name: Test fullscreen startup, Metal presentation and captured hide/restore
         if: matrix.architecture == 'universal'
         run: |
@@ -75,6 +67,14 @@ jobs:
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/fullscreen-window-tests
           build/fullscreen-window-tests 0 build/fullscreen-previews/fullscreen
           build/fullscreen-window-tests 1 build/fullscreen-previews/borderless
+      - name: Test actual SDL stream window hide and restore
+        if: matrix.architecture == 'universal'
+        run: |
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
+            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
+          build/stream-window-tests
       - uses: actions/upload-artifact@v6
         if: always() && matrix.architecture == 'universal'
         with:
@@ -98,7 +98,13 @@ jobs:
         if: matrix.architecture == 'universal'
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
-          build/status-icon-tests macos-native/Resources
+          build/status-icon-tests macos-native/Resources build/status-icon-previews
+      - uses: actions/upload-artifact@v6
+        if: matrix.architecture == 'universal'
+        with:
+          name: Native-Status-Icon-Previews
+          path: build/status-icon-previews/*.png
+          if-no-files-found: error
       - name: Package preview artifact
         run: |
           ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-15-${{ matrix.architecture }}.zip'
