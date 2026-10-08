@@ -148,11 +148,27 @@ a fullscreen Cocoa window without first exiting its fullscreen Space. A hidden
 window alone is therefore insufficient evidence of a successful desktop return.
 
 The native adapter now saves the requested fullscreen flags, exits fullscreen
-before hiding, and restores the requested mode on reopen. Its production callback
+before hiding, and restores the requested mode on reopen. Token-checked restore
+notifications enqueue a separately registered SDL event; Session handles the
+restore outside AppKit/distributed notification callbacks so the blocking
+fullscreen animation can complete. Stock SDL user events remain reserved and
+stale restore requests are flushed on cleanup. Its production callback
 uses Session's existing `toggleFullscreen()` and its existing platform safety;
 no decoder implementation, network, timing, bitrate or settings policy changes.
-The small Session callback registration/cleanup is reviewed as a presentation
-hook in the protected-source check. Native titlebar attachment also avoids ever
+The small Session callback registration/cleanup and native-only focus-loss guard
+are reviewed as presentation hooks in the protected-source check. The guard
+preserves fullscreen capture intent while the window is temporarily windowed and
+hidden. Native title controls stay suppressed throughout hide/restore and AppKit
+fullscreen transitions, and are never reinstalled on a hidden window. The native
+controls focus helper remains unchanged and refuses to reopen deliberately
+hidden streams. The focus-routing fixture disables SDL auto-minimize only for
+its optional physical exclusive case; that avoids conflating the separate SDL
+exclusive display/minimize behavior with controls focus routing. The actual
+Full Screen and Borderless Full Screen presentation tests retain stock hints.
+Physical exclusive mode remains the existing opt-in `I_WANT_BUGGY_FULLSCREEN`
+path, with no claim of a fix to its upstream display auto-minimize behavior.
+The fixture continues to check real relative mouse motion and active
+keyboard/mouse focus in its controlled cases. Native titlebar attachment also avoids ever
 installing a toolbar on an already-fullscreen window, or restoring title styling
 that it never installed. The black-output-at-startup report remains subject to
 physical Intel/host validation: a known-color Metal fixture is not a live decode
@@ -165,3 +181,52 @@ unchanged. Rendered pixel checks cover transparent corners, opaque edges and
 original color at standard and Retina sizes, in addition to existing state,
 cache, accessibility and observation tests. README and release publication stay
 outside this work.
+
+
+## Broader non-performance acceptance pass
+
+The real-helper bridge checks now cover every exported setting's schema/value
+agreement and JSON type rejection, every advertised enum choice, a batch toggle
+of every Boolean preference, complete restoration of the isolated test
+preferences, existing atomic validation and restart persistence. Ordinary helper
+mode rejects malformed host addresses before contacting a host, and rejects
+stale-host pair/wake/rename/remove/game visibility/artwork/quit requests while
+remaining responsive to snapshots. Discovery stays disabled in the isolated
+root; these tests do not alter a user's stored hosts or preferences.
+
+Existing acceptance coverage also includes 16 composited library/settings
+screens, expanded overlay customization, About, menu-bar reopen/Settings/Quit,
+Dock reopen/fresh launch, all native shortcut actions, overlay sizing and
+pointer behavior, controller status attach/detach, helper cancellation/retry,
+malformed responses and process/pipe failure recovery. Settings UI screenshots
+and design-preview host sheets verify presentation; they do not prove live
+pairing, discovery, artwork transfer or host operations succeed.
+
+Remaining physical acceptance: Intel live-host launch, keyboard/mouse and
+controller input, audio, successful discovery/add/pair/rename/remove/wake,
+host game visibility/quit, disconnect/reconnect, repeated fullscreen shortcuts,
+sleep/wake and display changes; clean installation on each claimed supported
+macOS/architecture. Performance benchmarking is outside this pass. Optional
+physical exclusive fullscreen retains its upstream opt-in limitation. Passing
+CI is evidence for tested paths, not certification of every app behavior.
+
+Release-candidate recommendation: freeze features after these checks and a
+live-host physical smoke test pass. Publish an RC as a GitHub pre-release with
+known issues and separate frontend/engine version identities. For ordinary
+public macOS distribution, use Developer ID signing and notarization; current
+preview artifacts use ad-hoc signatures. No release or tag is created by this
+acceptance pass.
+
+
+Expanded run `37792252998` exposed a SIGSEGV on helper shutdown after settings
+restart, and diagnostic run `37793963298` reproduced it during repeated
+immediate exits. The native helper was parented to the application with no
+explicit earlier destruction. It is now scoped in native launch mode and reset
+after the event loop and worker drain, while the QML engine, Qt platform and
+logger remain alive. Stock manager implementations and streaming algorithms
+are unchanged. Regression coverage alternates eight immediate launches/exits
+between isolated test and ordinary helper mode with discovery disabled.
+Failure diagnostics retain stderr and try the matching macOS crash report,
+then immediate-shutdown LLDB reproduction if hosted macOS suppresses reports.
+The UI job's timeout is increased from five to ten minutes because all five
+tests passed before its old limit cancelled screenshot export.

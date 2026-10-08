@@ -155,3 +155,49 @@ builds and screenshot checks provide the available evidence.
 - [Run 37774999668](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37774999668) completed successfully for that exact revision: full Intel and Universal builds, 105-file Mach-O dependency/architecture audits, signatures, overlay/SDL window-input checks, engine framing/failure/bridge/persistence/status checks and all five native UI tests with zero failures. Compact library, expanded Overlay customization and Shortcuts captures reviewed. Runtime tests used arm64 macOS 26.6.2/Xcode 26.6.0; physical Intel remains untested.
 - Audited Preview 14 artifacts: [Intel](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37774999668/artifacts/11549692572), [Universal](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37774999668/artifacts/11550003271). This supersedes the earlier Preview 14 artifacts for these audit fixes. No release, version bump, README change or master code change was made. Prior audit runs were superseded during builds and are not final validation.
 - Physical acceptance remains: real host movement/clicks immediately after Control Center Done, repeated title-bar/shortcut cycles across all three modes, capture already released, absolute mouse/pointer lock, Settings/app focus changes, controller/host reconnects, cancellation/retry and host removal during network completion. Automated checks reduce risk; no claim that bugs can never recur.
+
+
+## October 8 — Preview 15 fullscreen and expanded acceptance
+
+- Application changes remain on `native-ui` in `th3d3ck3r/moonlight-native-glass`.
+  Full Screen and Borderless Full Screen now exit their desktop/Space before
+  hiding and restore through a separately registered SDL event outside AppKit
+  notification callbacks, using Session's original fullscreen transition.
+  Toolbar installation is suppressed during fullscreen/hidden transitions.
+  About separates UI build 15 from engine 6.2.0. Both menu bar states are rounded.
+- Full run [37790564463](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37790564463)
+  passed all three jobs at application revision `a0c982fd`: both complete builds,
+  all five UI tests, real SDL focus/motion/lifecycle, both stock macOS fullscreen
+  hint/startup/Metal/hide/restore fixtures, bridge/persistence, status icon pixels.
+  Optional physical exclusive focus routing uses a controlled no-auto-minimize
+  fixture; its upstream opt-in display auto-minimize limitation is not fixed.
+- User subsequently requested broader non-performance app testing. Added every
+  settings schema/type/enum/Boolean contract, stale-host and invalid-address
+  recovery, and eight repeated immediate helper startup/shutdown cycles.
+  Runs `37792252998` and `37793963298` exposed SIGSEGV on helper shutdown.
+  The second run completed all broad settings/host checks before a repeated exit
+  failed. Crash reports were unavailable on that runner; LLDB failure fallback
+  is now included. This is an unresolved release-candidate blocker until the fix
+  below passes. Do not report the entire app certified or publish a release.
+- New application change `977dea4f` scopes NativeBridge and destroys it after
+  event-loop/worker completion but before Qt platform/logger teardown. This
+  addresses a cleanup-order risk without changing stock manager/decoder code.
+  Latest source/test revision `7202a71c8f6224ea5cdad29c7e8e58434d9e66ac`.
+  [Run 37795784286](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37795784286)
+  currently has UI SUCCESS; both build jobs are queued for macOS runners.
+  UI timeout is now 10 minutes after the old 5-minute limit cancelled screenshot
+  export despite all five tests passing. Next step: wait for both build jobs,
+  inspect repeated-shutdown result/diagnostics, fix any remaining native lifecycle
+  defect, and update this checkpoint with final verified artifacts.
+- No README/master/release/tag changes, no Xcode project ZIP (user explicitly
+  said not to create it). Preserve stream core, decoding, network, bitrate and
+  settings policy. Existing source-boundary check passes; changes in Session
+  and Input are reviewed native presentation hooks, main.cpp change is native
+  helper ownership only. Runtime validation is ARM macOS CI; Intel remains a
+  cross-build until physical live-host acceptance.
+- RC recommendation: freeze features and require these automated tests plus
+  physical host pairing/launch/input/audio/hide/restore/disconnect/reconnect and
+  clean-install coverage on claimed macOS/architecture support. Public ordinary
+  macOS distribution should use Developer ID signing and notarization; current
+  previews are ad-hoc signed. GitHub RC publication should be a pre-release,
+  with known limitations and separate UI/engine version numbers.
