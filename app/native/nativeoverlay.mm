@@ -301,6 +301,11 @@ void nativeOverlayRestoreStreamFocus(SDL_Window* window) {
     SDL_SysWMinfo info; SDL_VERSION(&info.version);
     if (!SDL_GetWindowWMInfo(window,&info)) return;
     [NSApp activateIgnoringOtherApps:YES];
+    // A completed exclusive-mode focus-loss transition can leave AppKit key
+    // while SDL has cleared keyboard focus. Re-key through real notifications
+    // so SDL's original delegate restores its input state too.
+    if (info.info.cocoa.window.keyWindow && SDL_GetKeyboardFocus()!=window)
+        [info.info.cocoa.window resignKeyWindow];
     [info.info.cocoa.window makeKeyAndOrderFront:nil];
     SDL_RaiseWindow(window);
     // AppKit child-window mouse tracking can leave SDL's mouse focus outside
