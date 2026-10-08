@@ -113,9 +113,12 @@ import XCTest
         // Dock exposes macOS items by title, rather than their empty label.
         let icon = dock.dockItems["MoonlightNative"]
         XCTAssertTrue(icon.waitForExistence(timeout: 5), "Frontend Dock icon missing")
-        // A direct element click asks XCTest to activate the Dock process.
-        // Click its visible icon without making the system Dock an active app.
-        icon.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        // Any coordinate rooted in Dock asks XCTest to activate that system
+        // process. Read its icon frame, but synthesize from our app instead.
+        let target = icon.frame
+        let origin = app.frame.origin
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: target.midX - origin.x, dy: target.midY - origin.y)).click()
         XCTAssertTrue(window.waitForExistence(timeout: 5), "Dock click must reopen the library when no stream window exists")
         app.terminate()
         app.launch()
