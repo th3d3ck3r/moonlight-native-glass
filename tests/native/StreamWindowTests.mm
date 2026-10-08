@@ -8,7 +8,7 @@
 #include "nativeoverlay.h"
 
 // Test-only observation of the confinement property already used internally
-// by SDL 2.30.5's Cocoa backend; it is absent from AppKit's public headers.
+// by SDL's Cocoa backend; it is absent from AppKit's public headers.
 // Production code continues to use SDL's public capture/grab APIs exclusively.
 @interface NSWindow (SDLConfinementProbe)
 @property(nonatomic, readonly) NSRect mouseConfinementRect;
@@ -165,6 +165,10 @@ int main(int argc, char** argv) {
             // Session selects a supported display mode before entering exclusive
             // fullscreen. Keep the fixture's floating 640x360 size from being
             // mistaken for a physical monitor mode by sdl2-compat.
+            // Keep this focus-routing fixture from triggering SDL's separate
+            // exclusive display auto-minimize path. The user-facing macOS modes
+            // are exercised with their stock hints by FullscreenWindowTests.
+            SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS,mode==SDL_WINDOW_FULLSCREEN ? "0" : "auto");
             if (mode==SDL_WINDOW_FULLSCREEN) {
                 SDL_DisplayMode desktop;
                 check(SDL_GetDesktopDisplayMode(SDL_GetWindowDisplayIndex(window),&desktop)==0,"Exclusive fixture desktop mode unavailable");
