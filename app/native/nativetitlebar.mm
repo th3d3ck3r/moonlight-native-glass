@@ -63,7 +63,7 @@ static MLStreamTitlebar* titlebar;
     if ((self=[super init])) {
         self.buttons=[NSMutableDictionary dictionary];
         self.batteryDetails=@"No controller connected";
-        for (NSString* name in @[NSWindowDidResizeNotification, NSWindowDidMiniaturizeNotification, NSWindowWillEnterFullScreenNotification, NSWindowWillExitFullScreenNotification, NSWindowDidChangeOcclusionStateNotification])
+        for (NSString* name in @[NSWindowDidResizeNotification, NSWindowDidMiniaturizeNotification, NSWindowWillEnterFullScreenNotification, NSWindowWillExitFullScreenNotification, NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification, NSWindowDidChangeOcclusionStateNotification])
             [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:name object:nil];
     }
     return self;
@@ -101,7 +101,17 @@ static MLStreamTitlebar* titlebar;
     return item;
 }
 - (void)windowChanged:(NSNotification*)notification {
-    if (notification.object==self.window) [self closeDetails];
+    if (notification.object!=self.window) return;
+    [self closeDetails];
+    // Defer until SDL/AppKit finish changing the window style. Borderless
+    // desktop fullscreen has no titled mask; native fullscreen has FullScreen.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self.window) return;
+        NSWindowStyleMask style=self.window.styleMask;
+        BOOL fullscreen=(style & NSWindowStyleMaskFullScreen) || !(style & NSWindowStyleMaskTitled);
+        if (fullscreen && self.window.toolbar==self.toolbar) self.window.toolbar=nil;
+        else if (!fullscreen && !self.window.toolbar) self.window.toolbar=self.toolbar;
+    });
 }
 - (void)overflowClicked:(NSMenuItem*)sender { [self perform:sender.representedObject anchor:nil]; }
 - (void)clicked:(NSButton*)sender {
@@ -207,7 +217,7 @@ static MLStreamTitlebar* titlebar;
 }
 - (void)invalidate {
     [[NSNotificationCenter defaultCenter] removeObserver:self]; [self closeDetails]; self.details.delegate=nil;
-    if (self.window.toolbar==self.toolbar) {
+    if (self.window && (self.window.toolbar==self.toolbar || !self.window.toolbar)) {
         self.window.toolbar=self.previousToolbar; self.window.titleVisibility=self.previousTitleVisibility;
         self.window.toolbarStyle=self.previousToolbarStyle;
     }
@@ -248,6 +258,7 @@ void nativeTitlebarAttach(void* window) {
     else titlebar.toolbar.centeredItemIdentifier=hostID;
     titlebar.window.titleVisibility=NSWindowTitleHidden; titlebar.window.toolbarStyle=NSWindowToolbarStyleUnifiedCompact;
     titlebar.window.toolbar=titlebar.toolbar; [titlebar readControllers];
+    [titlebar windowChanged:[NSNotification notificationWithName:NSWindowDidResizeNotification object:titlebar.window]];
 }
 void nativeTitlebarDetach() {
     { std::lock_guard<std::mutex> lock(stateMutex); epoch++; pending=false; }

@@ -92,10 +92,22 @@ int main(int argc, char** argv) {
         check(pressed && released,"Accessory stream must still receive SDL keyboard input");
         check(SDL_SetWindowFullscreen(window,SDL_WINDOW_FULLSCREEN_DESKTOP)==0,"Accessory fullscreen entry"); pump(1.0);
         check(NSApp.activationPolicy==NSApplicationActivationPolicyAccessory,"Fullscreen must not promote engine to Dock");
+        check(cocoa(window).toolbar==nil,"Borderless fullscreen must not show native title-bar controls");
         check(SDL_SetWindowFullscreen(window,0)==0,"Accessory fullscreen exit"); pump(1.0);
         nativeWindow=cocoa(window);
         // Keep the title toolbar and customizable overlays in an accessory app.
         check(nativeWindow.toolbar!=nil,"Single-Dock engine lost title-bar controls");
+        for (Uint32 mode : {Uint32(0), Uint32(SDL_WINDOW_FULLSCREEN_DESKTOP), Uint32(SDL_WINDOW_FULLSCREEN)}) {
+            check(SDL_SetWindowFullscreen(window,mode)==0,"Mouse confinement fullscreen transition"); pump(1.0);
+            check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
+            SDL_Rect region={0,0,320,200};
+            check(SDL_SetWindowMouseRect(window,&region)==0,"Absolute pointer region setup");
+            SDL_SetWindowMouseGrab(window,SDL_TRUE); pump();
+            check(SDL_GetWindowMouseGrab(window)==SDL_TRUE,"Cocoa stream mouse grab did not activate");
+            SDL_SetWindowMouseRect(window,nullptr); SDL_SetWindowMouseGrab(window,SDL_FALSE); pump();
+            check(SDL_GetWindowMouseGrab(window)==SDL_FALSE && SDL_GetWindowMouseRect(window)==nullptr,"Released input must remove mouse confinement");
+        }
+        check(SDL_SetWindowFullscreen(window,0)==0,"Return to windowed stream"); pump(1.0);
         // Resizing must still reach SDL's original window delegate.
         [nativeWindow setContentSize:NSMakeSize(720, 400)];
         pump();
