@@ -69,7 +69,7 @@ static MLOverlayController* controller;
 - (NSPanel*)panelWithText:(NSTextField**)field {
     NSPanel* panel = [[[MLOverlayPanel alloc] initWithContentRect:NSMakeRect(0,0,300,100) styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO] autorelease];
     panel.releasedWhenClosed = NO; panel.opaque = NO; panel.backgroundColor = NSColor.clearColor;
-    panel.hasShadow = YES; panel.ignoresMouseEvents = field != nullptr;
+    panel.hasShadow = YES; panel.hidesOnDeactivate = NO; panel.ignoresMouseEvents = field != nullptr;
     panel.collectionBehavior = NSWindowCollectionBehaviorFullScreenAuxiliary | NSWindowCollectionBehaviorIgnoresCycle;
     panel.becomesKeyOnlyIfNeeded = YES;
     NSVisualEffectView* material = [[[NSVisualEffectView alloc] initWithFrame:panel.contentView.bounds] autorelease];
@@ -145,7 +145,7 @@ static MLOverlayController* controller;
     if (!panel) return;
     if (visible) {
         if (panel.parentWindow != self.parent) [self.parent addChildWindow:panel ordered:NSWindowAbove];
-        if (!panel.visible) [panel orderFront:nil];
+        [panel orderFront:nil];
     } else {
         if (panel.parentWindow) [panel.parentWindow removeChildWindow:panel];
         if (panel.visible) [panel orderOut:nil];

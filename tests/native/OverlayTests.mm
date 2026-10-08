@@ -45,7 +45,9 @@ int main(int argc,char** argv) { @autoreleasepool {
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
     NSString* out=argc>1 ? [NSString stringWithUTF8String:argv[1]] : @"/tmp";
     [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]]; pump(); capture([out stringByAppendingPathComponent:@"overlay-dark.png"]);
-    nativeOverlaySetControlsVisible(true); pump(); check(window.childWindows.count==3,"Separate controls surface"); capture([out stringByAppendingPathComponent:@"overlay-controls-dark.png"]);
+    nativeOverlaySetControlsVisible(true); pump(); check(window.childWindows.count==3,"Separate controls surface");
+    for (NSWindow* panel in window.childWindows) check(panel.visible && (panel.occlusionState & NSWindowOcclusionStateVisible),"Showing controls must keep all overlays unobscured");
+    capture([out stringByAppendingPathComponent:@"overlay-controls-dark.png"]);
     [defaults setDouble:1.5 forKey:@"scale"]; [defaults setObject:@"bottomRight" forKey:@"position"]; [defaults synchronize];
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES];
     [window setContentSize:NSMakeSize(640,360)]; pump();
