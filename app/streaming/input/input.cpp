@@ -9,6 +9,7 @@
 #ifdef Q_OS_MACOS
 #include "native/nativetitlebar.h"
 #include "native/nativeoverlay.h"
+#include "native/nativeapplication.h"
 #endif
 #include <QDir>
 #include <QGuiApplication>
@@ -292,7 +293,13 @@ void SdlInputHandler::notifyFocusLost()
     // This lets user to interact with our window's title bar and with the buttons in it.
     // Doing this while the window is full-screen breaks the transition out of FS
     // (desktop and exclusive), so we must check for that before releasing mouse capture.
-    if (!(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN) && !m_AbsoluteMouseMode) {
+    if (!(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN) && !m_AbsoluteMouseMode
+#ifdef Q_OS_MACOS
+        // Native fullscreen hide exits the Space temporarily. Preserve the
+        // original fullscreen capture intent until its window is restored.
+        && !nativeStreamWindowHasHiddenFullscreen(m_Window)
+#endif
+        ) {
         setCaptureActive(false);
     }
 #ifdef Q_OS_MACOS

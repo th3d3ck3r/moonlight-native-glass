@@ -62,6 +62,8 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic, assign) NSWindowTitleVisibility previousTitleVisibility;
 @property(nonatomic, assign) NSWindowToolbarStyle previousToolbarStyle;
 @property(nonatomic, assign) BOOL presentationInstalled;
+@property(nonatomic, assign) BOOL windowTransition;
+@property(nonatomic, assign) BOOL fullscreenTransition;
 @property(nonatomic, retain) NSMutableDictionary* buttons;
 @property(nonatomic, retain) NSPopover* details;
 @property(nonatomic, copy) NSString* detailsID;
@@ -84,7 +86,7 @@ static MLStreamTitlebar* titlebar;
     if ((self=[super init])) {
         self.buttons=[NSMutableDictionary dictionary];
         self.batteryDetails=@"No controller connected";
-        for (NSString* name in @[NSWindowDidResizeNotification, NSWindowDidMiniaturizeNotification, NSWindowWillEnterFullScreenNotification, NSWindowWillExitFullScreenNotification, NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification, NSWindowDidChangeOcclusionStateNotification])
+        for (NSString* name in @[NSWindowDidResizeNotification, NSWindowDidMiniaturizeNotification, NSWindowWillEnterFullScreenNotification, NSWindowWillExitFullScreenNotification, NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification, NSWindowDidChangeOcclusionStateNotification, @"NSWindowDidFailToEnterFullScreenNotification", @"NSWindowDidFailToExitFullScreenNotification"])
             [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:name object:nil];
     }
     return self;
@@ -124,6 +126,11 @@ static MLStreamTitlebar* titlebar;
 - (void)windowChanged:(NSNotification*)notification {
     if (notification.object!=self.window) return;
     [self closeDetails];
+    if ([notification.name isEqual:NSWindowWillEnterFullScreenNotification] || [notification.name isEqual:NSWindowWillExitFullScreenNotification])
+        self.fullscreenTransition=YES;
+    else if ([notification.name isEqual:NSWindowDidEnterFullScreenNotification] || [notification.name isEqual:NSWindowDidExitFullScreenNotification]
+        || [notification.name isEqual:@"NSWindowDidFailToEnterFullScreenNotification"] || [notification.name isEqual:@"NSWindowDidFailToExitFullScreenNotification"])
+        self.fullscreenTransition=NO;
     // Defer until SDL/AppKit finish changing the window style. Borderless
     // desktop fullscreen has no titled mask; native fullscreen has FullScreen.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -134,13 +141,13 @@ static MLStreamTitlebar* titlebar;
 - (void)updateWindowToolbar {
     if (!self.window) return;
     NSWindowStyleMask style=self.window.styleMask;
-    BOOL fullscreen=(style & NSWindowStyleMaskFullScreen) || !(style & NSWindowStyleMaskTitled);
+    BOOL fullscreen=self.windowTransition || self.fullscreenTransition || (style & NSWindowStyleMaskFullScreen) || !(style & NSWindowStyleMaskTitled);
     // Attaching a toolbar changes the Cocoa content geometry. In particular,
     // never install it on SDL's already-borderless initial fullscreen window,
     // even briefly before a deferred resize callback removes it again.
     if (fullscreen) {
         if (self.window.toolbar==self.toolbar) self.window.toolbar=nil;
-    } else if (!self.window.toolbar) {
+    } else if (self.window.visible && !self.window.toolbar) {
         self.presentationInstalled=YES;
         self.window.titleVisibility=NSWindowTitleHidden;
         self.window.toolbarStyle=NSWindowToolbarStyleUnifiedCompact;
@@ -295,4 +302,8 @@ void nativeTitlebarAttach(void* window) {
 void nativeTitlebarDetach() {
     { std::lock_guard<std::mutex> lock(stateMutex); epoch++; pending=false; }
     [titlebar invalidate]; [titlebar release]; titlebar=nil;
+}
+void nativeTitlebarSetWindowTransition(bool transitioning) {
+    titlebar.windowTransition=transitioning;
+    [titlebar updateWindowToolbar];
 }

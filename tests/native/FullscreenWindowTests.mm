@@ -115,6 +115,7 @@ int main(int argc, char** argv) { @autoreleasepool {
         SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);
         check(nativeHideStreamWindow(window),"Native close-window shortcut failed"); pump(1);
         check(!cocoa(window).visible && SDL_GetWindowFromID(id)==window,"Hide destroyed or retained a visible stream window");
+        check(nativeStreamWindowHasHiddenFullscreen(window),"Hidden fullscreen capture intent was lost");
         SDL_Event event;
         while (SDL_PollEvent(&event)) check(event.type!=SDL_QUIT && !(event.type==SDL_WINDOWEVENT
             && event.window.event==SDL_WINDOWEVENT_CLOSE),"Hide queued session termination");
@@ -123,6 +124,7 @@ int main(int argc, char** argv) { @autoreleasepool {
             object:@"fullscreen-start-fixture" userInfo:nil deliverImmediately:YES]; pump(1);
         check(SDL_GetKeyboardFocus()==window && cocoa(window).visible,"Restore lost the original stream focus");
         check(SDL_GetWindowFlags(window)&SDL_WINDOW_FULLSCREEN,"Restore lost the requested fullscreen mode");
+        check(!nativeStreamWindowHasHiddenFullscreen(window) && SDL_GetRelativeMouseMode(),"Restore lost fullscreen capture intent");
         check(cocoa(window).toolbar==nil,"Restore installed fullscreen title controls");
         draw(layer,queue);
         capture(directory,[NSString stringWithFormat:@"restored-%d.png",attempt],true);

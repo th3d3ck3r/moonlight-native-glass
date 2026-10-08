@@ -65,17 +65,20 @@ static bool hideStreamWindow(SDL_Window* window)
     if (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) return true;
     const Uint32 fullscreen = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
     delegate.changingVisibility = YES;
+    if (fullscreen) nativeTitlebarSetWindowTransition(true);
     // SDL3 (through sdl2-compat) hides a fullscreen Cocoa window without leaving
     // its Space. Exit explicitly first or the user is stranded on a black Space.
     // Use Session's stock transition so its existing renderer safety applies.
     if (fullscreen && !transitionFullscreen(window, 0)) {
         delegate.changingVisibility = NO;
+        nativeTitlebarSetWindowTransition(false);
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Native fullscreen hide transition failed: %s", SDL_GetError());
         return false;
     }
     delegate.hiddenFullscreenFlags = fullscreen;
     SDL_HideWindow(window);
     delegate.changingVisibility = NO;
+    if (fullscreen) nativeTitlebarSetWindowTransition(false);
     sendWindowEvent("windowHidden");
     return true;
 }
@@ -110,6 +113,13 @@ bool nativeHideStreamWindow(SDL_Window* window)
     NSWindow* nativeWindow = nativeSDLWindow(window);
     if (!nativeWindow || ![nativeWindow.delegate isKindOfClass:[MLStreamWindowDelegate class]]) return false;
     return hideStreamWindow(window);
+}
+bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
+{
+    NSWindow* nativeWindow = nativeSDLWindow(window);
+    if (!nativeWindow || ![nativeWindow.delegate isKindOfClass:[MLStreamWindowDelegate class]]) return false;
+    return ((MLStreamWindowDelegate*)nativeWindow.delegate).hiddenFullscreenFlags != 0
+        && (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN);
 }
 
 @interface MLStreamWindowAccess : NSObject
@@ -146,6 +156,8 @@ bool nativeHideStreamWindow(SDL_Window* window)
     NSWindow* nativeWindow = nativeSDLWindow(window);
     if (!nativeWindow || self.windowDelegate.changingVisibility) return;
     self.windowDelegate.changingVisibility = YES;
+    const bool restoringFullscreen = self.windowDelegate.hiddenFullscreenFlags != 0;
+    if (restoringFullscreen) nativeTitlebarSetWindowTransition(true);
     [NSApp activateIgnoringOtherApps:YES];
     SDL_ShowWindow(window);
     if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) SDL_RestoreWindow(window);
@@ -157,6 +169,7 @@ bool nativeHideStreamWindow(SDL_Window* window)
     SDL_RaiseWindow(window);
     [nativeWindow makeKeyAndOrderFront:nil];
     self.windowDelegate.changingVisibility = NO;
+    if (restoringFullscreen) nativeTitlebarSetWindowTransition(false);
 }
 - (void)dealloc
 {

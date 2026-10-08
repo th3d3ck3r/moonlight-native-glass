@@ -3,6 +3,7 @@
 enum class NativeConnectionState { Idle, Connecting, Connected, Poor, Disconnected };
 void nativeTitlebarAttach(void* window);
 void nativeTitlebarDetach();
+void nativeTitlebarSetWindowTransition(bool transitioning);
 void nativeTitlebarSetCapture(bool captured);
 void nativeTitlebarSetStatistics(bool visible);
 void nativeTitlebarSetConnection(NativeConnectionState state);
