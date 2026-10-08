@@ -37,6 +37,17 @@ jobs:
           git fetch --no-tags --depth=1 origin de2467e433821664cdd2224aad8c89a625be1ad9
           python3 tests/native/check_streaming_boundary.py
           xcodebuild -version
+      # Exercise process/cancellation failures before the full engine build.
+      - name: Test native event framing
+        run: |
+          mkdir -p build
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift tests/native/EngineProtocolTests.swift -o build/engine-protocol-tests
+          build/engine-protocol-tests
+      - name: Test frontend engine failure recovery
+        if: matrix.architecture == 'universal'
+        run: |
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
+          build/engine-store-tests
       - name: Test native overlays and capture composited previews
         if: matrix.architecture == 'universal'
         run: |
@@ -63,15 +74,6 @@ jobs:
           if-no-files-found: error
       - name: Build app and verify bundle
         run: bash scripts/build-native-macos.sh '${{ matrix.architecture }}'
-      - name: Test native event framing
-        run: |
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift tests/native/EngineProtocolTests.swift -o build/engine-protocol-tests
-          build/engine-protocol-tests
-      - name: Test frontend engine failure recovery
-        if: matrix.architecture == 'universal'
-        run: |
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
-          build/engine-store-tests
       - name: Test real engine bridge and persistence
         if: matrix.architecture == 'universal'
         run: |

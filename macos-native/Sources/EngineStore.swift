@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Darwin
 
 /// One serialized read queue per helper; only complete events cross to the UI.
 final class EngineChannel {
@@ -14,6 +15,9 @@ final class EngineChannel {
     var stopRequested: Bool { closed }
 
     init(executable: URL, arguments: [String]) {
+        // A helper can close stdin before exiting. Let FileHandle surface EPIPE
+        // as a send error instead of allowing SIGPIPE to terminate the frontend.
+        signal(SIGPIPE, SIG_IGN)
         process.executableURL = executable
         process.arguments = arguments
         process.currentDirectoryURL = executable.deletingLastPathComponent()
@@ -211,7 +215,11 @@ struct PairingRequest: Identifiable {
         guard !preview else { return false }
         var request = data; request["command"] = action
         do { guard let channel else { throw CocoaError(.fileWriteUnknown) }; try channel.send(request); return true }
-        catch { fail("Could not send the request to the engine. Use Refresh to reconnect."); return false }
+        catch {
+            ready = false; channel?.stop()
+            fail("Could not send the request to the engine. Use Refresh to reconnect.")
+            return false
+        }
     }
     func requestArtwork(_ computer: Computer, game: Game) {
         guard !streamActive, !preview, game.artwork.isEmpty else { return }

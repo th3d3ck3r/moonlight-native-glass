@@ -59,10 +59,14 @@ func nativeArgument(_ name: String) -> String? { nil }
             let executable = directory.appendingPathComponent("engine-fixture")
             try """
             #!/usr/bin/env python3
-            import json, pathlib, sys
+            import json, os, pathlib, sys, time
             def emit(value):
                 print(json.dumps(value), flush=True)
-            if len(sys.argv) > 2 and sys.argv[2] == 'stream':
+            if '\(mode)' == 'broken-pipe':
+                os.close(0)
+                emit({'event': 'ready', 'protocol': 1})
+                time.sleep(5)
+            elif len(sys.argv) > 2 and sys.argv[2] == 'stream':
                 pathlib.Path('stream-started').write_text('started')
                 emit({'event': 'quitRequired', 'app': 'Previous game'})
                 for line in sys.stdin:
@@ -88,6 +92,21 @@ func nativeArgument(_ name: String) -> String? { nil }
             """.write(to: executable, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
             return executable
+        }
+        let brokenHelper = try fixture("broken-pipe")
+        for operation in 0..<3 {
+            let broken = EngineStore(executable: brokenHelper)
+            broken.start()
+            try await wait { broken.ready }
+            switch operation {
+            case 0: broken.add("127.0.0.1")
+            case 1: broken.pair(computer)
+            default: broken.testConnection()
+            }
+            precondition(!broken.ready && broken.message != nil && !broken.addingHost && broken.pairing == nil && !broken.testingConnection,
+                         "Broken pipe terminated the frontend or stranded an operation")
+            try await wait { if !broken.ready { broken.refresh() }; return broken.ready }
+            broken.shutdown()
         }
         let rejected = EngineStore(executable: try fixture("reject"))
         rejected.start()
@@ -150,6 +169,6 @@ func nativeArgument(_ name: String) -> String? { nil }
         try await wait { !malformed.ready && malformed.pairing == nil }
         precondition(malformed.message != nil, "Invalid typed event retained an unusable ready engine")
         malformed.shutdown()
-        print("PASS: helper exit, send failures, live rejection, cancelled/replacement replies, confirmation dismissal, launch deadline")
+        print("PASS: helper exit, missing/broken-pipe sends, busy guard, live rejection, cancelled/replacement replies, confirmation dismissal, quiet cancellation, launch deadline, malformed events")
     }
 }
