@@ -11,9 +11,9 @@ import threading
 executable = sys.argv[1]
 
 class Bridge:
-    def __init__(self, root):
+    def __init__(self, root, test_mode=True):
         self.events = queue.Queue()
-        self.p = subprocess.Popen([executable, "native", "test"], stdin=subprocess.PIPE,
+        self.p = subprocess.Popen([executable, "native"] + (["test"] if test_mode else []), stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                   env={**os.environ, "MOONLIGHT_NATIVE_TEST_ROOT": root}, text=True)
         def read():
@@ -71,6 +71,10 @@ with tempfile.TemporaryDirectory() as root:
         bridge.send({"command": "settings", "values": {"width": 2560, "height": 1440}})
         resolution = bridge.wait("settings")["values"]
         assert (resolution["width"], resolution["height"]) == (2560, 1440), "Resolution transaction failed"
+        # The isolated test root has no hosts. Disable discovery before testing
+        # the ordinary pause/resume path so it cannot probe the local network.
+        bridge.send({"command": "settings", "values": {"enableMdns": False}})
+        assert bridge.wait("settings")["values"]["enableMdns"] is False
         bridge.p.stdin.write("not json\n"); bridge.p.stdin.flush(); bridge.wait("error")
     finally:
         bridge.close()
@@ -82,4 +86,16 @@ with tempfile.TemporaryDirectory() as root:
         assert (persisted["width"], persisted["height"]) == (2560, 1440), "Resolution did not persist"
     finally:
         restarted.close()
-print("PASS: adapter startup, JSON validation, atomic settings validation, persistence across restart")
+    live = Bridge(root, test_mode=False)
+    try:
+        live.wait("ready")
+        assert live.wait("settings")["values"]["enableMdns"] is False
+        assert live.wait("hosts")["hosts"] == []
+        for request_id in ["cancelled-launch", "replacement-launch"]:
+            live.send({"command": "pause", "requestID": request_id})
+            assert live.wait("paused")["requestID"] == request_id, "Pause reply lost its launch identity"
+            live.send({"command": "resume"})
+            assert live.wait("hosts")["hosts"] == []
+    finally:
+        live.close()
+print("PASS: adapter startup, JSON/settings validation, persistence, correlated pause/resume replies")

@@ -98,8 +98,9 @@ struct PairingRequest: Identifiable {
     private var channel: EngineChannel?
     private var stream: EngineChannel?
     private var shuttingDown = false
-    private var pendingStream: (Computer, Game)?
+    private var pendingStream: (id: String, computer: Computer, game: Game)?
     private var hostDeadline: Task<Void, Never>?
+    private var launchDeadline: Task<Void, Never>?
     private let executableOverride: URL?
 
     var selected: Computer? { computers.first { $0.id == selectedID } }
@@ -116,7 +117,6 @@ struct PairingRequest: Identifiable {
                 serverVersion: "Sunshine", gpu: "Gaming GPU", supported: true,
                 apps: [Game(id: 1, name: "Desktop", hdr: false, hidden: false, artwork: ""),
                        Game(id: 2, name: "Steam", hdr: true, hidden: false, artwork: "")])]
-            let args = CommandLine.arguments
             if let screen = nativeArgument("--preview-screen") {
                 if screen == "empty" { computers = [] }
                 else if ["offline", "unpaired", "loading"].contains(screen), let host = computers.first {
@@ -142,7 +142,10 @@ struct PairingRequest: Identifiable {
         shuttingDown = false
         ready = false
         let helper = EngineChannel(executable: executable, arguments: ["native"])
-        helper.onEvent = { [weak self] event in self?.receive(event) }
+        helper.onEvent = { [weak self, weak helper] event in
+            guard let self, !self.shuttingDown, self.channel === helper else { return }
+            self.receive(event)
+        }
         helper.onExit = { [weak self, weak helper] code in
             guard let self, self.channel === helper else { return }
             self.ready = false
@@ -150,6 +153,7 @@ struct PairingRequest: Identifiable {
             self.pairing = nil; self.addingHost = false; self.testingConnection = false
             self.hostDeadline?.cancel()
             if self.pendingStream != nil {
+                self.launchDeadline?.cancel()
                 self.pendingStream = nil; self.streamActive = false; self.streamStarted = false
             }
             if !self.shuttingDown { self.fail("The streaming engine stopped (exit \(code)). Use Refresh to restart it.") }
@@ -169,8 +173,9 @@ struct PairingRequest: Identifiable {
                 if !computers.contains(where: { $0.id == selectedID }) { selectedID = computers.first?.id }
                 status = computers.isEmpty ? "Looking for computers…" : "\(computers.count) computer\(computers.count == 1 ? "" : "s")"
             case "settings":
+                let schema = try decodeEngineValue(event["schema"] ?? [], as: [PreferenceField].self)
                 values = event["values"] as? [String: Any] ?? [:]
-                fields = try decodeEngineValue(event["schema"] ?? [], as: [PreferenceField].self)
+                fields = schema
             case "artwork":
                 if let host = event["host"] as? String, let app = event["app"] as? Int, let url = event["url"] as? String,
                    let h = computers.firstIndex(where: { $0.id == host }), let a = computers[h].apps.firstIndex(where: { $0.id == app }) {
@@ -184,11 +189,21 @@ struct PairingRequest: Identifiable {
                 let detail = result == 0 ? "Internet streaming ports are reachable. This test does not check your local host or its firewall." : result == -1 ? "The Internet streaming port test was inconclusive. Check your network connection and try again." : "These Internet streaming ports appear blocked: \(event["ports"] as? String ?? "Not reported")."
                 message = NativeMessage(title: "Connection Test", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true)
             case "paused":
-                if let request = pendingStream { pendingStream = nil; runStream(request.0, game: request.1) }
-            case "error": testingConnection = false; addingHost = false; hostDeadline?.cancel(); pairing = nil; fail(event["message"] as? String ?? "The engine could not complete this request.")
+                if let request = pendingStream, event["requestID"] as? String == request.id {
+                    launchDeadline?.cancel(); pendingStream = nil
+                    runStream(request.computer, game: request.game)
+                }
+            case "error":
+                testingConnection = false; addingHost = false; hostDeadline?.cancel(); pairing = nil
+                if pendingStream != nil { cancelLaunch() }
+                fail(event["message"] as? String ?? "The engine could not complete this request.")
             default: break
             }
-        } catch { fail("Could not read the engine response: \(error.localizedDescription)") }
+        } catch {
+            if pendingStream != nil { cancelLaunch() }
+            fail("Could not read the engine response: \(error.localizedDescription)")
+            channel?.stop()
+        }
     }
 
     @discardableResult func send(_ action: String, _ data: [String: Any] = [:]) -> Bool {
@@ -208,9 +223,10 @@ struct PairingRequest: Identifiable {
     }
     func refresh() { if channel == nil { start() } else { send("snapshot") } }
     func add(_ address: String) {
-        addingHost = true
-        send("addHost", ["address": address])
+        guard !addingHost else { return }
         hostDeadline?.cancel()
+        addingHost = true
+        guard send("addHost", ["address": address]) else { addingHost = false; return }
         hostDeadline = Task { [weak self] in
             try? await Task.sleep(for: .seconds(35))
             guard !Task.isCancelled, let self, self.addingHost else { return }
@@ -222,7 +238,7 @@ struct PairingRequest: Identifiable {
         guard pairing == nil else { return }
         let pin = String(format: "%04d", Int.random(in: 0...9999))
         pairing = PairingRequest(computer: computer, pin: pin)
-        send("pair", ["host": computer.id, "pin": pin])
+        if !send("pair", ["host": computer.id, "pin": pin]) { pairing = nil }
     }
     func set(_ key: String, _ value: Any) {
         var changes: [String: Any] = [key: value]
@@ -238,11 +254,19 @@ struct PairingRequest: Identifiable {
         send("settings", ["values": ["width": width, "height": height]])
     }
     func startStream(_ computer: Computer, game: Game) {
-        guard ready, !streamActive, pairing == nil, !addingHost, !preview else { return }
+        guard ready, !streamActive, pairing == nil, !addingHost, !testingConnection, !preview else { return }
         streamActive = true; streamStarted = false; warnings = []
         status = "Preparing \(game.name)…"
-        pendingStream = (computer, game)
-        if !send("pause") { pendingStream = nil; streamActive = false }
+        let requestID = UUID().uuidString
+        pendingStream = (requestID, computer, game)
+        guard send("pause", ["requestID": requestID]) else { pendingStream = nil; streamActive = false; return }
+        launchDeadline?.cancel()
+        launchDeadline = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled, let self, self.pendingStream?.id == requestID else { return }
+            self.cancelLaunch()
+            self.fail("The streaming engine did not prepare the launch. Use Refresh and try again.")
+        }
     }
     private func runStream(_ computer: Computer, game: Game) {
         guard let executable else { streamActive = false; return }
@@ -254,8 +278,8 @@ struct PairingRequest: Identifiable {
         streamWindowToken = token
         streamWindowExists = false
         let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y), token])
-        helper.onEvent = { [weak self] event in
-            guard let self else { return }
+        helper.onEvent = { [weak self, weak helper] event in
+            guard let self, !self.shuttingDown, self.stream === helper else { return }
             switch event["event"] as? String {
             case "stage": self.status = event["message"] as? String ?? "Starting stream…"
             case "windowOpened": self.streamWindowExists = true
@@ -272,11 +296,14 @@ struct PairingRequest: Identifiable {
             self.streamWindowExists = false; self.streamWindowToken = nil
             self.stream = nil; self.streamActive = false; self.streamStarted = false; self.quitRequired = nil
             self.status = "Stream ended"
-            self.send("resume")
-            if code != 0 && self.message == nil { self.fail("The streaming engine exited unexpectedly (\(code)). Please save its crash report and engine log.") }
+            if !self.shuttingDown { self.send("resume") }
+            if !self.shuttingDown && code != 0 && self.message == nil { self.fail("The streaming engine exited unexpectedly (\(code)). Please save its crash report and engine log.") }
         }
         stream = helper
-        do { try helper.start() } catch { stream = nil; streamActive = false; send("resume"); fail(error.localizedDescription) }
+        do { try helper.start() } catch {
+            stream = nil; streamWindowToken = nil; streamActive = false
+            send("resume"); fail(error.localizedDescription)
+        }
     }
     func restoreStreamWindow() {
         guard streamWindowExists, let token = streamWindowToken else { return }
@@ -293,9 +320,22 @@ struct PairingRequest: Identifiable {
         quitRequired = nil
         do { try stream?.send(["command": "confirmQuit"]) } catch { fail(error.localizedDescription) }
     }
-    func cancelLaunch() { quitRequired = nil; pendingStream = nil; stream?.stop(); if stream == nil { streamActive = false; send("resume") } }
+    func cancelLaunch() {
+        quitRequired = nil; launchDeadline?.cancel(); pendingStream = nil
+        stream?.stop()
+        if stream == nil { streamActive = false; status = "Launch cancelled"; send("resume") }
+    }
+    func dismissQuitConfirmation() {
+        // SwiftUI may dismiss before invoking a selected button. Defer until
+        // its action has cleared quitRequired; outside-click/Escape still cancels.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.quitRequired != nil else { return }
+            self.cancelLaunch()
+        }
+    }
     func fail(_ detail: String) { message = NativeMessage(title: "Moonlight Native Glass", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true) }
     func shutdown() {
-        shuttingDown = true; hostDeadline?.cancel(); channel?.stop(); stream?.stop()
+        shuttingDown = true; hostDeadline?.cancel(); launchDeadline?.cancel(); pendingStream = nil
+        channel?.stop(); stream?.stop()
     }
 }

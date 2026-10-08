@@ -77,7 +77,7 @@ struct LibraryView: View {
         .confirmationDialog("Quit the running app?", isPresented: Binding(get: { quitApp != nil }, set: { if !$0 { quitApp = nil } }), titleVisibility: .visible) {
             if let computer = quitApp { Button("Quit App", role: .destructive) { store.send("quitApp", ["host": computer.id]) } }
         } message: { Text("Unsaved progress on the host may be lost.") }
-        .confirmationDialog("Quit \(store.quitRequired ?? "the running app")?", isPresented: Binding(get: { store.quitRequired != nil }, set: { if !$0 { store.quitRequired = nil } }), titleVisibility: .visible) {
+        .confirmationDialog("Quit \(store.quitRequired ?? "the running app")?", isPresented: Binding(get: { store.quitRequired != nil }, set: { if !$0 { store.dismissQuitConfirmation() } }), titleVisibility: .visible) {
             Button("Quit and Start Selected Game", role: .destructive) { store.confirmQuit() }
             Button("Cancel", role: .cancel) { store.cancelLaunch() }
         } message: { Text("Unsaved progress in the running app may be lost.") }
@@ -201,7 +201,7 @@ struct LibraryView: View {
                 if store.streamActive && !store.streamStarted { Button("Cancel") { store.cancelLaunch() }.controlSize(.small) }
             }.padding(.horizontal, 16).padding(.bottom, 9)
             if store.streamStarted {
-                Text("Hide the stream window with Close Stream Window (see Settings → Shortcuts). Disconnect with Disconnect and Exit or Start + Select + L1 + R1 on your controller.")
+                Text("Hide the stream window with Close Stream Window (see Settings → Shortcuts). End the stream with Disconnect or Start + Select + L1 + R1 on your controller. Disconnect and Exit also quits the host game.")
                     .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.bottom, 9)
             }
             if !store.warnings.isEmpty {

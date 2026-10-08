@@ -8,15 +8,16 @@ struct EngineLineDecoder {
     private var buffer = Data()
     mutating func append(_ data: Data) throws -> [[String: Any]] {
         buffer.append(data)
-        guard buffer.count <= 1_048_576 else { throw EngineProtocolError.oversizedFrame }
         var events = [[String: Any]]()
         while let end = buffer.firstIndex(of: 0x0A) {
+            guard buffer.distance(from: buffer.startIndex, to: end) <= 1_048_576 else { throw EngineProtocolError.oversizedFrame }
             let line = Data(buffer[..<end])
             buffer.removeSubrange(...end)
             guard let event = try JSONSerialization.jsonObject(with: line) as? [String: Any],
                   event["event"] is String else { throw EngineProtocolError.invalidEvent }
             events.append(event)
         }
+        guard buffer.count <= 1_048_576 else { throw EngineProtocolError.oversizedFrame }
         return events
     }
 }

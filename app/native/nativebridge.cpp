@@ -173,7 +173,7 @@ void NativeBridge::command(const QJsonObject& request) {
     }
     if (action == "pause") {
         if (m_Polling) { m_Manager->stopPollingAsync(); m_Polling = false; }
-        send({{"event", "paused"}}); return;
+        send({{"event", "paused"}, {"requestID", request["requestID"]}}); return;
     }
     if (action == "resume") {
         // The streaming helper can update pairing/server metadata. Reloading a
