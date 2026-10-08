@@ -51,6 +51,7 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic, assign) SDL_JoystickPowerLevel batteryLevel;
 - (void)refresh;
 - (void)updateDetails;
+- (void)closeDetails;
 - (void)perform:(NSString*)identifier anchor:(NSView*)anchor;
 - (void)readControllers;
 - (void)invalidate;
@@ -100,7 +101,7 @@ static MLStreamTitlebar* titlebar;
     return item;
 }
 - (void)windowChanged:(NSNotification*)notification {
-    if (notification.object==self.window) [self.details close];
+    if (notification.object==self.window) [self closeDetails];
 }
 - (void)overflowClicked:(NSMenuItem*)sender { [self perform:sender.representedObject anchor:nil]; }
 - (void)clicked:(NSButton*)sender {
@@ -109,9 +110,9 @@ static MLStreamTitlebar* titlebar;
 - (void)perform:(NSString*)identifier anchor:(NSView*)anchor {
     if ([identifier isEqual:captureID]) { nativeOverlayPerformAction(1); return; }
     if ([identifier isEqual:statisticsID]) { nativeOverlayPerformAction(3); return; }
-    if ([identifier isEqual:hostID]) { [self.details close]; nativeOverlayPerformAction(102); return; }
-    if (self.details.shown && [self.detailsID isEqual:identifier]) { [self.details close]; return; }
-    [self.details close]; self.detailsID=identifier;
+    if ([identifier isEqual:hostID]) { [self closeDetails]; nativeOverlayPerformAction(102); return; }
+    if (self.details.shown && [self.detailsID isEqual:identifier]) { [self closeDetails]; return; }
+    [self closeDetails]; self.detailsID=identifier;
     self.details=[[[NSPopover alloc] init] autorelease]; self.details.delegate=self;
     self.details.behavior=NSPopoverBehaviorTransient; self.details.animates=NO;
     NSViewController* content=[[[NSViewController alloc] init] autorelease];
@@ -148,7 +149,7 @@ static MLStreamTitlebar* titlebar;
     NSString* symbol=@"circle.fill"; NSColor* tint=NSColor.secondaryLabelColor;
     switch (copy.connection) {
         case NativeConnectionState::Connecting: symbol=@"clock.fill"; tint=NSColor.systemOrangeColor; break;
-        case NativeConnectionState::Connected: tint=NSColor.systemGreenColor; break;
+        case NativeConnectionState::Connected: symbol=@"checkmark.circle.fill"; tint=NSColor.systemGreenColor; break;
         case NativeConnectionState::Poor: symbol=@"exclamationmark.circle.fill"; tint=NSColor.systemOrangeColor; break;
         case NativeConnectionState::Disconnected: symbol=@"xmark.circle.fill"; tint=NSColor.systemRedColor; break;
         case NativeConnectionState::Idle: break;
@@ -191,14 +192,21 @@ static MLStreamTitlebar* titlebar;
     if (lines.count && !present) [self.toolbar insertItemWithItemIdentifier:batteryID atIndex:self.toolbar.items.count-1];
     if (!lines.count && present) {
         for (NSUInteger i=0;i<self.toolbar.items.count;i++) if ([self.toolbar.items[i].itemIdentifier isEqual:batteryID]) { [self.toolbar removeItemAtIndex:i]; break; }
-        if ([self.detailsID isEqual:batteryID]) [self.details close];
+        if ([self.detailsID isEqual:batteryID]) [self closeDetails];
         [self.buttons removeObjectForKey:batteryID];
     }
     [self refresh];
 }
-- (void)popoverDidClose:(NSNotification*)notification { self.detailsID=nil; }
+- (void)closeDetails {
+    // Remove the delegate before closing/replacing a popover. A delayed close
+    // notification must not clear a newer popover's state or target a dead owner.
+    self.details.delegate=nil; [self.details close]; self.details=nil; self.detailsID=nil;
+}
+- (void)popoverDidClose:(NSNotification*)notification {
+    if (notification.object==self.details) self.detailsID=nil;
+}
 - (void)invalidate {
-    [[NSNotificationCenter defaultCenter] removeObserver:self]; [self.details close]; self.details.delegate=nil;
+    [[NSNotificationCenter defaultCenter] removeObserver:self]; [self closeDetails]; self.details.delegate=nil;
     if (self.window.toolbar==self.toolbar) {
         self.window.toolbar=self.previousToolbar; self.window.titleVisibility=self.previousTitleVisibility;
         self.window.toolbarStyle=self.previousToolbarStyle;
@@ -222,6 +230,12 @@ static void scheduleRefresh() {
 void nativeTitlebarSetCapture(bool captured) { std::lock_guard<std::mutex> lock(stateMutex); if (state.captured!=captured) { state.captured=captured; scheduleRefresh(); } }
 void nativeTitlebarSetStatistics(bool visible) { std::lock_guard<std::mutex> lock(stateMutex); if (state.statistics!=visible) { state.statistics=visible; scheduleRefresh(); } }
 void nativeTitlebarSetConnection(NativeConnectionState value) { std::lock_guard<std::mutex> lock(stateMutex); if (state.connection!=value) { state.connection=value; scheduleRefresh(); } }
+void nativeTitlebarConnectionStarted() {
+    std::lock_guard<std::mutex> lock(stateMutex);
+    // A health/termination callback can race the asynchronous startup return.
+    // Do not overwrite a more recent warning or failure with optimistic green.
+    if (state.connection==NativeConnectionState::Connecting) { state.connection=NativeConnectionState::Connected; scheduleRefresh(); }
+}
 void nativeTitlebarControllersChanged() { [titlebar readControllers]; }
 void nativeTitlebarAttach(void* window) {
     nativeTitlebarDetach();

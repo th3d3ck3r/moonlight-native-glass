@@ -1727,9 +1727,8 @@ bool Session::startConnectionAsync()
         return false;
     }
 
-
 #ifdef Q_OS_MACOS
-    nativeTitlebarSetConnection(NativeConnectionState::Connected);
+    nativeTitlebarConnectionStarted();
 #endif
     emit connectionStarted();
     return true;

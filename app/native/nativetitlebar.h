@@ -6,4 +6,5 @@ void nativeTitlebarDetach();
 void nativeTitlebarSetCapture(bool captured);
 void nativeTitlebarSetStatistics(bool visible);
 void nativeTitlebarSetConnection(NativeConnectionState state);
+void nativeTitlebarConnectionStarted();
 void nativeTitlebarControllersChanged();

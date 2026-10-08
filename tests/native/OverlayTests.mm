@@ -60,7 +60,9 @@ int main(int argc,char** argv) { @autoreleasepool {
     nativeTitlebarSetConnection(NativeConnectionState::Connecting); pump(); check([connectionButton.toolTip containsString:@"Connecting"],"Connecting state");
     nativeTitlebarSetConnection(NativeConnectionState::Connected); pump(); check([connectionButton.toolTip containsString:@"No connection warning"],"Connected state");
     nativeTitlebarSetConnection(NativeConnectionState::Poor); pump(); check([connectionButton.toolTip containsString:@"poor connection"],"Poor state");
+    nativeTitlebarConnectionStarted(); pump(); check([connectionButton.toolTip containsString:@"poor connection"],"Startup completion must not clear an existing connection warning");
     nativeTitlebarSetConnection(NativeConnectionState::Disconnected); pump(); check([connectionButton.toolTip containsString:@"lost or failed"],"Disconnected state");
+    nativeTitlebarConnectionStarted(); pump(); check([connectionButton.toolTip containsString:@"lost or failed"],"Startup completion must not clear a connection failure");
     nativeTitlebarSetConnection(NativeConnectionState::Idle); pump(); check([connectionButton.toolTip containsString:@"No stream connection"],"Idle state");
     nativeTitlebarSetConnection(NativeConnectionState::Connected); pump();
     // An actual virtual SDL controller exercises appearance/removal without
@@ -75,7 +77,10 @@ int main(int argc,char** argv) { @autoreleasepool {
     [connectionButton performClick:nil]; pump();
     bool foundDetails=false; for (NSWindow* candidate in NSApp.windows) if (candidate.visible && hasLabel(candidate.contentView,@"not latency or frame pacing")) foundDetails=true;
     check(foundDetails,"Connection popover contains accurate state explanation");
-    [connectionButton performClick:nil]; pump();
+    [connectionButton performClick:nil]; [batteryButton performClick:nil]; pump();
+    bool foundBattery=false; for (NSWindow* candidate in NSApp.windows) if (candidate.visible && hasLabel(candidate.contentView,@"Battery information unavailable")) foundBattery=true;
+    check(foundBattery,"Rapid details replacement must keep the current popover state");
+    [batteryButton performClick:nil]; pump();
     const char* sample="Video stream: 1920x1080 60 FPS\nVideo codec: H.264\nIncoming frame rate: 59.98 FPS\nRendering frame rate: 59.98 FPS\nFrames dropped by network: 0.00%\nAverage network latency: 2 ms\nAverage decoding time: 1.2 ms\nAverage frame queue delay: 0.4 ms\nAverage rendering time: 0.8 ms";
     check(nativeOverlayPresent(0,true,sample),"Native statistics ownership"); check(nativeOverlayPresent(1,true,"Design preview · Sample values"),"Status ownership"); pump();
     fprintf(stderr,"Overlay children=%lu visible=%d configured=%d\n",(unsigned long)window.childWindows.count,window.visible,nativeOverlayConfigured());
