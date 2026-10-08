@@ -51,6 +51,7 @@ static MLOverlayController* controller;
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:NSWindowDidDeminiaturizeNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:NSWindowDidMiniaturizeNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:NSWindowDidChangeOcclusionStateNotification object:nil];
+        [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self selector:@selector(accessibilityChanged:) name:NSWorkspaceAccessibilityDisplayOptionsDidChangeNotification object:nil];
         [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(settingsChanged:) name:changed object:nil];
         [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(toggleControls:) name:toggle object:nil];
     }
@@ -85,6 +86,7 @@ static MLOverlayController* controller;
 }
 - (void)windowChanged:(NSNotification*)n { if (n.object == self.parent) [self layoutPanels]; }
 - (void)settingsChanged:(NSNotification*)n { [self.defaults synchronize]; if (self.showingControls && ![self.defaults boolForKey:@"controlsEnabled"]) pushAction(101); [self refresh]; }
+- (void)accessibilityChanged:(NSNotification*)n { [self refresh]; }
 - (void)toggleControls:(NSNotification*)n { if ([n.object isEqual:self.token]) pushAction(100); }
 - (void)action:(NSButton*)sender { pushAction((int)sender.tag); }
 - (void)dismiss:(id)sender { pushAction(101); }
@@ -148,24 +150,31 @@ static MLOverlayController* controller;
     double savedScale = [self.defaults doubleForKey:@"scale"]; CGFloat scale = savedScale > 0 ? MAX(.8,MIN(1.5,savedScale)) : 1;
     NSRect bounds = [self.parent convertRectToScreen:[self.parent.contentView bounds]];
     CGFloat width = MAX(120,MIN(510*scale,bounds.size.width-24));
+    CGFloat reservedBottom = self.controls ? 70 : 0;
+    if (copy[1].enabled && copy[1].text[0]) {
+        NSString* status = [NSString stringWithUTF8String:copy[1].text] ?: @"";
+        NSRect size = [status boundingRectWithSize:NSMakeSize(width-24*scale,CGFLOAT_MAX) options:NSStringDrawingUsesLineFragmentOrigin attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:13*scale weight:NSFontWeightMedium]}];
+        reservedBottom = (self.controls ? 70 : 12) + ceil(size.size.height) + 24*scale + 12;
+    }
     for (int i=0;i<2;i++) {
+        CGFloat availableHeight = MAX(0,bounds.size.height-24-(i==0 ? reservedBottom : 0));
         NSPanel* panel = i==0 ? self.stats : self.status; NSTextField* label=i==0?self.statsText:self.statusText;
         label.stringValue=[NSString stringWithUTF8String:copy[i].text] ?: @"";
         label.font=i==0 ? [NSFont monospacedDigitSystemFontOfSize:12*scale weight:NSFontWeightRegular] : [NSFont systemFontOfSize:13*scale weight:NSFontWeightMedium];
         CGFloat padding=12*scale;
         NSRect needed=[label.stringValue boundingRectWithSize:NSMakeSize(width-2*padding,CGFLOAT_MAX) options:NSStringDrawingUsesLineFragmentOrigin attributes:@{NSFontAttributeName:label.font}];
-        for (int attempt=0; attempt<8 && needed.size.height+2*padding>bounds.size.height-24; attempt++) {
+        for (int attempt=0; attempt<8 && needed.size.height+2*padding>availableHeight; attempt++) {
             CGFloat size=MAX(9,label.font.pointSize*.9);
             label.font=i==0 ? [NSFont monospacedDigitSystemFontOfSize:size weight:NSFontWeightRegular] : [NSFont systemFontOfSize:size weight:NSFontWeightMedium];
             needed=[label.stringValue boundingRectWithSize:NSMakeSize(width-2*padding,CGFLOAT_MAX) options:NSStringDrawingUsesLineFragmentOrigin attributes:@{NSFontAttributeName:label.font}];
         }
-        CGFloat height=MIN(ceil(needed.size.height)+2*padding,bounds.size.height-24);
+        CGFloat height=MIN(ceil(needed.size.height)+2*padding,availableHeight);
         NSRect labelFrame=NSMakeRect(padding,padding,width-2*padding,MAX(0,height-2*padding));
         if (!NSEqualRects(label.frame,labelFrame)) label.frame=labelFrame;
         NSString* position=[self.defaults stringForKey:@"position"] ?: @"topLeft";
         CGFloat x=[position containsString:@"Right"] ? NSMaxX(bounds)-width-12 : NSMinX(bounds)+12;
-        CGFloat y=[position hasPrefix:@"bottom"] ? NSMinY(bounds)+12 : NSMaxY(bounds)-height-12;
-        if (i==1) { x=NSMidX(bounds)-width/2; y=NSMinY(bounds)+70; }
+        CGFloat y=[position hasPrefix:@"bottom"] ? NSMinY(bounds)+12+reservedBottom : NSMaxY(bounds)-height-12;
+        if (i==1) { x=NSMidX(bounds)-width/2; y=NSMinY(bounds)+(self.controls ? 70 : 12); }
         NSRect frame=NSMakeRect(x,y,width,height);
         if (!NSEqualRects(panel.frame,frame)) [panel setFrame:frame display:NO];
         BOOL visible=copy[i].enabled && copy[i].text[0] && self.parent.visible && !self.parent.miniaturized;
@@ -179,6 +188,7 @@ static MLOverlayController* controller;
     } @finally { self.layingOut=NO; }
 }
 - (void)dealloc {
+    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self];
     [[NSNotificationCenter defaultCenter] removeObserver:self]; [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
     for (NSPanel* panel in @[self.stats ?: (id)NSNull.null,self.status ?: (id)NSNull.null,self.controls ?: (id)NSNull.null]) if ((id)panel != NSNull.null) { [self.parent removeChildWindow:panel]; [panel orderOut:nil]; }
     [_stats release]; [_status release]; [_controls release]; [_statsText release]; [_statusText release]; [_defaults release]; [_token release]; [super dealloc];

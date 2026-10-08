@@ -41,6 +41,8 @@ int main(int argc,char** argv) { @autoreleasepool {
     [window setContentSize:NSMakeSize(640,360)]; pump();
     NSRect bounds=[window convertRectToScreen:window.contentView.bounds];
     for (NSWindow* panel in window.childWindows) check(NSContainsRect(bounds,panel.frame),"Scaled panel must fit resized stream");
+    NSArray* panels=window.childWindows;
+    for (NSUInteger i=0;i<panels.count;i++) for (NSUInteger j=i+1;j<panels.count;j++) check(!NSIntersectsRect([panels[i] frame],[panels[j] frame]),"Overlay panels must not overlap");
     capture([out stringByAppendingPathComponent:@"overlay-compact-large.png"]);
     [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameAqua]]; capture([out stringByAppendingPathComponent:@"overlay-light.png"]);
     nativeOverlayDetach(); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
