@@ -1,6 +1,6 @@
 # Scalable native stream overlay and shortcut customization plan
 
-Status: planning only. Do not implement or build until separately authorized.
+Status: planning only. Double-checked against the source and revised to reflect the user's button-free statistics overlay plus separate optional control bar. Do not implement or build until separately authorized.
 
 ## Goal and boundaries
 
@@ -20,11 +20,18 @@ Inspected the current native-ui application source:
 
 The checked code has statistics/status overlays, not an existing native shortcut-button toolbar. Adding a button bar is an additive presentation feature. Changing key bindings is a separate input feature and should be independently reviewed.
 
+## Confirmed scope
+
+- Statistics/status overlay: scalable and button-free; no hidden controls, clickable metrics or embedded toolbar.
+- Control bar: a separate optional surface, off by default and shown only by explicit user action. Closing it must not disconnect the stream.
+- Settings: separate Statistics Overlay and Stream Controls groups within one Overlay section.
+- Shortcut customization remains optional and is a later phase; existing shortcuts continue working by default.
+
 ## Proposed appearance
 
 1. A compact statistics card near the stream's upper-left corner, retaining every existing metric and unit.
 2. Readable status messages in a small native toast; do not silently discard network warnings or controller mouse-mode messages.
-3. An optional compact control bar with native buttons, SF Symbols, tooltips and an overflow menu.
+3. A separate optional compact control bar with native buttons, SF Symbols, tooltips and an overflow menu. Never embed it in the statistics card.
 4. Glass limited to control/navigation surfaces. Use restrained readable statistics backgrounds; no full-window blur or video wrapper.
 5. System typography, monospaced digits for changing numbers, current accent and spacing. Light/dark appearance follows macOS.
 6. Use genuine NSGlassEffectView/native glass on macOS 26+ when appropriate; native material/opaque fallbacks on macOS 15. Reduce Transparency uses an opaque accessible surface. Avoid relying on newer APIs without availability guards.
@@ -42,9 +49,9 @@ The checked code has statistics/status overlays, not an existing native shortcut
 | Display change | Recompute backing scale and anchors from window/display notifications |
 | Saved placement | Store relative corner/anchor and bounded offsets; recover visibly if displays change |
 
-- Reflow rather than crop. Keep all metrics accessible through the expanded layout.
+- Reflow rather than crop. Preserve all existing metrics in a readable multiline layout. No expand button on the statistics overlay; select layout/size in Settings. If a requested size cannot fit, clamp it to readable bounds and show a sizing explanation in Settings rather than dropping metrics.
 - Respect visible content bounds, fullscreen safe areas and title bar; do not place controls offscreen or across display edges.
-- Snap to corners and allow optional dragging while in an explicit overlay interaction/customization mode.
+- Choose corner placement and offsets in Settings. Keep the statistics overlay passive and click-through at all times; any later drag-edit mode is outside the initial scope.
 - Do not scale by applying a blurry bitmap transform.
 - Avoid changing constraints or subview geometry recursively from layout callbacks. Compute stable frames, skip no-op changes, and keep AppKit updates on the main thread.
 - Restore Defaults resets overlay preferences alone.
@@ -56,7 +63,7 @@ The checked code has statistics/status overlays, not an existing native shortcut
 - [ ] Capture current app build/source, chosen renderer, stream resolution/FPS, display scale and settings.
 - [ ] Measure old overlay hidden/visible under the same stream workload on the user's Intel Mac.
 - [ ] Prototype a small auxiliary AppKit panel associated with the existing SDL stream window. Do not replace its contentView, reparent its video layer, change SDL's delegate contract or create a full-screen transparent canvas.
-- [ ] Create a noninteractive statistics surface that does not take key focus or mouse events. Treat interactive controls as a distinct bounded surface.
+- [ ] Create a noninteractive statistics surface that does not take key focus or mouse events. The separate control bar is a distinct bounded surface, hidden by default; never cover the whole video with an interactive window.
 - [ ] Verify fullscreen spaces, parent ordering, minimization, hidden-window restore and multiple displays before choosing the final attachment approach.
 - [ ] Check whether true glass samples/composites correctly over the actual Metal/AVSampleBuffer video surface, including HDR. Do not assume appearance or performance from a static mockup.
 - [ ] Choose native AppKit implementation in the stream helper as the initial approach, minimizing new SwiftUI runtime/window integration in the rendering process. SwiftUI remains the customization frontend.
@@ -68,7 +75,7 @@ References: https://developer.apple.com/documentation/appkit/nsglasseffectview a
 - [ ] Introduce a small overlay presentation interface that receives copied text/state snapshots from existing producers.
 - [ ] Preserve every statistic's calculation, sampling interval, metric definition and warning trigger.
 - [ ] Coalesce UI updates; at most one pending main-thread update, with stale session updates rejected using a session generation/token.
-- [ ] Keep allocation, AppKit work and waiting out of decode/render callbacks and renderer locks.
+- [ ] Keep AppKit work and waiting out of decode/render callbacks and renderer locks. Reuse preallocated storage for snapshot handoff so the new presentation adapter introduces no per-frame allocations.
 - [ ] Disable duplicate legacy visuals only when the native presentation path is available and owns that overlay. Keep the original path as fallback.
 - [ ] Do not maintain a second independent statistics calculation or add high-frequency sampling.
 - [ ] Remove observers, timers and panels safely on session exit; handle late callbacks.
@@ -90,13 +97,13 @@ References: https://developer.apple.com/documentation/appkit/nsglasseffectview a
 Add one Overlay section within Settings using the current native style.
 
 - [ ] Choose visible actions and order using stable action IDs and native list/reordering controls.
-- [ ] Provide size, placement and Restore Defaults in the same section.
+- [ ] Provide statistics size/placement and separate control-bar enablement/button order in the same settings section. Restore Defaults affects only overlay/control preferences.
 - [ ] Proposed actions from existing handlers: Full Screen, Performance Statistics, Release/Capture Input, Mouse Mode, Cursor Visibility, Minimize, Paste Clipboard, Pointer Region Lock and Keyboard Capture.
-- [ ] Disconnect must be visually distinct and cannot silently become Quit Host Game. Verify the two existing quit actions before naming/exposing them.
+- [ ] Disconnect must be visibly distinct from any destructive host action. Verified KeyComboQuit pushes SDL_QUIT; KeyComboQuitAndExit sets shouldExit then pushes SDL_QUIT. These are not evidence of a Quit Host Game action. Trace full session cleanup/preferences before finalizing labels; do not add host termination behavior.
 - [ ] Unavailable actions are disabled with a reason; the button bar must not circumvent existing platform/state eligibility.
 - [ ] Dispatch through the existing action handler on its proper SDL/session thread. Do not synthesize keyboard combinations to activate buttons.
 - [ ] Preserve current keyboard/controller shortcuts and all normal input forwarding.
-- [ ] Opening interactive controls must use the existing input-release mechanism, preserve prior capture state and restore it appropriately. Never forward UI clicks to the host or leave modifiers/buttons stuck.
+- [ ] Opening the separate control bar must use the existing input-release mechanism, preserve prior capture state and restore it appropriately. Define an explicit show/dismiss path through the native menu bar/menu and, later, an optional shortcut. Never forward UI clicks to the host or leave modifiers/buttons stuck. Do not promise controller navigation until its event routing is verified.
 - [ ] Do not auto-release capture solely because the pointer passes over the overlay.
 - [ ] In small windows place excess actions in a native overflow menu, keeping a consistent keyboard/controller path.
 
@@ -145,7 +152,7 @@ Add one Overlay section within Settings using the current native style.
 
 1. Baseline evidence and native/scalable presentation prototype.
 2. Statistics/status replacement and physical Intel comparison.
-3. Button bar and customization, keeping original keyboard behavior.
+3. Separate optional control bar and customization, keeping original keyboard behavior.
 4. Optional Mac binding preset as a separately reviewed feature.
 5. Only after authorization and required validation: increment build number and publish a separate preview link. Preserve About text, master and earlier releases; update README only if requested.
 
