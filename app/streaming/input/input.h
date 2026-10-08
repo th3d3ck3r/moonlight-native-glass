@@ -84,6 +84,9 @@ struct DualSenseOutputReport{
 class SdlInputHandler
 {
 public:
+#ifdef Q_OS_MACOS
+    void handleNativeOverlayAction(int action);
+#endif
     explicit SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight);
 
     ~SdlInputHandler();
@@ -156,6 +159,11 @@ public:
     QString getUnmappedGamepads();
 
 private:
+#ifdef Q_OS_MACOS
+    bool m_NativeControlsVisible = false;
+    bool m_NativeCaptureBeforeControls = false;
+    bool m_NativeConsumedKeys[SDL_NUM_SCANCODES] = {};
+#endif
     enum KeyCombo {
         KeyComboQuit,
         KeyComboUngrabInput,

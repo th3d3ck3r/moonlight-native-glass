@@ -1,3 +1,4 @@
+#include "native/nativeoverlay.h"
 // Nasty hack to avoid conflict between AVFoundation and
 // libavutil both defining AVMediaType
 #define AVMediaType AVMediaType_FFmpeg
@@ -748,7 +749,7 @@ public:
     virtual void notifyOverlayUpdated(Overlay::OverlayType type) override
     { @autoreleasepool {
         SDL_Surface* newSurface = Session::get()->getOverlayManager().getUpdatedOverlaySurface(type);
-        bool overlayEnabled = Session::get()->getOverlayManager().isOverlayEnabled(type);
+        bool overlayEnabled = Session::get()->getOverlayManager().isOverlayEnabled(type) && !nativeOverlayConfigured();
         if (newSurface == nullptr && overlayEnabled) {
             // The overlay is enabled and there is no new surface. Leave the old texture alone.
             return;

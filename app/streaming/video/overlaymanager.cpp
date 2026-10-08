@@ -1,5 +1,8 @@
 #include "overlaymanager.h"
 #include "path.h"
+#ifdef Q_OS_MACOS
+#include "native/nativeoverlay.h"
+#endif
 
 using namespace Overlay;
 
@@ -118,6 +121,16 @@ void OverlayManager::setOverlayRenderer(IOverlayRenderer* renderer)
 
 void OverlayManager::notifyOverlayUpdated(OverlayType type)
 {
+    #ifdef Q_OS_MACOS
+    if (nativeOverlayPresent((int)type, m_Overlays[type].enabled, m_Overlays[type].text)) {
+        if (!m_NativeOverlayOwned[type] && m_Renderer) {
+            m_NativeOverlayOwned[type] = true;
+            SDL_FreeSurface((SDL_Surface*)SDL_AtomicSetPtr((void**)&m_Overlays[type].surface, nullptr));
+            m_Renderer->notifyOverlayUpdated(type);
+        }
+        return;
+    }
+    #endif
     if (m_Renderer == nullptr) {
         return;
     }

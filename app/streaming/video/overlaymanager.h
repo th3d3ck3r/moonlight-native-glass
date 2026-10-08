@@ -53,6 +53,7 @@ private:
         SDL_Surface* surface;
     } m_Overlays[OverlayMax];
     IOverlayRenderer* m_Renderer;
+    bool m_NativeOverlayOwned[OverlayMax] = {};
     QByteArray m_FontData;
 };
 

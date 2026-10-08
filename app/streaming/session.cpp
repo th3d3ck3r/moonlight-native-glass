@@ -1,4 +1,7 @@
 #include "session.h"
+#ifdef Q_OS_MACOS
+#include "native/nativeoverlay.h"
+#endif
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
@@ -1992,6 +1995,12 @@ void Session::exec()
             SDL_Delay(10);
 #endif
             presence.runCallbacks();
+            continue;
+        }
+#endif
+#ifdef Q_OS_MACOS
+        if (event.type == nativeOverlayEventType() && nativeOverlayConfigured()) {
+            m_InputHandler->handleNativeOverlayAction(event.user.code);
             continue;
         }
 #endif

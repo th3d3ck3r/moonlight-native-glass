@@ -10,6 +10,7 @@ void configureNativeBackgroundApplication()
 #import <SDL.h>
 #import <SDL_syswm.h>
 #include <cstdio>
+#include "nativeoverlay.h"
 
 static NSString* const MLRestoreStreamWindow = @"com.moonlight-stream.NativeGlass.restoreStreamWindow";
 
@@ -54,6 +55,7 @@ static void sendWindowEvent(const char* event)
 }
 - (void)windowWillClose:(NSNotification*)notification
 {
+    nativeOverlayDetach();
     self.windowID = 0;
     sendWindowEvent("windowClosed");
     if ([self.original respondsToSelector:_cmd]) [self.original windowWillClose:notification];
@@ -84,6 +86,7 @@ static void sendWindowEvent(const char* event)
         self.windowDelegate = delegate;
         candidate.delegate = delegate;
         [delegate release];
+        nativeOverlayAttach(candidate, self.token.UTF8String);
         sendWindowEvent("windowOpened");
     });
 }
@@ -122,5 +125,6 @@ void configureNativeStreamWindow(const char* token)
 }
 void stopNativeStreamWindow()
 {
+    nativeOverlayDetach();
     [streamWindowAccess release]; streamWindowAccess = nil;
 }

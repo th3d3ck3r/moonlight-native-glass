@@ -1,4 +1,8 @@
 #include "streaming/session.h"
+#ifdef Q_OS_MACOS
+#include "native/nativeoverlay.h"
+#endif
+
 
 #include <Limelight.h>
 #include "SDL_compat.h"
@@ -182,6 +186,34 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
     }
 }
 
+#ifdef Q_OS_MACOS
+void SdlInputHandler::handleNativeOverlayAction(int action)
+{
+    if (action == 100) {
+        if (!m_NativeControlsVisible && !nativeOverlayControlsEnabled()) return;
+        if (!m_NativeControlsVisible) {
+            m_NativeCaptureBeforeControls = isCaptureActive();
+            setCaptureActive(false); raiseAllKeys();
+            m_NativeControlsVisible = true;
+        } else {
+            m_NativeControlsVisible = false;
+            setCaptureActive(m_NativeCaptureBeforeControls);
+        }
+        nativeOverlaySetControlsVisible(m_NativeControlsVisible);
+        return;
+    }
+    if (m_NativeControlsVisible) {
+        m_NativeControlsVisible = false;
+        nativeOverlaySetControlsVisible(false);
+        setCaptureActive(m_NativeCaptureBeforeControls);
+    }
+    if (action >= 0 && action < KeyComboMax && m_SpecialKeyCombos[action].enabled) {
+        raiseAllKeys();
+        performSpecialKeyCombo(static_cast<KeyCombo>(action));
+    }
+}
+#endif
+
 void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 {
     short keyCode;
@@ -195,8 +227,27 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         return;
     }
 
+#ifdef Q_OS_MACOS
+    if (nativeOverlayConfigured()) {
+        int scan = (int)event->keysym.scancode;
+        if (scan >= 0 && scan < SDL_NUM_SCANCODES && m_NativeConsumedKeys[scan]) {
+            if (event->state == SDL_RELEASED) m_NativeConsumedKeys[scan] = false;
+            return;
+        }
+        int action = nativeOverlayShortcut(event);
+        if (action >= 0) {
+            if (scan >= 0 && scan < SDL_NUM_SCANCODES) m_NativeConsumedKeys[scan] = true;
+            handleNativeOverlayAction(action == 11 ? 100 : action);
+            return;
+        }
+    }
+#endif
     // Check for our special key combos
-    if ((event->state == SDL_PRESSED) &&
+    if (
+#ifdef Q_OS_MACOS
+            !nativeOverlayConfigured() &&
+#endif
+            (event->state == SDL_PRESSED) &&
             (event->keysym.mod & KMOD_CTRL) &&
             (event->keysym.mod & KMOD_ALT) &&
             (event->keysym.mod & KMOD_SHIFT)) {

@@ -1,3 +1,4 @@
+#include "native/nativeoverlay.h"
 // Nasty hack to avoid conflict between AVFoundation and
 // libavutil both defining AVMediaType
 #define AVMediaType AVMediaType_FFmpeg
@@ -401,6 +402,10 @@ public:
 
     void updateOverlayOnMainThread(Overlay::OverlayType type)
     { @autoreleasepool {
+        if (nativeOverlayConfigured()) {
+            if (m_OverlayTextFields[type]) [m_OverlayTextFields[type] setHidden:YES];
+            return;
+        }
         // Lazy initialization for the overlay
         if (m_OverlayTextFields[type] == nullptr) {
             m_OverlayTextFields[type] = [[NSTextField alloc] initWithFrame:m_StreamView.bounds];
