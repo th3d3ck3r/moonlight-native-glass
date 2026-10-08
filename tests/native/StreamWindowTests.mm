@@ -192,11 +192,16 @@ int main(int argc, char** argv) {
             [other makeKeyAndOrderFront:nil]; pump();
             SDL_WarpMouseGlobal(0,0); pump();
             nativeOverlayRestoreStreamFocus(window);
-            check(SDL_GetKeyboardFocus()==window && SDL_GetMouseFocus()==window,"Done must restore both keyboard and mouse focus to the stream");
+            check(SDL_GetKeyboardFocus()==window,"Done must restore keyboard focus to the stream");
+            // Exclusive modesetting can leave mouse focus unset while capture
+            // is off. SDL establishes it on relative-mode activation. The two
+            // normal macOS modes must restore mouse focus before capture too.
+            if (mode!=SDL_WINDOW_FULLSCREEN)
+                check(SDL_GetMouseFocus()==window,"Done must restore mouse focus before normal-mode capture");
             check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Relative capture must still work after controls");
             pump();
             check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Capture must survive the native event queue after Done");
-            // SDL 2.30.5 disassociates the system cursor in relative mode;
+            // SDL's Cocoa backend disassociates the system cursor in relative mode;
             // without an explicit grab its Cocoa confinement rect is empty.
             // Compare against fresh capture and verify real event routing,
             // while keeping the nonempty-rect assertion for visible controls.
