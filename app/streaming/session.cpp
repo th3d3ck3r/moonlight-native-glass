@@ -2025,6 +2025,10 @@ void Session::exec()
         }
 #endif
 #ifdef Q_OS_MACOS
+        if (event.type == nativeRestoreStreamWindowEventType()) {
+            nativeRestoreStreamWindow(event.user.windowID);
+            continue;
+        }
         if (event.type == nativeOverlayEventType() && nativeOverlayConfigured()) {
             m_InputHandler->handleNativeOverlayAction(event.user.code);
             continue;

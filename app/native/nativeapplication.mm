@@ -17,6 +17,8 @@ void configureNativeBackgroundApplication()
 #include "nativeapplication.h"
 
 static NSString* const MLRestoreStreamWindow = @"com.moonlight-stream.NativeGlass.restoreStreamWindow";
+static Uint32 restoreEventType;
+Uint32 nativeRestoreStreamWindowEventType() { return restoreEventType; }
 
 static NSWindow* nativeSDLWindow(SDL_Window* window)
 {
@@ -127,6 +129,7 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 @property(nonatomic, copy) NSString* token;
 - (void)windowBecameKey:(NSNotification*)notification;
 - (void)restore:(NSNotification*)notification;
+- (void)restoreWindow;
 @end
 
 @implementation MLStreamWindowAccess
@@ -146,12 +149,24 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
         candidate.delegate = delegate;
         [delegate release];
         nativeOverlayAttach(candidate, self.token.UTF8String);
+        // Overlay attachment reserves SDL_USEREVENT for stock Session events.
+        if (!restoreEventType) restoreEventType = SDL_RegisterEvents(1);
         sendWindowEvent("windowOpened");
     });
 }
 - (void)restore:(NSNotification*)notification
 {
     if (![notification.object isEqualToString:self.token]) return;
+    if (!self.windowDelegate.windowID || !restoreEventType || restoreEventType == Uint32(-1)) return;
+    // Never run SDL's blocking fullscreen animation inside an AppKit/distributed
+    // notification callback. Its completion must be able to drain the main loop.
+    SDL_Event event = {};
+    event.type = restoreEventType;
+    event.user.windowID = self.windowDelegate.windowID;
+    SDL_PushEvent(&event);
+}
+- (void)restoreWindow
+{
     SDL_Window* window = SDL_GetWindowFromID(self.windowDelegate.windowID);
     NSWindow* nativeWindow = nativeSDLWindow(window);
     if (!nativeWindow || self.windowDelegate.changingVisibility) return;
@@ -183,6 +198,11 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 @end
 
 static MLStreamWindowAccess* streamWindowAccess;
+void nativeRestoreStreamWindow(Uint32 windowID)
+{
+    if (windowID && streamWindowAccess.windowDelegate.windowID == windowID)
+        [streamWindowAccess restoreWindow];
+}
 void configureNativeStreamWindow(const char* token)
 {
     configureNativeBackgroundApplication();
@@ -198,6 +218,7 @@ void configureNativeStreamWindow(const char* token)
 }
 void stopNativeStreamWindow()
 {
+    if (restoreEventType && restoreEventType != Uint32(-1)) SDL_FlushEvent(restoreEventType);
     nativeOverlayDetach();
     [streamWindowAccess release]; streamWindowAccess = nil;
 }

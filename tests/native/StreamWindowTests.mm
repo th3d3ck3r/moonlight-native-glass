@@ -26,6 +26,10 @@ static void pump(double seconds = 0.3) {
     do {
         SDL_PumpEvents();
         [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+        SDL_Event restore;
+        if (nativeRestoreStreamWindowEventType())
+            while (SDL_PeepEvents(&restore,1,SDL_GETEVENT,nativeRestoreStreamWindowEventType(),nativeRestoreStreamWindowEventType())==1)
+                nativeRestoreStreamWindow(restore.user.windowID);
     } while ([deadline timeIntervalSinceNow] > 0);
 }
 static NSWindow* cocoa(SDL_Window* window) {

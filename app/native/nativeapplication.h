@@ -6,3 +6,5 @@ bool nativeHideStreamWindow(SDL_Window* window);
 // is duplicated in the native window adapter. Clear before window destruction.
 void nativeSetStreamFullscreenTransition(bool (*transition)(SDL_Window*, Uint32));
 bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window);
+Uint32 nativeRestoreStreamWindowEventType();
+void nativeRestoreStreamWindow(Uint32 windowID);

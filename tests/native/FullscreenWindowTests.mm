@@ -25,6 +25,11 @@ static void pump(double seconds=.3) {
     do {
         SDL_PumpEvents();
         [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
+        // Match Session: handle restoration after returning from AppKit callbacks.
+        SDL_Event restore;
+        if (nativeRestoreStreamWindowEventType())
+            while (SDL_PeepEvents(&restore,1,SDL_GETEVENT,nativeRestoreStreamWindowEventType(),nativeRestoreStreamWindowEventType())==1)
+                nativeRestoreStreamWindow(restore.user.windowID);
     } while (end.timeIntervalSinceNow>0);
 }
 static NSWindow* cocoa(SDL_Window* window) {
