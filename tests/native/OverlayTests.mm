@@ -16,12 +16,17 @@ int main(int argc,char** argv) { @autoreleasepool {
     window.title=@"Native overlay preview — sample statistics, no live stream"; window.releasedWhenClosed=NO;
     window.backgroundColor=[NSColor colorWithSRGBRed:.06 green:.10 blue:.16 alpha:1];
     [window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
+    pump(); [window makeKeyAndOrderFront:nil]; pump();
+    check(NSApp.keyWindow==window,"Fixture must own keyboard focus before overlay attachment");
     nativeOverlayAttach(window,"overlay-test"); check(nativeOverlayEventType()!=SDL_USEREVENT,"Must not consume upstream SDL user events");
     const char* sample="Video stream: 1920x1080 60 FPS\nVideo codec: H.264\nIncoming frame rate: 59.98 FPS\nRendering frame rate: 59.98 FPS\nFrames dropped by network: 0.00%\nAverage network latency: 2 ms\nAverage decoding time: 1.2 ms\nAverage frame queue delay: 0.4 ms\nAverage rendering time: 0.8 ms";
     check(nativeOverlayPresent(0,true,sample),"Native statistics ownership"); check(nativeOverlayPresent(1,true,"Design preview · Sample values"),"Status ownership"); pump();
     fprintf(stderr,"Overlay children=%lu visible=%d configured=%d\n",(unsigned long)window.childWindows.count,window.visible,nativeOverlayConfigured());
     check(window.childWindows.count==2,"Passive surfaces only; controls hidden by default");
-    for (NSWindow* panel in window.childWindows) check(panel.ignoresMouseEvents,"Statistics/status must pass through input");
+    for (NSWindow* panel in window.childWindows) {
+        check(panel.ignoresMouseEvents,"Statistics/status must pass through input");
+        check(!panel.canBecomeKeyWindow && !panel.canBecomeMainWindow,"Passive panels must reject keyboard/main focus");
+    }
     check(NSApp.keyWindow==window,"Passive overlay must not steal focus");
     SDL_KeyboardEvent key={}; key.state=SDL_PRESSED; key.keysym.sym=SDLK_o; key.keysym.mod=KMOD_LCTRL|KMOD_LALT|KMOD_LSHIFT;
     check(nativeOverlayShortcut(&key)==11,"Default controls shortcut");

@@ -24,6 +24,15 @@ static NSArray* titles() { return @[@"Disconnect", @"Release / Capture Input", @
 // Index 9 is the existing quit-and-exit action, not a host-game termination.
 static void pushAction(int code) { if (actionEvent == (Uint32)-1) return; SDL_Event e = {}; e.type = actionEvent; e.user.code = code; SDL_PushEvent(&e); }
 
+// Passive surfaces must never become keyboard or main windows. Controls may
+// accept keyboard focus when explicitly clicked, without replacing the stream.
+@interface MLOverlayPanel : NSPanel
+@end
+@implementation MLOverlayPanel
+- (BOOL)canBecomeKeyWindow { return !self.ignoresMouseEvents; }
+- (BOOL)canBecomeMainWindow { return NO; }
+@end
+
 @interface MLOverlayController : NSObject
 @property(nonatomic, assign) NSWindow* parent;
 @property(nonatomic, retain) NSPanel* stats;
@@ -58,7 +67,7 @@ static MLOverlayController* controller;
     return self;
 }
 - (NSPanel*)panelWithText:(NSTextField**)field {
-    NSPanel* panel = [[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,300,100) styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO] autorelease];
+    NSPanel* panel = [[[MLOverlayPanel alloc] initWithContentRect:NSMakeRect(0,0,300,100) styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO] autorelease];
     panel.releasedWhenClosed = NO; panel.opaque = NO; panel.backgroundColor = NSColor.clearColor;
     panel.hasShadow = YES; panel.ignoresMouseEvents = field != nullptr;
     panel.collectionBehavior = NSWindowCollectionBehaviorFullScreenAuxiliary | NSWindowCollectionBehaviorIgnoresCycle;
