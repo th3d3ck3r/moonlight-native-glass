@@ -201,6 +201,7 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
             setCaptureActive(false); raiseAllKeys();
             m_NativeControlsVisible = true;
             nativeOverlayBeginControlsInput(m_Window);
+            nativeOverlaySetControlsVisible(true);
         } else {
             m_NativeControlsVisible = false;
             nativeOverlaySetControlsVisible(false);
@@ -209,7 +210,6 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
             if (m_NativeCaptureBeforeControls) nativeOverlayRestoreStreamFocus(m_Window);
             setCaptureActive(m_NativeCaptureBeforeControls);
         }
-        nativeOverlaySetControlsVisible(m_NativeControlsVisible);
         return;
     }
     if (m_NativeControlsVisible) {
