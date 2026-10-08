@@ -7,6 +7,13 @@
 #include "nativeapplication.h"
 #include "nativeoverlay.h"
 
+// Test-only observation of the confinement property already used internally
+// by SDL 2.30.5's Cocoa backend; it is absent from AppKit's public headers.
+// Production code continues to use SDL's public capture/grab APIs exclusively.
+@interface NSWindow (SDLConfinementProbe)
+@property(nonatomic, readonly) NSRect mouseConfinementRect;
+@end
+
 void configureNativeBackgroundApplication();
 void configureNativeStreamWindow(const char* token);
 void stopNativeStreamWindow();
