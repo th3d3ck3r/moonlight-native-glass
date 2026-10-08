@@ -55,6 +55,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 .onAppear { delegate.store = store; store.start() }
         }
         .defaultSize(width: 1080, height: 720)
+        .defaultLaunchBehavior(.presented)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Moonlight Native Glass") {
