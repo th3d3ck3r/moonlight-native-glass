@@ -5,6 +5,7 @@ import Combine
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     var open: (() -> Void)?
     var settings: (() -> Void)?
+    var controls: (() -> Void)?
     private let crescent: NSImage?
     private let fullMoon: NSImage?
     private var windowObservation: AnyCancellable?
@@ -44,6 +45,8 @@ import Combine
                 let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
                 entry.target = self; menu.addItem(entry)
             }
+            let controlsItem = NSMenuItem(title: "Show / Hide Stream Controls", action: #selector(controlsFromMenu), keyEquivalent: "")
+            controlsItem.target = self; controlsItem.isEnabled = controls != nil; menu.addItem(controlsItem)
             menu.addItem(.separator())
             let quit = NSMenuItem(title: "Quit Moonlight Native Glass", action: #selector(quitFromMenu), keyEquivalent: "")
             quit.target = self; menu.addItem(quit)
@@ -52,6 +55,7 @@ import Combine
     }
     @objc private func openFromMenu() { open?() }
     @objc private func settingsFromMenu() { settings?() }
+    @objc private func controlsFromMenu() { controls?() }
     @objc private func quitFromMenu() { NSApp.terminate(nil) }
 }
 

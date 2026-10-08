@@ -1,6 +1,20 @@
 import XCTest
 
 @MainActor final class NativeUIScreensTests: XCTestCase {
+    func testOverlaySettings() throws {
+        let app = XCUIApplication()
+        let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "preview-settings", withExtension: "json"))
+        app.launchArguments = ["--design-preview", "--settings-fixture=" + fixture.path, "--preview-screen=settings-overlay", "--dark"]
+        app.launch()
+        let window = app.windows["native-settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        let label = window.staticTexts["Enable Optional Control Bar"]
+        for _ in 0..<8 { if label.isHittable { break }; window.scrollViews.firstMatch.swipeUp() }
+        XCTAssertTrue(label.exists, "Optional controls setting missing")
+        let shot = XCTAttachment(screenshot: window.screenshot()); shot.name = "settings-overlay"; shot.lifetime = .keepAlways; add(shot)
+        app.terminate()
+    }
+
     func testNativeScreens() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -35,7 +35,7 @@ jobs:
       - name: Verify streaming baseline
         run: |
           git fetch --no-tags --depth=1 origin de2467e433821664cdd2224aad8c89a625be1ad9
-          git diff --exit-code de2467e433821664cdd2224aad8c89a625be1ad9 -- app/streaming app/backend app/settings moonlight-common-c qmdnsengine
+          python3 tests/native/check_streaming_boundary.py
           xcodebuild -version
       - name: Build app and verify bundle
         run: bash scripts/build-native-macos.sh '${{ matrix.architecture }}'
@@ -52,8 +52,8 @@ jobs:
         if: matrix.architecture == 'universal'
         run: |
           xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 \
-            app/native/nativeapplication.mm tests/native/StreamWindowTests.mm \
-            -L libs/mac/lib -lSDL2 -framework AppKit \
+            app/native/nativeapplication.mm app/native/nativeoverlay.mm tests/native/StreamWindowTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
           build/stream-window-tests
       - name: Test actual menu bar icon state
@@ -61,15 +61,30 @@ jobs:
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
           build/status-icon-tests macos-native/Resources
+      - name: Test native overlays and capture composited previews
+        if: matrix.architecture == 'universal'
+        run: |
+          mkdir -p build/overlay-previews
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
+            app/native/nativeoverlay.mm tests/native/OverlayTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/overlay-tests
+          build/overlay-tests build/overlay-previews
+      - uses: actions/upload-artifact@v6
+        if: matrix.architecture == 'universal'
+        with:
+          name: Native-Stream-Overlay-Previews
+          path: build/overlay-previews/*.png
+          if-no-files-found: error
       - name: Package preview artifact
         run: |
-          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-6-${{ matrix.architecture }}.zip'
-          shasum -a 256 'build/Moonlight-Native-Glass-Preview-6-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
+          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-7-${{ matrix.architecture }}.zip'
+          shasum -a 256 'build/Moonlight-Native-Glass-Preview-7-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
       - uses: actions/upload-artifact@v6
         with:
-          name: Native-Glass-Preview-6-${{ matrix.architecture }}
+          name: Native-Glass-Preview-7-${{ matrix.architecture }}
           path: |
-            build/Moonlight-Native-Glass-Preview-6-${{ matrix.architecture }}.zip
+            build/Moonlight-Native-Glass-Preview-7-${{ matrix.architecture }}.zip
             build/SHA256-${{ matrix.architecture }}.txt
           if-no-files-found: error
 

@@ -87,6 +87,7 @@ private struct NativeStatusActions: View {
                 if store.streamWindowExists { store.restoreStreamWindow() }
                 else { openWindow(id: "library"); NSApp.activate(ignoringOtherApps: true) }
             }
+            delegate.statusMenu?.controls = { store.showStreamControls() }
             delegate.statusMenu?.settings = {
                 openSettings(); NSApp.activate(ignoringOtherApps: true)
             }

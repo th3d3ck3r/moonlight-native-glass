@@ -277,6 +277,11 @@ struct PairingRequest: Identifiable {
             Notification.Name("com.moonlight-stream.NativeGlass.restoreStreamWindow"),
             object: token, userInfo: nil, deliverImmediately: true)
     }
+    func showStreamControls() {
+        guard streamWindowExists, let token = streamWindowToken else { return }
+        restoreStreamWindow()
+        DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.moonlight-stream.NativeGlass.toggleStreamControls"), object: token, userInfo: nil, deliverImmediately: true)
+    }
     func confirmQuit() {
         quitRequired = nil
         do { try stream?.send(["command": "confirmQuit"]) } catch { fail(error.localizedDescription) }
