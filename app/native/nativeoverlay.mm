@@ -46,6 +46,7 @@ static void pushAction(int code) { if (actionEvent == (Uint32)-1) return; SDL_Ev
 @property(nonatomic, assign) BOOL layingOut;
 - (void)refresh;
 - (void)layoutPanels;
+- (void)invalidate;
 @end
 static MLOverlayController* controller;
 
@@ -202,10 +203,14 @@ static MLOverlayController* controller;
     if (self.controls) { NSRect frame=self.controls.frame; frame.origin=NSMakePoint(NSMidX(bounds)-frame.size.width/2,NSMinY(bounds)+12); [self.controls setFrame:frame display:NO]; [self setPanel:self.controls visible:self.parent.visible && !self.parent.miniaturized]; }
     } @finally { self.layingOut=NO; }
 }
-- (void)dealloc {
+- (void)invalidate {
     [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self];
     [[NSNotificationCenter defaultCenter] removeObserver:self]; [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
-    for (NSPanel* panel in @[self.stats ?: (id)NSNull.null,self.status ?: (id)NSNull.null,self.controls ?: (id)NSNull.null]) if ((id)panel != NSNull.null) { [self.parent removeChildWindow:panel]; [panel orderOut:nil]; }
+    self.parent = nil;
+    for (NSPanel* panel in @[self.stats ?: (id)NSNull.null,self.status ?: (id)NSNull.null,self.controls ?: (id)NSNull.null]) if ((id)panel != NSNull.null) { [panel.parentWindow removeChildWindow:panel]; [panel orderOut:nil]; }
+}
+- (void)dealloc {
+    [self invalidate];
     [_stats release]; [_status release]; [_controls release]; [_statsText release]; [_statusText release]; [_defaults release]; [_token release]; [super dealloc];
 }
 @end
@@ -238,6 +243,8 @@ void nativeOverlayAttach(void* window, const char* token) {
 void nativeOverlayDetach() {
     configured=false; { std::lock_guard<std::mutex> lock(snapshotMutex); generation++; updatePending=false; snapshots[0]={}; snapshots[1]={}; }
     if (actionEvent != (Uint32)-1) SDL_FlushEvent(actionEvent);
-    [controller release]; controller=nil;
+    // AppKit can retain notification targets until its current event drains.
+    // Detach now rather than relying on eventual object destruction.
+    [controller invalidate]; [controller release]; controller=nil;
 }
 void nativeOverlaySetControlsVisible(bool visible) { controller.showingControls=visible; [controller refresh]; }
