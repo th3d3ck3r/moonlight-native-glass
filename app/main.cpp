@@ -46,6 +46,7 @@
 #include "cli/commandlineparser.h"
 #ifdef Q_OS_DARWIN
 #include "native/nativebridge.h"
+#include <QScopedPointer>
 void configureNativeBackgroundApplication();
 #endif
 #include "path.h"
@@ -1011,13 +1012,16 @@ int main(int argc, char *argv[])
     }
 
     QQmlApplicationEngine engine;
+#ifdef Q_OS_DARWIN
+    QScopedPointer<NativeBridge> nativeBridge;
+#endif
     QString initialView;
     bool hasGUI = true;
 
     switch (commandLineParserResult) {
 #ifdef Q_OS_DARWIN
     case GlobalCommandLineParser::NativeRequested:
-        new NativeBridge(app.arguments(), &app);
+        nativeBridge.reset(new NativeBridge(app.arguments(), &app));
         hasGUI = false;
         break;
 #endif
@@ -1080,6 +1084,13 @@ int main(int argc, char *argv[])
     // Give worker tasks time to properly exit. Fixes PendingQuitTask
     // sometimes freezing and blocking process exit.
     QThreadPool::globalInstance()->waitForDone(30000);
+
+#ifdef Q_OS_DARWIN
+    // Release native helper managers/windows while Qt's platform and logging
+    // are still alive. Application-owned QObject cleanup happens after the
+    // QGuiApplication destructor has begun tearing that state down.
+    nativeBridge.reset();
+#endif
 
     // Restore the default logger for all libraries before shutting down ours
 #if SDL_VERSION_ATLEAST(3, 0, 0)
