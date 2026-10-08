@@ -97,12 +97,13 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(NSApp.keyWindow==window,"Passive overlay must not steal focus");
     SDL_KeyboardEvent key={}; key.state=SDL_PRESSED; key.keysym.sym=SDLK_o; key.keysym.mod=KMOD_LCTRL|KMOD_LALT|KMOD_LSHIFT;
     check(nativeOverlayShortcut(&key)==11,"Default controls shortcut");
-    for (int i=0;i<12;i++) { key.keysym.sym="qzxsmcdvleko"[i]; check(nativeOverlayShortcut(&key)==i,"Every existing shortcut is retained"); }
+    for (int i=0;i<13;i++) { key.keysym.sym="qzxsmcdvlekob"[i]; check(nativeOverlayShortcut(&key)==i,"Every existing shortcut and plain Disconnect must resolve"); }
     key.keysym.mod=KMOD_LCTRL; check(nativeOverlayShortcut(&key)==-1,"Normal host keys must not be consumed");
-    [defaults setObject:@{@"11":@{@"key":@"p",@"modifiers":@3}} forKey:@"shortcuts"]; [defaults synchronize];
+    [defaults setObject:@{@"11":@{@"key":@"p",@"modifiers":@3}, @"12":@{@"key":@"r",@"modifiers":@10}} forKey:@"shortcuts"]; [defaults synchronize];
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
     key.keysym.sym=SDLK_p; key.keysym.mod=KMOD_LCTRL|KMOD_LALT; check(nativeOverlayShortcut(&key)==11,"Customized controls shortcut");
     key.keysym.sym=SDLK_o; key.keysym.mod|=KMOD_LSHIFT; check(nativeOverlayShortcut(&key)==-1,"Old custom binding must be removed");
+    key.keysym.sym=SDLK_r; key.keysym.mod=KMOD_LGUI|KMOD_LALT; check(nativeOverlayShortcut(&key)==12,"Plain Disconnect shortcut must be customizable");
     [defaults removeObjectForKey:@"shortcuts"]; [defaults synchronize];
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
     NSString* out=argc>1 ? [NSString stringWithUTF8String:argv[1]] : @"/tmp";
@@ -110,9 +111,9 @@ int main(int argc,char** argv) { @autoreleasepool {
     nativeOverlaySetControlsVisible(true); pump(); check(window.childWindows.count==3,"Separate controls surface");
     NSWindow* controls=nil;
     for (NSWindow* panel in window.childWindows) if (!panel.ignoresMouseEvents) controls=panel;
-    NSButton* disconnect=buttonWithTag(controls.contentView,9);
+    NSButton* disconnect=buttonWithTag(controls.contentView,12);
     check(disconnect!=nil && [disconnect.accessibilityLabel isEqual:@"Disconnect"],"Default controls must expose Disconnect");
-    [disconnect performClick:nil]; check(takeAction(9),"Disconnect must use the existing customizable disconnect action, not close/hide");
+    [disconnect performClick:nil]; check(takeAction(12),"Disconnect must use plain disconnect, not close/hide or quit host game");
     check(NSApp.keyWindow==window && !controls.canBecomeKeyWindow,"Control buttons must preserve stream keyboard focus and cursor confinement");
     SDL_ShowCursor(SDL_DISABLE);
     SDL_SetWindowMouseGrab(stream,SDL_FALSE);
@@ -148,7 +149,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     bounds=[window convertRectToScreen:window.contentView.bounds];
     for (NSWindow* panel in window.childWindows) check(NSContainsRect(bounds,panel.frame),"Every panel must fit after controls shrink with all actions selected");
     controls=nil; for (NSWindow* panel in window.childWindows) if (!panel.ignoresMouseEvents) controls=panel;
-    check(buttonWithTag(controls.contentView,9)!=nil,"Disconnect must remain directly visible in compact controls");
+    check(buttonWithTag(controls.contentView,12)!=nil,"Disconnect must remain directly visible in compact controls");
     nativeOverlayDetach(); check(window.toolbar==nil && window.titleVisibility==NSWindowTitleVisible,"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
     nativeOverlayAttach(window,"next-session"); check(nativeOverlayConfigured(),"Repeated session attachment"); nativeOverlayDetach();
     if (previous) [defaults setPersistentDomain:previous forName:@"com.moonlight-stream.NativeGlass.Overlay"]; else [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [previous release]; [defaults synchronize];

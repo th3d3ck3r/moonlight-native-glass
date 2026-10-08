@@ -19,8 +19,8 @@ static bool updatePending = false;
 static unsigned generation = 0;
 struct Binding { SDL_Keycode key; SDL_Keymod modifiers; };
 static std::mutex bindingMutex;
-static std::array<Binding, 12> bindings;
-static const char* defaultKeys = "qzxsmcdvleko";
+static std::array<Binding, 13> bindings;
+static const char* defaultKeys = "qzxsmcdvlekob";
 static SDL_Window* controlsWindow = nullptr;
 static Uint32 controlsWindowID = 0;
 static SDL_bool previousMouseGrab = SDL_FALSE;
@@ -116,7 +116,7 @@ static MLOverlayController* controller;
     [self.defaults synchronize];
     NSDictionary* custom = [self.defaults dictionaryForKey:@"shortcuts"];
     { std::lock_guard<std::mutex> lock(bindingMutex);
-      for (int i=0;i<12;i++) {
+      for (int i=0;i<13;i++) {
           id stored = custom[[NSString stringWithFormat:@"%d",i]];
           NSDictionary* b = [stored isKindOfClass:NSDictionary.class] ? stored : nil;
           NSString* key = [b[@"key"] isKindOfClass:NSString.class] ? b[@"key"] : nil;
@@ -143,7 +143,6 @@ static MLOverlayController* controller;
         for (NSNumber* action in actions) {
             if (![action isKindOfClass:NSNumber.class]) continue;
             NSInteger i = action.integerValue; if (i<0 || i>10) continue;
-            if (i==9) continue; // Disconnect is always directly available below.
             // Reserve overflow, the always-visible Disconnect button and Done.
             if (x + 40 + 154 > available) { NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:names[i] action:@selector(action:) keyEquivalent:@""] autorelease]; item.target=self; item.tag=i; [overflow addItem:item]; continue; }
             NSButton* button = [NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:names[i]] target:self action:@selector(action:)];
@@ -152,7 +151,7 @@ static MLOverlayController* controller;
         }
         if (overflow.numberOfItems) { NSPopUpButton* more = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(x,8,40,30) pullsDown:YES] autorelease]; [more addItemWithTitle:@"…"]; for (NSMenuItem* item in overflow.itemArray) [more.menu addItem:[[item copy] autorelease]]; [more setAccessibilityLabel:@"More Stream Controls"]; [content addSubview:more]; x+=46; }
         NSButton* disconnect = [NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"power" accessibilityDescription:@"Disconnect"] target:self action:@selector(action:)];
-        disconnect.bezelStyle=NSBezelStyleRounded; disconnect.tag=9;
+        disconnect.bezelStyle=NSBezelStyleRounded; disconnect.tag=12;
         disconnect.toolTip=@"Disconnect from this stream"; [disconnect setAccessibilityLabel:@"Disconnect"];
         disconnect.frame=NSMakeRect(x,8,34,30); [content addSubview:disconnect]; x+=40;
         NSButton* close = [NSButton buttonWithTitle:@"Done" target:self action:@selector(dismiss:)]; close.frame=NSMakeRect(x,8,58,30); [content addSubview:close];
@@ -242,7 +241,7 @@ int nativeOverlayShortcut(const SDL_KeyboardEvent* event) {
     int mods = event->keysym.mod;
     int normalized = ((mods & KMOD_CTRL)?KMOD_CTRL:0)|((mods & KMOD_ALT)?KMOD_ALT:0)|((mods & KMOD_SHIFT)?KMOD_SHIFT:0)|((mods & KMOD_GUI)?KMOD_GUI:0);
     std::lock_guard<std::mutex> lock(bindingMutex);
-    for (int i=0;i<12;i++) if (bindings[i].key==event->keysym.sym && bindings[i].modifiers==normalized) return i;
+    for (int i=0;i<13;i++) if (bindings[i].key==event->keysym.sym && bindings[i].modifiers==normalized) return i;
     return -1;
 }
 void nativeOverlayPerformAction(int action) { pushAction(action); }

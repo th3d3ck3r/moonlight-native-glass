@@ -216,6 +216,13 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
         nativeOverlayEndControlsInput();
         setCaptureActive(m_NativeCaptureBeforeControls);
     }
+    if (action == 12) {
+        // Plain Disconnect follows the stock quit action without forcing the
+        // host game to exit. Keep the separate quit-and-exit action intact.
+        raiseAllKeys();
+        performSpecialKeyCombo(KeyComboQuit);
+        return;
+    }
     if (action == KeyComboQuit && m_SpecialKeyCombos[action].enabled) {
         // The native close-window binding matches the red button. Ordinary Qt
         // quit shortcuts and explicit disconnect-and-exit retain their behavior.

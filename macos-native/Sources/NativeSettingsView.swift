@@ -229,11 +229,11 @@ private struct ShortcutSettings: View {
     private static let defaults = UserDefaults(suiteName: "com.moonlight-stream.NativeGlass.Overlay")!
     @State private var shortcuts = (Self.defaults.dictionary(forKey: "shortcuts") as? [String: [String: Any]]) ?? [:]
     @State private var shortcutError: String?
-    private let names = ["Close Stream Window", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls"]
-    private let defaultKeys = Array("qzxsmcdvleko").map(String.init)
+    private let names = ["Close Stream Window", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls", "Disconnect"]
+    private let defaultKeys = Array("qzxsmcdvlekob").map(String.init)
     var body: some View {
         Section("Stream Shortcuts") {
-            ForEach(0..<12, id: \.self) { id in
+            ForEach(0..<names.count, id: \.self) { id in
                 VStack(alignment: .leading) {
                     Text(names[id])
                     HStack {
@@ -259,7 +259,7 @@ private struct ShortcutSettings: View {
     private func key(_ id: Int) -> String { shortcuts[String(id)]?["key"] as? String ?? defaultKeys[id] }
     private func modifiers(_ id: Int) -> Int { shortcuts[String(id)]?["modifiers"] as? Int ?? 7 }
     private func update(_ id: Int, key: String, modifiers: Int) {
-        guard !(0..<12).contains(where: { $0 != id && self.key($0) == key && self.modifiers($0) == modifiers }) else { shortcutError = "This shortcut is already assigned to another stream action."; return }
+        guard !(0..<names.count).contains(where: { $0 != id && self.key($0) == key && self.modifiers($0) == modifiers }) else { shortcutError = "This shortcut is already assigned to another stream action."; return }
         shortcuts[String(id)] = ["key": key, "modifiers": modifiers]
         Self.defaults.set(shortcuts, forKey: "shortcuts"); shortcutError = nil; notify()
     }
