@@ -57,6 +57,12 @@ int main(int argc,char** argv) { @autoreleasepool {
     for (NSUInteger i=0;i<panels.count;i++) for (NSUInteger j=i+1;j<panels.count;j++) check(!NSIntersectsRect([panels[i] frame],[panels[j] frame]),"Overlay panels must not overlap");
     capture([out stringByAppendingPathComponent:@"overlay-compact-large.png"]);
     [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameAqua]]; capture([out stringByAppendingPathComponent:@"overlay-light.png"]);
+    // All selected actions must still fit when a previously wide bar shrinks.
+    [defaults setObject:@[@0,@1,@2,@3,@4,@5,@6,@7,@8,@9,@10] forKey:@"buttons"]; [defaults synchronize];
+    [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
+    [window setContentSize:NSMakeSize(320,300)]; pump();
+    bounds=[window convertRectToScreen:window.contentView.bounds];
+    for (NSWindow* panel in window.childWindows) check(NSContainsRect(bounds,panel.frame),"Every panel must fit after controls shrink with all actions selected");
     nativeOverlayDetach(); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
     nativeOverlayAttach(window,"next-session"); check(nativeOverlayConfigured(),"Repeated session attachment"); nativeOverlayDetach();
     if (previous) [defaults setPersistentDomain:previous forName:@"com.moonlight-stream.NativeGlass.Overlay"]; else [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [previous release]; [defaults synchronize];

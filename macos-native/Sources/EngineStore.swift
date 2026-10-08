@@ -100,14 +100,16 @@ struct PairingRequest: Identifiable {
     private var shuttingDown = false
     private var pendingStream: (Computer, Game)?
     private var hostDeadline: Task<Void, Never>?
+    private let executableOverride: URL?
 
     var selected: Computer? { computers.first { $0.id == selectedID } }
     var executable: URL? {
-        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight")
+        executableOverride ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight")
     }
 
-    init(preview: Bool = false) {
+    init(preview: Bool = false, executable: URL? = nil) {
         self.preview = preview
+        executableOverride = executable
         if preview {
             computers = [Computer(id: "preview-computer", name: "Gaming PC", online: true, unknown: false,
                 paired: true, runningApp: 0, address: "192.168.1.20", localAddress: "192.168.1.20",
@@ -145,6 +147,11 @@ struct PairingRequest: Identifiable {
             guard let self, self.channel === helper else { return }
             self.ready = false
             self.channel = nil
+            self.pairing = nil; self.addingHost = false; self.testingConnection = false
+            self.hostDeadline?.cancel()
+            if self.pendingStream != nil {
+                self.pendingStream = nil; self.streamActive = false; self.streamStarted = false
+            }
             if !self.shuttingDown { self.fail("The streaming engine stopped (exit \(code)). Use Refresh to restart it.") }
         }
         channel = helper

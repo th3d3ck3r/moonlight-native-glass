@@ -93,7 +93,12 @@ static MLOverlayController* controller;
     }
     return panel;
 }
-- (void)windowChanged:(NSNotification*)n { if (n.object == self.parent) [self layoutPanels]; }
+- (void)windowChanged:(NSNotification*)n {
+    if (n.object != self.parent) return;
+    // Reflow the controls, including overflow, when the stream gets narrower.
+    if (self.showingControls && [n.name isEqualToString:NSWindowDidResizeNotification]) [self refresh];
+    else [self layoutPanels];
+}
 - (void)settingsChanged:(NSNotification*)n { [self.defaults synchronize]; if (self.showingControls && ![self.defaults boolForKey:@"controlsEnabled"]) pushAction(101); [self refresh]; }
 - (void)accessibilityChanged:(NSNotification*)n { [self refresh]; }
 - (void)toggleControls:(NSNotification*)n { if ([n.object isEqual:self.token]) pushAction(100); }
@@ -125,12 +130,13 @@ static MLOverlayController* controller;
         CGFloat x = 10;
         NSArray* names = titles();
         NSArray* symbols = @[@"xmark.circle",@"cursorarrow",@"arrow.up.left.and.arrow.down.right",@"chart.bar",@"computermouse",@"eye",@"minus",@"doc.on.clipboard",@"rectangle.dashed",@"power",@"keyboard",@"slider.horizontal.3"];
-        CGFloat available = MAX(160,self.parent.frame.size.width - 40);
+        CGFloat available = MAX(120,self.parent.contentView.bounds.size.width - 24);
         NSMenu* overflow = [[[NSMenu alloc] initWithTitle:@"More Stream Controls"] autorelease];
         for (NSNumber* action in actions) {
             if (![action isKindOfClass:NSNumber.class]) continue;
             NSInteger i = action.integerValue; if (i<0 || i>10) continue;
-            if (x + 88 > available) { NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:names[i] action:@selector(action:) keyEquivalent:@""] autorelease]; item.target=self; item.tag=i; [overflow addItem:item]; continue; }
+            // Reserve the overflow menu and Done button before adding a button.
+            if (x + 40 + 114 > available) { NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:names[i] action:@selector(action:) keyEquivalent:@""] autorelease]; item.target=self; item.tag=i; [overflow addItem:item]; continue; }
             NSButton* button = [NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:names[i]] target:self action:@selector(action:)];
             button.bezelStyle=NSBezelStyleRounded; button.tag=i; button.toolTip=names[i]; [button setAccessibilityLabel:names[i]];
             button.frame=NSMakeRect(x,8,34,30); [content addSubview:button]; x+=40;

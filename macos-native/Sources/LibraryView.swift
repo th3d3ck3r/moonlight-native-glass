@@ -201,7 +201,7 @@ struct LibraryView: View {
                 if store.streamActive && !store.streamStarted { Button("Cancel") { store.cancelLaunch() }.controlSize(.small) }
             }.padding(.horizontal, 16).padding(.bottom, 9)
             if store.streamStarted {
-                Text("Disconnect: Control–Option–Shift–Q, or Start + Select + L1 + R1 on your controller.")
+                Text("Disconnect using your configured shortcut (see Settings → Shortcuts), or Start + Select + L1 + R1 on your controller.")
                     .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.bottom, 9)
             }
             if !store.warnings.isEmpty {

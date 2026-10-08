@@ -59,6 +59,11 @@ jobs:
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift tests/native/EngineProtocolTests.swift -o build/engine-protocol-tests
           build/engine-protocol-tests
+      - name: Test frontend engine failure recovery
+        if: matrix.architecture == 'universal'
+        run: |
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
+          build/engine-store-tests
       - name: Test real engine bridge and persistence
         if: matrix.architecture == 'universal'
         run: |
@@ -79,13 +84,13 @@ jobs:
           build/status-icon-tests macos-native/Resources
       - name: Package preview artifact
         run: |
-          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-7-${{ matrix.architecture }}.zip'
-          shasum -a 256 'build/Moonlight-Native-Glass-Preview-7-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
+          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-8-${{ matrix.architecture }}.zip'
+          shasum -a 256 'build/Moonlight-Native-Glass-Preview-8-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
       - uses: actions/upload-artifact@v6
         with:
-          name: Native-Glass-Preview-7-${{ matrix.architecture }}
+          name: Native-Glass-Preview-8-${{ matrix.architecture }}
           path: |
-            build/Moonlight-Native-Glass-Preview-7-${{ matrix.architecture }}.zip
+            build/Moonlight-Native-Glass-Preview-8-${{ matrix.architecture }}.zip
             build/SHA256-${{ matrix.architecture }}.txt
           if-no-files-found: error
 
