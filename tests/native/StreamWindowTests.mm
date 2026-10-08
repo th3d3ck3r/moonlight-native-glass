@@ -191,7 +191,10 @@ int main(int argc, char** argv) {
             NSWindow* other=[[NSWindow alloc] initWithContentRect:NSMakeRect(5,5,80,80) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
             [other makeKeyAndOrderFront:nil]; pump();
             SDL_WarpMouseGlobal(0,0); pump();
+            std::printf("BEFORE DONE: mode=0x%x flags=0x%x visible=%d mini=%d key=%d SDLkey=%u\n",mode,SDL_GetWindowFlags(window),cocoa(window).visible,cocoa(window).miniaturized,cocoa(window).keyWindow,SDL_GetKeyboardFocus() ? SDL_GetWindowID(SDL_GetKeyboardFocus()) : 0); std::fflush(stdout);
             nativeOverlayRestoreStreamFocus(window);
+            if (mode==SDL_WINDOW_FULLSCREEN) pump();
+            std::printf("AFTER DONE: mode=0x%x flags=0x%x visible=%d mini=%d key=%d SDLkey=%u\n",mode,SDL_GetWindowFlags(window),cocoa(window).visible,cocoa(window).miniaturized,cocoa(window).keyWindow,SDL_GetKeyboardFocus() ? SDL_GetWindowID(SDL_GetKeyboardFocus()) : 0); std::fflush(stdout);
             check(SDL_GetKeyboardFocus()==window,"Done must restore keyboard focus to the stream");
             // Exclusive modesetting can leave mouse focus unset while capture
             // is off. SDL establishes it on relative-mode activation. The two

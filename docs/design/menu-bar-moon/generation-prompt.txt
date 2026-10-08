@@ -1,6 +1,0 @@
-Built-in image generation; edit of the approved crescent artwork.
-Reference: existing approved Moonlight Native Glass crescent app icon.
-Proposed asset: full-moon-proposed.png
-
-Use case: precise-object-edit. Asset type: proposed macOS menu bar state icon for Moonlight Native Glass. Edit target: provided existing approved crescent app artwork. Create its matching FULL MOON state asset. Change only the large crescent to a complete circular full moon, with the same luminous pale cyan-to-periwinkle blue Liquid Glass material, restrained beveled edges, soft glass reflections and highlight quality. A clean smooth glass disc, not a textured astronomical moon; no craters, face, text, ring, letters, badge, play symbol or extra shapes. Preserve the midnight navy square background, the two tiny glass dots at the upper right, the palette, spacing, overall scale and polish. Center the circular moon optically within the square, give it roughly the same height as the existing crescent and enough separation from the two dots. Flat front view, no perspective tilt. The difference must read clearly at 18 point menu bar size. This is a design asset only, not a screenshot or new app icon replacement. Output a single square full-moon artwork, no comparison board.
-
