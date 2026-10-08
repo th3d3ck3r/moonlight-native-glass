@@ -52,7 +52,7 @@ static void capture(NSString* directory, NSString* name, bool stream) {
     task.arguments=@[@"-x",@"-m",path];
     check([task launchAndReturnError:nil],"Composited screenshot could not launch");
     [task waitUntilExit]; check(task.terminationStatus==0,"Composited screenshot failed");
-    NSBitmapImageRep* image=[NSBitmapImageRep imageRepWithContentsOfFile:path];
+    NSBitmapImageRep* image=(NSBitmapImageRep*)[NSBitmapImageRep imageRepWithContentsOfFile:path];
     check(image!=nil,"Composited screenshot unreadable");
     NSColor* color=[[image colorAtX:image.pixelsWide/2 y:image.pixelsHigh/2] colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
     std::printf("PIXEL %s: %.3f %.3f %.3f\n",name.UTF8String,color.redComponent,color.greenComponent,color.blueComponent);

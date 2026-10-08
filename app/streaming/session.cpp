@@ -2,6 +2,7 @@
 #ifdef Q_OS_MACOS
 #include "native/nativeoverlay.h"
 #include "native/nativetitlebar.h"
+#include "native/nativeapplication.h"
 #endif
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
@@ -1894,6 +1895,16 @@ void Session::exec()
         }
     }
 
+#ifdef Q_OS_MACOS
+    // Presentation-only hide/restore uses the same fullscreen transition as
+    // the existing shortcut, including its platform-specific safety handling.
+    nativeSetStreamFullscreenTransition([](SDL_Window* window, Uint32 flags) {
+        Session* session = Session::get();
+        if (!session || session->m_Window != window || (flags && flags != session->m_FullScreenFlag)) return false;
+        if ((SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP) != flags) session->toggleFullscreen();
+        return (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP) == flags;
+    });
+#endif
     m_InputHandler->setWindow(m_Window);
 
     QSvgRenderer svgIconRenderer(QString(":/res/moonlight.svg"));
@@ -2394,6 +2405,9 @@ DispatchDeferredCleanup:
 
     // This must be called after the decoder is deleted, because
     // the renderer may want to interact with the window
+#ifdef Q_OS_MACOS
+    nativeSetStreamFullscreenTransition(nullptr);
+#endif
     SDL_DestroyWindow(m_Window);
 
     if (iconSurface != nullptr) {

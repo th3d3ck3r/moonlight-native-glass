@@ -2,3 +2,6 @@
 #include <SDL.h>
 // Hide the existing native stream window without ending its session.
 bool nativeHideStreamWindow(SDL_Window* window);
+// Session supplies its existing safe fullscreen transition; no renderer logic
+// is duplicated in the native window adapter. Clear before window destruction.
+void nativeSetStreamFullscreenTransition(bool (*transition)(SDL_Window*, Uint32));

@@ -115,11 +115,14 @@ private struct NativeStatusActions: View {
 // Keep these credits fixed across builds. AppKit reads the build number from
 // CFBundleVersion for the preview number; release notes belong on GitHub.
 func showNativeAboutPanel() {
-    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "3"
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "15"
+    let engineBundle = Bundle(url: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app"))
+    let engineVersion = engineBundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "6.2.0"
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .center
     let credits = NSMutableAttributedString(
-        string: "SwiftUI/AppKit interface\nMoonlight Qt 6.2.0 streaming engine\nManual updates · GPL-3.0\n\nNative Glass created and maintained by Th3D3ck3r\n\nGitHub Repository",
+        string: "SwiftUI/AppKit interface\nMoonlight Qt \(engineVersion) streaming engine\nManual updates · GPL-3.0\n\nNative Glass created and maintained by Th3D3ck3r\n\nGitHub Repository",
         attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
                      .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
     credits.addAttributes([.link: URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass")!,
@@ -128,7 +131,7 @@ func showNativeAboutPanel() {
                           range: (credits.string as NSString).range(of: "GitHub Repository"))
     NSApp.orderFrontStandardAboutPanel(options: [
         .applicationName: "Moonlight Native Glass",
-        .applicationVersion: "Native UI Preview \(build) - Moonlight 6.2",
+        .applicationVersion: "Native UI Preview \(build) - Moonlight \(engineVersion)",
         .version: "",
         .credits: credits])
     NSApp.keyWindow?.setAccessibilityIdentifier("native-about")

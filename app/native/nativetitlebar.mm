@@ -61,6 +61,7 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic, retain) NSToolbar* previousToolbar;
 @property(nonatomic, assign) NSWindowTitleVisibility previousTitleVisibility;
 @property(nonatomic, assign) NSWindowToolbarStyle previousToolbarStyle;
+@property(nonatomic, assign) BOOL presentationInstalled;
 @property(nonatomic, retain) NSMutableDictionary* buttons;
 @property(nonatomic, retain) NSPopover* details;
 @property(nonatomic, copy) NSString* detailsID;
@@ -140,6 +141,7 @@ static MLStreamTitlebar* titlebar;
     if (fullscreen) {
         if (self.window.toolbar==self.toolbar) self.window.toolbar=nil;
     } else if (!self.window.toolbar) {
+        self.presentationInstalled=YES;
         self.window.titleVisibility=NSWindowTitleHidden;
         self.window.toolbarStyle=NSWindowToolbarStyleUnifiedCompact;
         self.window.toolbar=self.toolbar;
@@ -249,7 +251,7 @@ static MLStreamTitlebar* titlebar;
 }
 - (void)invalidate {
     [[NSNotificationCenter defaultCenter] removeObserver:self]; [self closeDetails]; self.details.delegate=nil;
-    if (self.window && (self.window.toolbar==self.toolbar || !self.window.toolbar)) {
+    if (self.presentationInstalled && self.window && (self.window.toolbar==self.toolbar || !self.window.toolbar)) {
         self.window.toolbar=self.previousToolbar; self.window.titleVisibility=self.previousTitleVisibility;
         self.window.toolbarStyle=self.previousToolbarStyle;
     }

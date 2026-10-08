@@ -33,12 +33,17 @@ static void sendWindowEvent(const char* event)
     std::fflush(stdout);
 }
 
-static bool hideStreamWindow(SDL_Window* window)
+static bool (*fullscreenTransition)(SDL_Window*, Uint32);
+void nativeSetStreamFullscreenTransition(bool (*transition)(SDL_Window*, Uint32))
 {
-    if (!window || !nativeSDLWindow(window)) return false;
-    SDL_HideWindow(window);
-    sendWindowEvent("windowHidden");
-    return true;
+    fullscreenTransition = transition;
+}
+static bool transitionFullscreen(SDL_Window* window, Uint32 flags)
+{
+    // Standalone window tests have no Session/decoder. The running engine always
+    // installs its Session callback before any native window action is handled.
+    return fullscreenTransition ? fullscreenTransition(window, flags)
+                                : SDL_SetWindowFullscreen(window, flags) == 0;
 }
 
 // Preserve SDL's delegate and forward every other responder/window callback.
@@ -47,7 +52,33 @@ static bool hideStreamWindow(SDL_Window* window)
 @interface MLStreamWindowDelegate : NSObject <NSWindowDelegate>
 @property(nonatomic, retain) id original;
 @property(nonatomic, assign) Uint32 windowID;
+@property(nonatomic, assign) Uint32 hiddenFullscreenFlags;
+@property(nonatomic, assign) BOOL changingVisibility;
 @end
+
+static bool hideStreamWindow(SDL_Window* window)
+{
+    NSWindow* nativeWindow = nativeSDLWindow(window);
+    if (!nativeWindow || ![nativeWindow.delegate isKindOfClass:[MLStreamWindowDelegate class]]) return false;
+    MLStreamWindowDelegate* delegate = nativeWindow.delegate;
+    if (delegate.changingVisibility) return false;
+    if (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) return true;
+    const Uint32 fullscreen = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
+    delegate.changingVisibility = YES;
+    // SDL3 (through sdl2-compat) hides a fullscreen Cocoa window without leaving
+    // its Space. Exit explicitly first or the user is stranded on a black Space.
+    // Use Session's stock transition so its existing renderer safety applies.
+    if (fullscreen && !transitionFullscreen(window, 0)) {
+        delegate.changingVisibility = NO;
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Native fullscreen hide transition failed: %s", SDL_GetError());
+        return false;
+    }
+    delegate.hiddenFullscreenFlags = fullscreen;
+    SDL_HideWindow(window);
+    delegate.changingVisibility = NO;
+    sendWindowEvent("windowHidden");
+    return true;
+}
 
 @implementation MLStreamWindowDelegate
 - (BOOL)respondsToSelector:(SEL)selector
@@ -113,12 +144,19 @@ bool nativeHideStreamWindow(SDL_Window* window)
     if (![notification.object isEqualToString:self.token]) return;
     SDL_Window* window = SDL_GetWindowFromID(self.windowDelegate.windowID);
     NSWindow* nativeWindow = nativeSDLWindow(window);
-    if (!nativeWindow) return;
+    if (!nativeWindow || self.windowDelegate.changingVisibility) return;
+    self.windowDelegate.changingVisibility = YES;
     SDL_ShowWindow(window);
     if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) SDL_RestoreWindow(window);
+    if (self.windowDelegate.hiddenFullscreenFlags) {
+        if (transitionFullscreen(window, self.windowDelegate.hiddenFullscreenFlags))
+            self.windowDelegate.hiddenFullscreenFlags = 0;
+        else SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Native fullscreen restore transition failed: %s", SDL_GetError());
+    }
     [NSApp activateIgnoringOtherApps:YES];
     SDL_RaiseWindow(window);
     [nativeWindow makeKeyAndOrderFront:nil];
+    self.windowDelegate.changingVisibility = NO;
 }
 - (void)dealloc
 {
