@@ -11,6 +11,7 @@ final class EngineChannel {
     var onEvent: (([String: Any]) -> Void)?
     var onExit: ((Int32) -> Void)?
     private var closed = false
+    var stopRequested: Bool { closed }
 
     init(executable: URL, arguments: [String]) {
         process.executableURL = executable
@@ -147,7 +148,7 @@ struct PairingRequest: Identifiable {
             self.receive(event)
         }
         helper.onExit = { [weak self, weak helper] code in
-            guard let self, self.channel === helper else { return }
+            guard let self, let helper, self.channel === helper else { return }
             self.ready = false
             self.channel = nil
             self.pairing = nil; self.addingHost = false; self.testingConnection = false
@@ -292,12 +293,12 @@ struct PairingRequest: Identifiable {
             }
         }
         helper.onExit = { [weak self, weak helper] code in
-            guard let self, self.stream === helper else { return }
+            guard let self, let helper, self.stream === helper else { return }
             self.streamWindowExists = false; self.streamWindowToken = nil
             self.stream = nil; self.streamActive = false; self.streamStarted = false; self.quitRequired = nil
             self.status = "Stream ended"
             if !self.shuttingDown { self.send("resume") }
-            if !self.shuttingDown && code != 0 && self.message == nil { self.fail("The streaming engine exited unexpectedly (\(code)). Please save its crash report and engine log.") }
+            if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil { self.fail("The streaming engine exited unexpectedly (\(code)). Please save its crash report and engine log.") }
         }
         stream = helper
         do { try helper.start() } catch {

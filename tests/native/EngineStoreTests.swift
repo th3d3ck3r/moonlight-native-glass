@@ -13,6 +13,7 @@ func nativeArgument(_ name: String) -> String? { nil }
         fatalError("Timed out waiting for engine lifecycle")
     }
     @MainActor static func main() async throws {
+        _ = NSApplication.shared
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -125,10 +126,12 @@ func nativeArgument(_ name: String) -> String? { nil }
         delayed.confirmQuit()
         try await wait { delayed.streamStarted }
         precondition(delayed.streamActive, "Confirmation dismissal cancelled an accepted launch")
+        delayed.message = nil
         delayed.quitRequired = "Previous game"
         delayed.dismissQuitConfirmation()
         try await wait { !delayed.streamActive }
         precondition(delayed.quitRequired == nil && !delayed.streamStarted, "Outside dismissal stranded the launch helper")
+        precondition(delayed.message == nil, "Intentional launch cancellation was reported as a crash")
         delayed.shutdown()
 
         let silent = EngineStore(executable: try fixture("silent"))
