@@ -49,7 +49,7 @@ struct NativeSettingsView: View {
                         }
                     }
                     if pane == .input {
-                        Section { Text("Hide the stream window with Close Stream Window (Control–Option–Shift–Q by default). Disconnect with Disconnect and Exit or Start + Select + L1 + R1. In the library, use the D-pad to select games, A to launch, and shoulder buttons to switch computers.").foregroundStyle(.secondary) }
+                        Section { Text("Hide the stream window with Close Stream Window (Control–Option–Shift–Q by default). End the stream with Disconnect or Start + Select + L1 + R1. Disconnect and Exit also quits the host game. In the library, use the D-pad to select games, A to launch, and shoulder buttons to switch computers.").foregroundStyle(.secondary) }
                     }
                     if pane == .network {
                         Section {

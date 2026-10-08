@@ -28,7 +28,7 @@ static int previousCursor = SDL_ENABLE;
 static SDL_Rect previousMouseRect = {};
 static bool hadMouseRect = false;
 static NSArray* titles() { return @[@"Close Stream Window", @"Release / Capture Input", @"Full Screen", @"Statistics", @"Mouse Mode", @"Cursor Visibility", @"Minimize", @"Paste Clipboard", @"Pointer Region Lock", @"Disconnect and Exit", @"Keyboard Capture", @"Show / Hide Controls"]; }
-// Index 9 is the existing quit-and-exit action, not a host-game termination.
+// Index 9 also quits the host game; action 12 disconnects without forcing that.
 static void pushAction(int code) { if (actionEvent == (Uint32)-1) return; SDL_Event e = {}; e.type = actionEvent; e.user.code = code; SDL_PushEvent(&e); }
 
 // Keep keyboard focus and SDL cursor confinement on the stream. Native buttons
