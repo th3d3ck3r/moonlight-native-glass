@@ -230,8 +230,8 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 #ifdef Q_OS_MACOS
     if (nativeOverlayConfigured()) {
         int scan = (int)event->keysym.scancode;
-        if (scan >= 0 && scan < SDL_NUM_SCANCODES && m_NativeConsumedKeys[scan]) {
-            if (event->state == SDL_RELEASED) m_NativeConsumedKeys[scan] = false;
+        if (scan >= 0 && scan < SDL_NUM_SCANCODES &&
+            nativeOverlayConsumeKeyRelease(m_NativeConsumedKeys[scan], event->state)) {
             return;
         }
         int action = nativeOverlayShortcut(event);

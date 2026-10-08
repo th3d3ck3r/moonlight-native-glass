@@ -218,6 +218,13 @@ static MLOverlayController* controller;
 bool nativeOverlayControlsEnabled() { return [controller.defaults boolForKey:@"controlsEnabled"]; }
 bool nativeOverlayConfigured() { return configured.load(); }
 Uint32 nativeOverlayEventType() { return actionEvent; }
+bool nativeOverlayConsumeKeyRelease(bool& consumed, Uint8 state) {
+    if (!consumed) return false;
+    // A new non-repeated press starts a new cycle if focus loss dropped the
+    // previous release (for example, after the Minimize shortcut).
+    consumed = false;
+    return state == SDL_RELEASED;
+}
 int nativeOverlayShortcut(const SDL_KeyboardEvent* event) {
     if (!configured || event->repeat || event->state != SDL_PRESSED) return -1;
     int mods = event->keysym.mod;

@@ -9,3 +9,4 @@ void nativeOverlaySetControlsVisible(bool visible);
 bool nativeOverlayConfigured();
 int nativeOverlayShortcut(const SDL_KeyboardEvent* event);
 bool nativeOverlayControlsEnabled();
+bool nativeOverlayConsumeKeyRelease(bool& consumed, Uint8 state);

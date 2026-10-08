@@ -10,6 +10,11 @@ static void capture(NSString* path) { pump(); NSTask* task=[[[NSTask alloc] init
 int main(int argc,char** argv) { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching];
     SDL_SetMainReady(); check(SDL_Init(SDL_INIT_VIDEO)==0,"SDL initialization");
+    bool consumed = true;
+    check(!nativeOverlayConsumeKeyRelease(consumed,SDL_PRESSED) && !consumed,"New press after missing key-up must start a fresh cycle");
+    consumed = true;
+    check(nativeOverlayConsumeKeyRelease(consumed,SDL_RELEASED) && !consumed,"Consumed shortcut release must not reach the host");
+    check(!nativeOverlayConsumeKeyRelease(consumed,SDL_RELEASED),"Ordinary host key release must pass through");
     NSUserDefaults* defaults=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
     NSDictionary* previous=[[defaults persistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"] retain];
     [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [defaults setBool:YES forKey:@"controlsEnabled"]; [defaults synchronize];
