@@ -19,7 +19,7 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication()
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "preview-settings", withExtension: "json"))
-        let screens = ["main-light", "main-dark", "main-compact", "empty", "loading", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-input", "settings-network", "settings-advanced"]
+        let screens = ["main-light", "main-dark", "main-compact", "empty", "loading", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-input", "settings-network", "settings-advanced", "settings-shortcuts"]
         for screen in screens {
             app.launchArguments = ["--design-preview", "--settings-fixture=" + fixture.path, screen == "main-light" ? "--light" : "--dark"]
             if screen == "main-compact" { app.launchArguments.append("--compact") }
@@ -47,6 +47,10 @@ import XCTest
                 resolution.click()
                 app.menuItems["1080p"].click()
                 XCTAssertEqual(resolution.value as? String, "1080p")
+            }
+            if screen == "settings-shortcuts" {
+                XCTAssertTrue(window.staticTexts["Disconnect"].exists, "Shortcut bindings missing")
+                XCTAssertFalse(window.staticTexts["Enable Optional Control Bar"].exists, "Overlay controls must have their own tab")
             }
             // XCTest captures the composited UI, including system-owned glass.
             let screenshot = target.screenshot()

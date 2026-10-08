@@ -3,10 +3,10 @@ import SwiftUI
 import IOKit
 
 private enum SettingsPane: String, CaseIterable, Identifiable {
-    case video = "Video", audio = "Audio", input = "Input", network = "Network", advanced = "Advanced", overlay = "Overlay"
+    case video = "Video", audio = "Audio", input = "Input", network = "Network", advanced = "Advanced", overlay = "Overlay", shortcuts = "Shortcuts"
     var id: String { rawValue }
     var symbol: String {
-        switch self { case .video: "display"; case .audio: "speaker.wave.2"; case .input: "gamecontroller"; case .network: "network"; case .advanced: "slider.horizontal.3"; case .overlay: "rectangle.on.rectangle" }
+        switch self { case .video: "display"; case .audio: "speaker.wave.2"; case .input: "gamecontroller"; case .network: "network"; case .advanced: "slider.horizontal.3"; case .overlay: "rectangle.on.rectangle"; case .shortcuts: "keyboard" }
     }
     var keys: [String] {
         switch self {
@@ -14,7 +14,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         case .audio: ["audioConfig", "playAudioOnHost", "muteOnFocusLoss"]
         case .input: ["multiController", "gamepadMouse", "backgroundGamepad", "swapFaceButtons", "absoluteMouseMode", "absoluteTouchMode", "swapMouseButtons", "reverseScrollDirection", "captureSysKeysMode"]
         case .network: ["enableMdns", "detectNetworkBlocking", "connectionWarnings"]
-        case .overlay: []
+        case .overlay, .shortcuts: []
         case .advanced: ["gameOptimizations", "quitAppAfter", "configurationWarnings", "showPerformanceOverlay", "keepAwake", "unlockBitrate", "richPresence"]
         }
     }
@@ -30,11 +30,11 @@ struct NativeSettingsView: View {
             if store.preview { Label("Design preview · Sample settings", systemImage: "photo").font(.caption).foregroundStyle(.secondary).padding(.top, 10) }
             Picker("Settings", selection: $pane) { ForEach(SettingsPane.allCases) { Label($0.rawValue, systemImage: $0.symbol).tag($0) } }
                 .pickerStyle(.segmented).padding(20)
-            if store.fields.isEmpty && pane != .overlay {
+            if store.fields.isEmpty && pane != .overlay && pane != .shortcuts {
                 ContentUnavailableView("Settings Unavailable", systemImage: "gearshape", description: Text("Open the main window and connect to the streaming engine first."))
             } else {
                 Form {
-                    if pane != .overlay {
+                    if pane != .overlay && pane != .shortcuts {
                         Section(pane.rawValue) {
                             if pane == .video { resolutionPicker }
                             ForEach(pane.keys.compactMap { key in store.fields.first { $0.id == key } }) { field in preference(field) }
@@ -42,6 +42,7 @@ struct NativeSettingsView: View {
                         .disabled(!store.ready || store.streamActive || store.pairing != nil)
                     }
                     if pane == .overlay { OverlaySettings() }
+                    if pane == .shortcuts { ShortcutSettings() }
                     if pane == .video {
                         Section {
                             Text("Automatic selections use Moonlight Qt's normal capability checks. HDR and codecs depend on your Mac, display and host.").font(.callout).foregroundStyle(.secondary)
@@ -180,10 +181,7 @@ private struct OverlaySettings: View {
         for id in saved where (0..<11).contains(id) && !result.contains(id) { result.append(id) }
         return result
     }
-    @State private var shortcuts = (Self.defaults.dictionary(forKey: "shortcuts") as? [String: [String: Any]]) ?? [:]
-    @State private var shortcutError: String?
     private let names = ["Disconnect", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls"]
-    private let defaultKeys = Array("qzxsmcdvleko").map(String.init)
     var body: some View {
         Section("Statistics Overlay") {
             HStack { Text("Size"); Slider(value: $scale, in: 0.8...1.5, step: 0.05); Text("\(Int(scale * 100))%").monospacedDigit().frame(width: 46) }
@@ -195,7 +193,7 @@ private struct OverlaySettings: View {
         }
         Section("Stream Controls") {
             Toggle("Enable Optional Control Bar", isOn: $enabled)
-            Text("Show or hide it with Control–Option–Shift–O by default, or from the Moonlight menu bar menu. Showing controls temporarily releases captured input; Done restores it.").font(.caption).foregroundStyle(.secondary)
+            Text("Set its show/hide binding in Shortcuts, or use the Moonlight menu bar menu. Showing controls temporarily releases captured input; Done restores it.").font(.caption).foregroundStyle(.secondary)
             DisclosureGroup("Choose and Order Buttons") {
                 ForEach(buttons, id: \.self) { id in
                     HStack {
@@ -207,31 +205,56 @@ private struct OverlaySettings: View {
                 }
                 Menu("Add Button") { ForEach((0..<11).filter { !buttons.contains($0) }, id: \.self) { id in Button(names[id]) { buttons.append(id); saveButtons() } } }
             }
-            DisclosureGroup("Customize All Stream Shortcuts") {
-                ForEach(0..<12, id: \.self) { id in
-                    VStack(alignment: .leading) {
-                        Text(names[id])
-                        HStack {
-                            Picker("Modifiers", selection: Binding(get: { modifiers(id) }, set: { update(id, key: key(id), modifiers: $0) })) {
-                                Text("⌃⌥⇧").tag(7); Text("⌘⌥⇧").tag(14); Text("⌃⌥").tag(3); Text("⌘⌥").tag(10)
-                            }.labelsHidden()
-                            Picker("Key", selection: Binding(get: { key(id) }, set: { update(id, key: $0, modifiers: modifiers(id)) })) {
-                                ForEach(Array("abcdefghijklmnopqrstuvwxyz").map(String.init), id: \.self) { Text($0.uppercased()).tag($0) }
-                            }.labelsHidden()
-                        }
-                    }
-                }
-                if let shortcutError { Text(shortcutError).foregroundStyle(.red) }
-                Text("These shortcuts control Moonlight locally. Ordinary keys still go to your host. Duplicate bindings are rejected.").font(.caption).foregroundStyle(.secondary)
-            }
-            Button("Restore Overlay and Shortcut Defaults") {
-                scale = 1; position = "topLeft"; enabled = false; buttons = [2,3,1,6,7]; shortcuts = [:]
-                Self.defaults.removeObject(forKey: "shortcuts"); shortcutError = nil; saveButtons(); notify()
+            Button("Restore Overlay Defaults") {
+                scale = 1; position = "topLeft"; enabled = false; buttons = [2,3,1,6,7]
+                saveButtons(); notify()
             }
         }
         .onChange(of: scale) { _, _ in notify() }
         .onChange(of: position) { _, _ in notify() }
         .onChange(of: enabled) { _, _ in notify() }
+    }
+    private func move(_ id: Int, by delta: Int) {
+        guard let index = buttons.firstIndex(of: id), buttons.indices.contains(index + delta) else { return }
+        buttons.swapAt(index, index + delta); saveButtons()
+    }
+    private func saveButtons() { Self.defaults.set(buttons, forKey: "buttons"); notify() }
+    private func notify() {
+        Self.defaults.synchronize()
+        DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.moonlight-stream.NativeGlass.overlaySettingsChanged"), object: nil, userInfo: nil, deliverImmediately: true)
+    }
+}
+
+private struct ShortcutSettings: View {
+    private static let defaults = UserDefaults(suiteName: "com.moonlight-stream.NativeGlass.Overlay")!
+    @State private var shortcuts = (Self.defaults.dictionary(forKey: "shortcuts") as? [String: [String: Any]]) ?? [:]
+    @State private var shortcutError: String?
+    private let names = ["Disconnect", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls"]
+    private let defaultKeys = Array("qzxsmcdvleko").map(String.init)
+    var body: some View {
+        Section("Stream Shortcuts") {
+            ForEach(0..<12, id: \.self) { id in
+                VStack(alignment: .leading) {
+                    Text(names[id])
+                    HStack {
+                        Picker("Modifiers", selection: Binding(get: { modifiers(id) }, set: { update(id, key: key(id), modifiers: $0) })) {
+                            Text("⌃⌥⇧").tag(7); Text("⌘⌥⇧").tag(14); Text("⌃⌥").tag(3); Text("⌘⌥").tag(10)
+                        }.labelsHidden()
+                        Picker("Key", selection: Binding(get: { key(id) }, set: { update(id, key: $0, modifiers: modifiers(id)) })) {
+                            ForEach(Array("abcdefghijklmnopqrstuvwxyz").map(String.init), id: \.self) { Text($0.uppercased()).tag($0) }
+                        }.labelsHidden()
+                    }
+                }
+            }
+            if let shortcutError { Text(shortcutError).foregroundStyle(.red) }
+            Text("These shortcuts control Moonlight locally. Ordinary keys still go to your host. Duplicate bindings are rejected.").font(.caption).foregroundStyle(.secondary)
+        }
+        Section {
+            Button("Restore Shortcut Defaults") {
+                shortcuts = [:]; shortcutError = nil
+                Self.defaults.removeObject(forKey: "shortcuts"); notify()
+            }
+        }
     }
     private func key(_ id: Int) -> String { shortcuts[String(id)]?["key"] as? String ?? defaultKeys[id] }
     private func modifiers(_ id: Int) -> Int { shortcuts[String(id)]?["modifiers"] as? Int ?? 7 }
@@ -240,11 +263,6 @@ private struct OverlaySettings: View {
         shortcuts[String(id)] = ["key": key, "modifiers": modifiers]
         Self.defaults.set(shortcuts, forKey: "shortcuts"); shortcutError = nil; notify()
     }
-    private func move(_ id: Int, by delta: Int) {
-        guard let index = buttons.firstIndex(of: id), buttons.indices.contains(index + delta) else { return }
-        buttons.swapAt(index, index + delta); saveButtons()
-    }
-    private func saveButtons() { Self.defaults.set(buttons, forKey: "buttons"); notify() }
     private func notify() {
         Self.defaults.synchronize()
         DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.moonlight-stream.NativeGlass.overlaySettingsChanged"), object: nil, userInfo: nil, deliverImmediately: true)
