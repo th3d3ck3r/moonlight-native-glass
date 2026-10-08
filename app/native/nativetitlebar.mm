@@ -87,8 +87,12 @@ static MLStreamTitlebar* titlebar;
     }
     button.toolTip=labels[identifier]; [button setAccessibilityLabel:labels[identifier]];
     self.buttons[identifier]=button; item.view=button; item.label=labels[identifier]; item.paletteLabel=item.label;
-    item.minSize=NSMakeSize([identifier isEqual:hostID] ? 70 : button.frame.size.width,26);
-    item.maxSize=NSMakeSize([identifier isEqual:hostID] ? 230 : button.frame.size.width,26);
+    button.translatesAutoresizingMaskIntoConstraints=NO;
+    [NSLayoutConstraint activateConstraints:@[
+        [button.heightAnchor constraintEqualToConstant:26],
+        [button.widthAnchor constraintGreaterThanOrEqualToConstant:[identifier isEqual:hostID] ? 70 : button.frame.size.width],
+        [button.widthAnchor constraintLessThanOrEqualToConstant:[identifier isEqual:hostID] ? 230 : button.frame.size.width]
+    ]];
     item.visibilityPriority=[identifier isEqual:batteryID] ? NSToolbarItemVisibilityPriorityLow : NSToolbarItemVisibilityPriorityHigh;
     // Native overflow must invoke the same action, including custom view items.
     NSMenuItem* menu=[[[NSMenuItem alloc] initWithTitle:item.label action:@selector(overflowClicked:) keyEquivalent:@""] autorelease];
@@ -162,7 +166,7 @@ static MLStreamTitlebar* titlebar;
     NSImage* levelImage=[NSImage imageWithSystemSymbolName:batterySymbol accessibilityDescription:nil];
     NSImage* combined=[NSImage imageWithSize:NSMakeSize(38,18) flipped:NO drawingHandler:^BOOL(NSRect rect) {
         [controllerImage drawInRect:NSMakeRect(0,1,20,16)]; [levelImage drawInRect:NSMakeRect(23,4,15,10)]; return YES;
-    }]; combined.template=YES; battery.image=combined;
+    }]; [combined setTemplate:YES]; battery.image=combined;
     battery.contentTintColor=self.batteryLow ? NSColor.systemOrangeColor : NSColor.labelColor;
     battery.toolTip=self.batteryDetails; [battery setAccessibilityLabel:[@"Controller Battery · " stringByAppendingString:self.batteryDetails]];
     [self updateDetails];
