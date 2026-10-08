@@ -1,6 +1,7 @@
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
 #include "nativeoverlay.h"
+#include "nativetitlebar.h"
 #include <atomic>
 #include <mutex>
 #include <array>
@@ -233,8 +234,10 @@ int nativeOverlayShortcut(const SDL_KeyboardEvent* event) {
     for (int i=0;i<12;i++) if (bindings[i].key==event->keysym.sym && bindings[i].modifiers==normalized) return i;
     return -1;
 }
+void nativeOverlayPerformAction(int action) { pushAction(action); }
 bool nativeOverlayPresent(int type, bool enabled, const char* text) {
     if (!configured || type<0 || type>1) return false;
+    if (type==0) nativeTitlebarSetStatistics(enabled);
     std::lock_guard<std::mutex> lock(snapshotMutex); snapshots[type].enabled=enabled; SDL_strlcpy(snapshots[type].text,text ?: "",sizeof(snapshots[type].text));
     if (!updatePending) { updatePending=true; unsigned current=generation; dispatch_async(dispatch_get_main_queue(), ^{ { std::lock_guard<std::mutex> guard(snapshotMutex); if (generation!=current) return; updatePending=false; } [controller layoutPanels]; }); }
     return true;
@@ -244,10 +247,11 @@ void nativeOverlayAttach(void* window, const char* token) {
     nativeOverlayDetach();
     if (actionEvent==(Uint32)-1) { Uint32 base=SDL_RegisterEvents(2); actionEvent=base == (Uint32)-1 ? base : base+1; }
     controller=[[MLOverlayController alloc] init]; controller.parent=(NSWindow*)window; controller.token=[NSString stringWithUTF8String:token];
-    @try { [controller refresh]; configured=true; }
+    @try { [controller refresh]; nativeTitlebarAttach(window); configured=true; }
     @catch (NSException* error) { SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Native overlay unavailable: %s", error.reason.UTF8String); nativeOverlayDetach(); }
 }
 void nativeOverlayDetach() {
+    nativeTitlebarDetach();
     configured=false; { std::lock_guard<std::mutex> lock(snapshotMutex); generation++; updatePending=false; snapshots[0]={}; snapshots[1]={}; }
     if (actionEvent != (Uint32)-1) SDL_FlushEvent(actionEvent);
     // AppKit can retain notification targets until its current event drains.

@@ -10,3 +10,6 @@ bool nativeOverlayConfigured();
 int nativeOverlayShortcut(const SDL_KeyboardEvent* event);
 bool nativeOverlayControlsEnabled();
 bool nativeOverlayConsumeKeyRelease(bool& consumed, Uint8 state);
+
+// Queue an existing action on SDL's main event loop; never call input from AppKit.
+void nativeOverlayPerformAction(int action);

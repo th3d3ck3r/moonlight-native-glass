@@ -11,6 +11,7 @@ void configureNativeBackgroundApplication()
 #import <SDL_syswm.h>
 #include <cstdio>
 #include "nativeoverlay.h"
+#include "nativetitlebar.h"
 
 static NSString* const MLRestoreStreamWindow = @"com.moonlight-stream.NativeGlass.restoreStreamWindow";
 
@@ -116,6 +117,9 @@ static void sendWindowEvent(const char* event)
 static MLStreamWindowAccess* streamWindowAccess;
 void configureNativeStreamWindow(const char* token)
 {
+    nativeTitlebarSetCapture(false);
+    nativeTitlebarSetStatistics(false);
+    nativeTitlebarSetConnection(NativeConnectionState::Connecting);
     streamWindowAccess = [[MLStreamWindowAccess alloc] init];
     streamWindowAccess.token = [NSString stringWithUTF8String:token];
     [[NSNotificationCenter defaultCenter] addObserver:streamWindowAccess selector:@selector(windowBecameKey:)

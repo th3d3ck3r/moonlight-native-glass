@@ -6,6 +6,9 @@
 #include "utils.h"
 
 #include <QtGlobal>
+#ifdef Q_OS_MACOS
+#include "native/nativetitlebar.h"
+#endif
 #include <QDir>
 #include <QGuiApplication>
 
@@ -402,6 +405,9 @@ void SdlInputHandler::setCaptureActive(bool active)
 
     // Now update the keyboard grab
     updateKeyboardGrabState();
+#ifdef Q_OS_MACOS
+    nativeTitlebarSetCapture(isCaptureActive());
+#endif
 }
 
 void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)

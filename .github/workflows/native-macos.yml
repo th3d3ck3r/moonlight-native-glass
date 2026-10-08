@@ -43,7 +43,7 @@ jobs:
           python3 setup-deps.py
           mkdir -p build/overlay-previews
           xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
-            app/native/nativeoverlay.mm tests/native/OverlayTests.mm \
+            app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/OverlayTests.mm \
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/overlay-tests
           build/overlay-tests build/overlay-previews
@@ -73,7 +73,7 @@ jobs:
         if: matrix.architecture == 'universal'
         run: |
           xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 \
-            app/native/nativeapplication.mm app/native/nativeoverlay.mm tests/native/StreamWindowTests.mm \
+            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
           build/stream-window-tests
@@ -84,13 +84,13 @@ jobs:
           build/status-icon-tests macos-native/Resources
       - name: Package preview artifact
         run: |
-          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-8-${{ matrix.architecture }}.zip'
-          shasum -a 256 'build/Moonlight-Native-Glass-Preview-8-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
+          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-9-${{ matrix.architecture }}.zip'
+          shasum -a 256 'build/Moonlight-Native-Glass-Preview-9-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
       - uses: actions/upload-artifact@v6
         with:
-          name: Native-Glass-Preview-8-${{ matrix.architecture }}
+          name: Native-Glass-Preview-9-${{ matrix.architecture }}
           path: |
-            build/Moonlight-Native-Glass-Preview-8-${{ matrix.architecture }}.zip
+            build/Moonlight-Native-Glass-Preview-9-${{ matrix.architecture }}.zip
             build/SHA256-${{ matrix.architecture }}.txt
           if-no-files-found: error
 

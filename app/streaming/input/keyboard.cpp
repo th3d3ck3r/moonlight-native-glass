@@ -189,8 +189,10 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
 #ifdef Q_OS_MACOS
 void SdlInputHandler::handleNativeOverlayAction(int action)
 {
-    if (action == 100) {
-        if (!m_NativeControlsVisible && !nativeOverlayControlsEnabled()) return;
+    if (action == 100 || action == 102) {
+        // The title-bar name is an explicit controls entry point even when the
+        // optional automatic/shortcut controls setting is disabled.
+        if (action != 102 && !m_NativeControlsVisible && !nativeOverlayControlsEnabled()) return;
         if (!m_NativeControlsVisible) {
             m_NativeCaptureBeforeControls = isCaptureActive();
             setCaptureActive(false); raiseAllKeys();

@@ -2,14 +2,29 @@
 #import <SDL.h>
 #import <SDL_syswm.h>
 #include "nativeoverlay.h"
+#include "nativetitlebar.h"
 #include <cstdio>
 #include <cstdlib>
 static void check(bool okay,const char* message) { if (!okay) { fprintf(stderr,"FAIL: %s\n",message); exit(1); } }
 static void pump() { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:.2]; while (end.timeIntervalSinceNow>0) { SDL_PumpEvents(); [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; } }
+static NSToolbarItem* toolbarItem(NSWindow* window, NSString* identifier) {
+    for (NSToolbarItem* item in window.toolbar.items) if ([item.itemIdentifier isEqual:identifier]) return item;
+    return nil;
+}
+static bool hasLabel(NSView* view, NSString* text) {
+    if ([view isKindOfClass:NSTextField.class] && [((NSTextField*)view).stringValue containsString:text]) return true;
+    for (NSView* child in view.subviews) if (hasLabel(child,text)) return true;
+    return false;
+}
+static bool takeAction(int code) {
+    SDL_Event event; bool found=false;
+    while (SDL_PollEvent(&event)) if (event.type==nativeOverlayEventType() && event.user.code==code) found=true;
+    return found;
+}
 static void capture(NSString* path) { pump(); NSTask* task=[[[NSTask alloc] init] autorelease]; task.launchPath=@"/usr/sbin/screencapture"; task.arguments=@[@"-x",path]; [task launch]; [task waitUntilExit]; check(task.terminationStatus==0,"Composited capture failed"); }
 int main(int argc,char** argv) { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching];
-    SDL_SetMainReady(); check(SDL_Init(SDL_INIT_VIDEO)==0,"SDL initialization");
+    SDL_SetMainReady(); check(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER)==0,"SDL initialization");
     bool consumed = true;
     check(!nativeOverlayConsumeKeyRelease(consumed,SDL_PRESSED) && !consumed,"New press after missing key-up must start a fresh cycle");
     consumed = true;
@@ -29,6 +44,38 @@ int main(int argc,char** argv) { @autoreleasepool {
     pump(); [window makeKeyAndOrderFront:nil]; pump();
     check(NSApp.keyWindow==window,"Fixture must own keyboard focus before overlay attachment");
     nativeOverlayAttach(window,"overlay-test"); check(nativeOverlayEventType()!=SDL_USEREVENT,"Must not consume upstream SDL user events");
+    check(window.toolbar!=nil && window.titleVisibility==NSWindowTitleHidden,"Native compact title toolbar installed");
+    check(toolbarItem(window,@"NativeHost") && toolbarItem(window,@"NativeCapture") && toolbarItem(window,@"NativeStatistics") && toolbarItem(window,@"NativeConnection"),"Required title-bar controls");
+    check(!toolbarItem(window,@"NativeControllerBattery"),"Controller indicator hidden when none connected");
+    NSButton* host=(NSButton*)toolbarItem(window,@"NativeHost").view;
+    check([host.title isEqual:window.title] && host.imagePosition==NSImageRight,"Computer name and chevron retained");
+    [host performClick:nil]; check(takeAction(102),"Computer name queues controls action, not statistics");
+    NSButton* captureButton=(NSButton*)toolbarItem(window,@"NativeCapture").view;
+    [captureButton performClick:nil]; check(takeAction(1),"Title capture uses original SDL action");
+    NSButton* statisticsButton=(NSButton*)toolbarItem(window,@"NativeStatistics").view;
+    [statisticsButton performClick:nil]; check(takeAction(3),"Title statistics uses original SDL action");
+    nativeTitlebarSetCapture(true); pump(); check([captureButton.toolTip containsString:@"captured by host"],"Capture state refresh");
+    nativeTitlebarSetCapture(false); pump(); check([captureButton.toolTip containsString:@"released to Mac"],"Capture release refresh");
+    NSButton* connectionButton=(NSButton*)toolbarItem(window,@"NativeConnection").view;
+    nativeTitlebarSetConnection(NativeConnectionState::Connecting); pump(); check([connectionButton.toolTip containsString:@"Connecting"],"Connecting state");
+    nativeTitlebarSetConnection(NativeConnectionState::Connected); pump(); check([connectionButton.toolTip containsString:@"No connection warning"],"Connected state");
+    nativeTitlebarSetConnection(NativeConnectionState::Poor); pump(); check([connectionButton.toolTip containsString:@"poor connection"],"Poor state");
+    nativeTitlebarSetConnection(NativeConnectionState::Disconnected); pump(); check([connectionButton.toolTip containsString:@"lost or failed"],"Disconnected state");
+    nativeTitlebarSetConnection(NativeConnectionState::Idle); pump(); check([connectionButton.toolTip containsString:@"No stream connection"],"Idle state");
+    nativeTitlebarSetConnection(NativeConnectionState::Connected); pump();
+    // An actual virtual SDL controller exercises appearance/removal without
+    // opening hardware from the title-bar implementation.
+    int device=SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER,6,16,0);
+    check(device>=0,"Virtual controller creation");
+    SDL_GameController* virtualController=SDL_GameControllerOpen(device); check(virtualController!=nullptr,"Virtual controller open");
+    nativeTitlebarControllersChanged(); pump();
+    check(toolbarItem(window,@"NativeControllerBattery")!=nil,"Controller indicator appears after connection");
+    NSButton* batteryButton=(NSButton*)toolbarItem(window,@"NativeControllerBattery").view;
+    check([batteryButton.toolTip containsString:@"unavailable"],"Unknown charge is not fabricated");
+    [connectionButton performClick:nil]; pump();
+    bool foundDetails=false; for (NSWindow* candidate in NSApp.windows) if (candidate.visible && hasLabel(candidate.contentView,@"not latency or frame pacing")) foundDetails=true;
+    check(foundDetails,"Connection popover contains accurate state explanation");
+    [connectionButton performClick:nil]; pump();
     const char* sample="Video stream: 1920x1080 60 FPS\nVideo codec: H.264\nIncoming frame rate: 59.98 FPS\nRendering frame rate: 59.98 FPS\nFrames dropped by network: 0.00%\nAverage network latency: 2 ms\nAverage decoding time: 1.2 ms\nAverage frame queue delay: 0.4 ms\nAverage rendering time: 0.8 ms";
     check(nativeOverlayPresent(0,true,sample),"Native statistics ownership"); check(nativeOverlayPresent(1,true,"Design preview · Sample values"),"Status ownership"); pump();
     fprintf(stderr,"Overlay children=%lu visible=%d configured=%d\n",(unsigned long)window.childWindows.count,window.visible,nativeOverlayConfigured());
@@ -53,6 +100,10 @@ int main(int argc,char** argv) { @autoreleasepool {
     nativeOverlaySetControlsVisible(true); pump(); check(window.childWindows.count==3,"Separate controls surface");
     for (NSWindow* panel in window.childWindows) check(panel.visible && (panel.occlusionState & NSWindowOcclusionStateVisible),"Showing controls must keep all overlays unobscured");
     capture([out stringByAppendingPathComponent:@"overlay-controls-dark.png"]);
+    [batteryButton performClick:nil]; pump(); capture([out stringByAppendingPathComponent:@"titlebar-controller-details.png"]);
+    [batteryButton performClick:nil]; pump();
+    SDL_GameControllerClose(virtualController); SDL_JoystickDetachVirtual(device); nativeTitlebarControllersChanged(); pump();
+    check(!toolbarItem(window,@"NativeControllerBattery"),"Controller indicator removed after disconnect");
     [defaults setDouble:1.5 forKey:@"scale"]; [defaults setObject:@"bottomRight" forKey:@"position"]; [defaults synchronize];
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES];
     [window setContentSize:NSMakeSize(640,360)]; pump();
@@ -68,7 +119,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     [window setContentSize:NSMakeSize(320,300)]; pump();
     bounds=[window convertRectToScreen:window.contentView.bounds];
     for (NSWindow* panel in window.childWindows) check(NSContainsRect(bounds,panel.frame),"Every panel must fit after controls shrink with all actions selected");
-    nativeOverlayDetach(); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
+    nativeOverlayDetach(); check(window.toolbar==nil && window.titleVisibility==NSWindowTitleVisible,"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
     nativeOverlayAttach(window,"next-session"); check(nativeOverlayConfigured(),"Repeated session attachment"); nativeOverlayDetach();
     if (previous) [defaults setPersistentDomain:previous forName:@"com.moonlight-stream.NativeGlass.Overlay"]; else [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [previous release]; [defaults synchronize];
     SDL_DestroyWindow(stream); SDL_Quit(); puts("Native overlay state, all shortcuts, layout, focus, teardown and preview checks passed"); return 0;

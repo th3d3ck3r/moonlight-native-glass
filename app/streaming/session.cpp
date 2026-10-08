@@ -1,6 +1,7 @@
 #include "session.h"
 #ifdef Q_OS_MACOS
 #include "native/nativeoverlay.h"
+#include "native/nativetitlebar.h"
 #endif
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
@@ -79,6 +80,9 @@ void Session::clStageStarting(int stage)
 
 void Session::clStageFailed(int stage, int errorCode)
 {
+#ifdef Q_OS_MACOS
+    nativeTitlebarSetConnection(NativeConnectionState::Disconnected);
+#endif
     // Perform the port test now, while we're on the async connection thread and not blocking the UI.
     unsigned int portFlags = LiGetPortFlagsFromStage(stage);
     s_ActiveSession->m_PortTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443, portFlags);
@@ -90,6 +94,9 @@ void Session::clStageFailed(int stage, int errorCode)
 
 void Session::clConnectionTerminated(int errorCode)
 {
+#ifdef Q_OS_MACOS
+    nativeTitlebarSetConnection(errorCode == ML_ERROR_GRACEFUL_TERMINATION ? NativeConnectionState::Idle : NativeConnectionState::Disconnected);
+#endif
     unsigned int portFlags = LiGetPortFlagsFromTerminationErrorCode(errorCode);
     s_ActiveSession->m_PortTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443, portFlags);
 
@@ -178,6 +185,11 @@ void Session::clConnectionStatusUpdate(int connectionStatus)
                 "Connection status update: %d",
                 connectionStatus);
 
+    // The title-bar indicator is independent of the optional text warning.
+#ifdef Q_OS_MACOS
+    if (connectionStatus == CONN_STATUS_POOR || connectionStatus == CONN_STATUS_OKAY)
+        nativeTitlebarSetConnection(connectionStatus == CONN_STATUS_POOR ? NativeConnectionState::Poor : NativeConnectionState::Connected);
+#endif
     if (!s_ActiveSession->m_Preferences->connectionWarnings) {
         return;
     }
@@ -1715,6 +1727,10 @@ bool Session::startConnectionAsync()
         return false;
     }
 
+
+#ifdef Q_OS_MACOS
+    nativeTitlebarSetConnection(NativeConnectionState::Connected);
+#endif
     emit connectionStarted();
     return true;
 }
@@ -2291,11 +2307,17 @@ void Session::exec()
 #if SDL_VERSION_ATLEAST(2, 24, 0)
         case SDL_JOYBATTERYUPDATED:
             m_InputHandler->handleJoystickBatteryEvent(&event.jbattery);
+#ifdef Q_OS_MACOS
+            nativeTitlebarControllersChanged();
+#endif
             break;
 #endif
         case SDL_CONTROLLERDEVICEADDED:
         case SDL_CONTROLLERDEVICEREMOVED:
             m_InputHandler->handleControllerDeviceEvent(&event.cdevice);
+#ifdef Q_OS_MACOS
+            nativeTitlebarControllersChanged();
+#endif
             break;
         case SDL_JOYDEVICEADDED:
             m_InputHandler->handleJoystickArrivalEvent(&event.jdevice);
