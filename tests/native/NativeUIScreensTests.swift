@@ -2,13 +2,17 @@ import XCTest
 
 @MainActor final class NativeUIScreensTests: XCTestCase {
     func testOverlaySettings() throws {
+        continueAfterFailure = false
         let app = XCUIApplication()
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "preview-settings", withExtension: "json"))
         app.launchArguments = ["--design-preview", "--settings-fixture=" + fixture.path, "--preview-screen=settings-overlay", "--dark"]
         app.launch()
         let window = app.windows["native-settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        let customization = window.descendants(matching: .any)["overlay-button-customization"].firstMatch
+        // As in the other Settings captures, activate the window before the
+        // first control click; AppKit otherwise uses that click for activation.
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.025)).click()
+        let customization = window.disclosureTriangles["overlay-button-customization"]
         for _ in 0..<8 { if customization.isHittable { break }; window.scrollViews.firstMatch.swipeUp() }
         XCTAssertTrue(customization.exists, "Control bar customization missing")
         customization.click()
