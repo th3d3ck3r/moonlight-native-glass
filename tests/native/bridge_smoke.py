@@ -7,14 +7,16 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 
 executable = sys.argv[1]
 
 class Bridge:
     def __init__(self, root, test_mode=True):
         self.events = queue.Queue()
+        self.diagnostics = tempfile.TemporaryFile(mode="w+t")
         self.p = subprocess.Popen([executable, "native"] + (["test"] if test_mode else []), stdin=subprocess.PIPE,
-                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                  stdout=subprocess.PIPE, stderr=self.diagnostics,
                                   env={**os.environ, "MOONLIGHT_NATIVE_TEST_ROOT": root}, text=True)
         def read():
             for line in self.p.stdout:
@@ -40,6 +42,27 @@ class Bridge:
         if self.p.poll() is None:
             self.send({"command": "shutdown"})
             self.p.wait(timeout=30)
+        if self.p.returncode != 0:
+            self.diagnostics.seek(0)
+            print("HELPER STDERR:", self.diagnostics.read(), flush=True)
+            reports = pathlib.Path.home() / "Library/Logs/DiagnosticReports"
+            for _ in range(10):
+                matches = sorted(reports.glob("Moonlight*.ips"), key=lambda p: p.stat().st_mtime, reverse=True)
+                found = False
+                for report in matches[:5]:
+                    raw = report.read_text()
+                    try:
+                        crash = json.loads(raw.split("\n", 1)[1])
+                    except (ValueError, IndexError):
+                        continue
+                    if crash.get("pid") == self.p.pid:
+                        print("HELPER CRASH REPORT:", raw, flush=True)
+                        found = True
+                        break
+                if found:
+                    break
+                time.sleep(1)
+        self.diagnostics.close()
         assert self.p.returncode == 0, self.p.returncode
 
 with tempfile.TemporaryDirectory() as root:

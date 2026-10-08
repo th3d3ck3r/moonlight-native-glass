@@ -121,7 +121,7 @@ jobs:
   native-windows:
     name: Native UI window smoke test
     runs-on: macos-26
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: maxim-lobanov/setup-xcode@v1
