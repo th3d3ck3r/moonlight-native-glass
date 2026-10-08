@@ -158,4 +158,12 @@ with tempfile.TemporaryDirectory() as root:
             assert live.wait("hosts")["hosts"] == []
     finally:
         live.close()
+    for cycle in range(8):
+        repeated = Bridge(root, test_mode=(cycle % 2 == 0))
+        try:
+            repeated.wait("ready")
+            assert repeated.wait("settings")["values"]["enableMdns"] is False
+            assert repeated.wait("hosts")["hosts"] == []
+        finally:
+            repeated.close()
 print("PASS: adapter startup, every setting schema/type, enum choices, Boolean roundtrip, atomic validation, persistence, invalid address/stale host recovery, correlated pause/resume replies")
