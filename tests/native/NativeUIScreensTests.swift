@@ -18,7 +18,8 @@ import XCTest
         // Its observed AX frame includes the label and left form padding.
         // Clicking the label center does not toggle the native disclosure;
         // target the arrow, 26 points from that frame's leading edge.
-        customization.coordinate(withOffset: CGVector(dx: 26, dy: 8)).click()
+        customization.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            .withOffset(CGVector(dx: 26, dy: 8)).click()
         XCTAssertTrue(window.descendants(matching: .any)["Add Button"].firstMatch.waitForExistence(timeout: 5), "Control bar customization must expand")
         let shot = XCTAttachment(screenshot: window.screenshot()); shot.name = "settings-overlay"; shot.lifetime = .keepAlways; add(shot)
         app.terminate()
