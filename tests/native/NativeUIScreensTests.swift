@@ -116,9 +116,12 @@ import XCTest
         // Any coordinate rooted in Dock asks XCTest to activate that system
         // process. Read its icon frame, but synthesize from our app instead.
         let target = icon.frame
-        let origin = app.frame.origin
-        app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: target.midX - origin.x, dy: target.midY - origin.y)).click()
+        let anchor = app.descendants(matching: .any)["native-status-item"]
+        XCTAssertTrue(anchor.waitForExistence(timeout: 5))
+        let origin = anchor.frame
+        XCTAssertTrue(target.midX.isFinite && target.midY.isFinite && origin.midX.isFinite && origin.midY.isFinite)
+        anchor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .withOffset(CGVector(dx: target.midX - origin.midX, dy: target.midY - origin.midY)).click()
         XCTAssertTrue(window.waitForExistence(timeout: 5), "Dock click must reopen the library when no stream window exists")
         app.terminate()
         app.launch()
