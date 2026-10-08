@@ -9,6 +9,8 @@ void nativeOverlaySetControlsVisible(bool visible);
 // Temporary local cursor ownership while Control Center is open.
 void nativeOverlayBeginControlsInput(SDL_Window* window);
 void nativeOverlayEndControlsInput();
+// Re-establish SDL's mouse focus after an AppKit child panel is dismissed.
+void nativeOverlayRestoreStreamFocus(SDL_Window* window);
 bool nativeOverlayConfigured();
 int nativeOverlayShortcut(const SDL_KeyboardEvent* event);
 bool nativeOverlayControlsEnabled();

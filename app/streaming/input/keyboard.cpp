@@ -191,11 +191,10 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
 void SdlInputHandler::handleNativeOverlayAction(int action)
 {
     if (action == 100 || action == 102) {
-        // The title-bar name is an explicit controls entry point even when the
-        // optional automatic/shortcut controls setting is disabled.
-        if (action != 102 && !m_NativeControlsVisible && !nativeOverlayControlsEnabled()) return;
+        // Keyboard, title bar and menu requests are all explicit entry points.
+        // The optional presentation setting must not disable these actions.
         if (!m_NativeControlsVisible) {
-            m_NativeCaptureBeforeControls = isCaptureActive();
+            m_NativeCaptureBeforeControls = isCaptureActive() || m_NativeCaptureBeforeFocusLoss;
             // Release held host buttons before local overlay interaction.
             for (int button : {BUTTON_LEFT, BUTTON_MIDDLE, BUTTON_RIGHT, BUTTON_X1, BUTTON_X2})
                 LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, button);
@@ -204,7 +203,10 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
             nativeOverlayBeginControlsInput(m_Window);
         } else {
             m_NativeControlsVisible = false;
+            nativeOverlaySetControlsVisible(false);
             nativeOverlayEndControlsInput();
+            setCaptureActive(false);
+            if (m_NativeCaptureBeforeControls) nativeOverlayRestoreStreamFocus(m_Window);
             setCaptureActive(m_NativeCaptureBeforeControls);
         }
         nativeOverlaySetControlsVisible(m_NativeControlsVisible);
@@ -214,6 +216,8 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
         m_NativeControlsVisible = false;
         nativeOverlaySetControlsVisible(false);
         nativeOverlayEndControlsInput();
+        setCaptureActive(false);
+        if (m_NativeCaptureBeforeControls) nativeOverlayRestoreStreamFocus(m_Window);
         setCaptureActive(m_NativeCaptureBeforeControls);
     }
     if (action == 12) {

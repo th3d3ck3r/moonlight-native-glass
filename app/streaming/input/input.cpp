@@ -279,6 +279,15 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 
 void SdlInputHandler::notifyFocusLost()
 {
+#ifdef Q_OS_MACOS
+    // Native controls may restore focus before an older SDL focus-loss event
+    // drains. That stale event must not release newly restored capture.
+    if (nativeOverlayConfigured() && SDL_GetKeyboardFocus() == m_Window) {
+        raiseAllKeys();
+        return;
+    }
+    const bool captureBeforeFocusLoss = isCaptureActive();
+#endif
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
     // This lets user to interact with our window's title bar and with the buttons in it.
     // Doing this while the window is full-screen breaks the transition out of FS
@@ -286,6 +295,9 @@ void SdlInputHandler::notifyFocusLost()
     if (!(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN) && !m_AbsoluteMouseMode) {
         setCaptureActive(false);
     }
+#ifdef Q_OS_MACOS
+    m_NativeCaptureBeforeFocusLoss = captureBeforeFocusLoss;
+#endif
 
     // Raise all keys that are currently pressed. If we don't do this, certain keys
     // used in shortcuts that cause focus loss (such as Alt+Tab) may get stuck down.
@@ -362,6 +374,7 @@ void SdlInputHandler::setCaptureActive(bool active)
 #ifdef Q_OS_MACOS
     // Window/decoder events must not hide or recapture the local control cursor.
     if (active && m_NativeControlsVisible) return;
+    m_NativeCaptureBeforeFocusLoss = false;
 #endif
     if (active) {
         // If we're in relative mode, try to activate SDL's relative mouse mode

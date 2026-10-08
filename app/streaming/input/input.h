@@ -162,6 +162,7 @@ private:
 #ifdef Q_OS_MACOS
     bool m_NativeControlsVisible = false;
     bool m_NativeCaptureBeforeControls = false;
+    bool m_NativeCaptureBeforeFocusLoss = false;
     bool m_NativeConsumedKeys[SDL_NUM_SCANCODES] = {};
 #endif
     enum KeyCombo {

@@ -96,6 +96,8 @@ int main(int argc,char** argv) { @autoreleasepool {
     }
     check(NSApp.keyWindow==window,"Passive overlay must not steal focus");
     SDL_KeyboardEvent key={}; key.state=SDL_PRESSED; key.keysym.sym=SDLK_o; key.keysym.mod=KMOD_LCTRL|KMOD_LALT|KMOD_LSHIFT;
+    [defaults setBool:NO forKey:@"controlsEnabled"]; [defaults synchronize];
+    [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
     check(nativeOverlayShortcut(&key)==11,"Default controls shortcut");
     for (int i=0;i<13;i++) { key.keysym.sym="qzxsmcdvlekob"[i]; check(nativeOverlayShortcut(&key)==i,"Every existing shortcut and plain Disconnect must resolve"); }
     key.keysym.mod=KMOD_LCTRL; check(nativeOverlayShortcut(&key)==-1,"Normal host keys must not be consumed");

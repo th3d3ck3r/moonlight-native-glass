@@ -99,6 +99,22 @@ int main(int argc, char** argv) {
         nativeWindow=cocoa(window);
         // Keep the title toolbar and customizable overlays in an accessory app.
         check(nativeWindow.toolbar!=nil,"Single-Dock engine lost title-bar controls");
+        NSButton* hostButton=nil;
+        for (NSToolbarItem* item in nativeWindow.toolbar.items)
+            if ([item.itemIdentifier isEqual:@"NativeHost"]) hostButton=(NSButton*)item.view;
+        check(hostButton!=nil,"Missing computer-name Control Center entry");
+        // Unlike performClick:, these events exercise AppKit's button tracking
+        // loop and SDL's title-bar focus-click bookkeeping.
+        NSPoint click=[hostButton convertPoint:NSMakePoint(NSMidX(hostButton.bounds),NSMidY(hostButton.bounds)) toView:nil];
+        for (NSEventType type : {NSEventTypeLeftMouseDown,NSEventTypeLeftMouseUp}) {
+            NSEvent* event=[NSEvent mouseEventWithType:type location:click modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:nativeWindow.windowNumber context:nil eventNumber:1 clickCount:1 pressure:0];
+            [NSApp postEvent:event atStart:NO];
+        }
+        pump();
+        bool opened=false; SDL_Event nativeAction;
+        while (SDL_PollEvent(&nativeAction))
+            if (nativeAction.type==nativeOverlayEventType() && nativeAction.user.code==102) opened=true;
+        check(opened,"Real title-bar click must queue Control Center");
         for (Uint32 mode : {Uint32(0), Uint32(SDL_WINDOW_FULLSCREEN_DESKTOP), Uint32(SDL_WINDOW_FULLSCREEN)}) {
             check(SDL_SetWindowFullscreen(window,mode)==0,"Fullscreen title-bar transition"); pump(1.0);
             check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
@@ -109,8 +125,19 @@ int main(int argc, char** argv) {
             check(SDL_GetKeyboardFocus()==window,"Controls must preserve SDL keyboard focus");
             nativeOverlaySetControlsVisible(false); nativeOverlayEndControlsInput();
             check(!SDL_GetWindowMouseGrab(window) && SDL_ShowCursor(SDL_QUERY)==SDL_DISABLE,"Controls dismissal must restore the prior pointer state");
+            // Reproduce a native panel/menu leaving SDL's mouse focus outside
+            // the parent stream. Use the production focus restoration helper,
+            // not just SDL's relative-mode boolean (which can mask this bug).
+            NSWindow* other=[[NSWindow alloc] initWithContentRect:NSMakeRect(5,5,80,80) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+            [other makeKeyAndOrderFront:nil]; pump();
+            SDL_WarpMouseGlobal(0,0); pump();
+            nativeOverlayRestoreStreamFocus(window);
+            check(SDL_GetKeyboardFocus()==window && SDL_GetMouseFocus()==window,"Done must restore both keyboard and mouse focus to the stream");
             check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Relative capture must still work after controls");
+            pump();
+            check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Capture must survive the native event queue after Done");
             SDL_SetRelativeMouseMode(SDL_FALSE); SDL_ShowCursor(SDL_ENABLE);
+            [other orderOut:nil]; [other release];
             SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);
             check(nativeHideStreamWindow(window),"Close shortcut could not hide the existing stream window"); pump(1.0);
             check(!cocoa(window).visible && SDL_GetWindowFromID(windowID)==window,"Close shortcut must hide rather than destroy the stream window");

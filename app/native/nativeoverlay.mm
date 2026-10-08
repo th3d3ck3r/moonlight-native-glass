@@ -2,6 +2,7 @@
 #import <QuartzCore/QuartzCore.h>
 #include "nativeoverlay.h"
 #include "nativetitlebar.h"
+#include <SDL_syswm.h>
 #include <atomic>
 #include <mutex>
 #include <array>
@@ -107,7 +108,7 @@ static MLOverlayController* controller;
     if (self.showingControls && [n.name isEqualToString:NSWindowDidResizeNotification]) [self refresh];
     else [self layoutPanels];
 }
-- (void)settingsChanged:(NSNotification*)n { [self.defaults synchronize]; if (self.showingControls && ![self.defaults boolForKey:@"controlsEnabled"]) pushAction(101); [self refresh]; }
+- (void)settingsChanged:(NSNotification*)n { [self.defaults synchronize]; [self refresh]; }
 - (void)accessibilityChanged:(NSNotification*)n { [self refresh]; }
 - (void)toggleControls:(NSNotification*)n { if ([n.object isEqual:self.token]) pushAction(100); }
 - (void)action:(NSButton*)sender { pushAction((int)sender.tag); }
@@ -291,4 +292,19 @@ void nativeOverlayEndControlsInput() {
         SDL_ShowCursor(previousCursor);
     }
     controlsWindow=nullptr; controlsWindowID=0;
+}
+void nativeOverlayRestoreStreamFocus(SDL_Window* window) {
+    if (!window || (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN)) return;
+    SDL_SysWMinfo info; SDL_VERSION(&info.version);
+    if (!SDL_GetWindowWMInfo(window,&info)) return;
+    [NSApp activateIgnoringOtherApps:YES];
+    [info.info.cocoa.window makeKeyAndOrderFront:nil];
+    SDL_RaiseWindow(window);
+    // AppKit child-window mouse tracking can leave SDL's mouse focus outside
+    // the stream. Warp while relative mode is OFF so SDL updates that focus
+    // before the input handler reacquires relative mode. Do not retain a panel
+    // click's position as the remote cursor position.
+    int width=0,height=0; SDL_GetWindowSize(window,&width,&height);
+    SDL_WarpMouseInWindow(window,width/2,height/2);
+    SDL_PumpEvents();
 }

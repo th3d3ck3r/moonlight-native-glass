@@ -15,6 +15,25 @@ static std::mutex stateMutex;
 static unsigned epoch=0;
 static bool pending=false;
 
+// SDL's Cocoa backend observes title-bar mouse-down before AppKit starts a
+// button's tracking loop. AppKit consumes the matching mouse-up inside that
+// loop, so return a title-bar release to SDL's normal event pump afterwards.
+// Otherwise SDL keeps its focus-click-pending flag and disables confinement.
+@interface MLStreamToolbarButton : NSButton
+@end
+@implementation MLStreamToolbarButton
+- (void)mouseDown:(NSEvent*)event {
+    [super mouseDown:event];
+    if (([NSEvent pressedMouseButtons] & 1) == 0) {
+        NSEvent* release=[NSEvent mouseEventWithType:NSEventTypeLeftMouseUp
+            location:event.locationInWindow modifierFlags:event.modifierFlags
+            timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:event.windowNumber
+            context:nil eventNumber:event.eventNumber clickCount:event.clickCount pressure:0];
+        [NSApp postEvent:release atStart:YES];
+    }
+}
+@end
+
 static NSString* connectionDescription(NativeConnectionState value) {
     switch (value) {
         case NativeConnectionState::Idle: return @"No stream connection";
@@ -77,7 +96,7 @@ static MLStreamTitlebar* titlebar;
 - (NSToolbarItem*)toolbar:(NSToolbar*)toolbar itemForItemIdentifier:(NSString*)identifier willBeInsertedIntoToolbar:(BOOL)inserted {
     NSToolbarItem* item=[[[NSToolbarItem alloc] initWithItemIdentifier:identifier] autorelease];
     NSDictionary* labels=@{captureID:@"Release / Capture Input",hostID:@"Control Center",statisticsID:@"Show / Hide Statistics",batteryID:@"Controller Battery",connectionID:@"Connection Status"};
-    NSButton* button=[NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"circle" accessibilityDescription:labels[identifier]] target:self action:@selector(clicked:)];
+    NSButton* button=[MLStreamToolbarButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"circle" accessibilityDescription:labels[identifier]] target:self action:@selector(clicked:)];
     button.bordered=NO; button.bezelStyle=NSBezelStyleTexturedRounded;
     button.frame=NSMakeRect(0,0,[identifier isEqual:hostID] ? 180 : ([identifier isEqual:batteryID] ? 42 : 28),26);
     if ([identifier isEqual:hostID]) {

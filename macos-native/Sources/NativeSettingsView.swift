@@ -173,7 +173,6 @@ private struct OverlaySettings: View {
     private static let defaults = UserDefaults(suiteName: "com.moonlight-stream.NativeGlass.Overlay")!
     @AppStorage("scale", store: Self.defaults) private var scale = 1.0
     @AppStorage("position", store: Self.defaults) private var position = "topLeft"
-    @AppStorage("controlsEnabled", store: Self.defaults) private var enabled = false
     @State private var buttons = Self.savedButtons()
     private static func savedButtons() -> [Int] {
         guard let saved = defaults.array(forKey: "buttons") as? [Int] else { return [2,3,1,6,7] }
@@ -192,7 +191,6 @@ private struct OverlaySettings: View {
             Text("Statistics resize with the stream window and remain click-through.").font(.caption).foregroundStyle(.secondary)
         }
         Section("Stream Controls") {
-            Toggle("Enable Optional Control Bar", isOn: $enabled)
             Text("Set its show/hide binding in Shortcuts, or use the Moonlight menu bar menu. The visible pointer stays inside the stream window while controls are open. Done restores input; Disconnect ends the stream.").font(.caption).foregroundStyle(.secondary)
             DisclosureGroup("Choose and Order Buttons") {
                 ForEach(buttons, id: \.self) { id in
@@ -206,13 +204,12 @@ private struct OverlaySettings: View {
                 Menu("Add Button") { ForEach((0..<11).filter { !buttons.contains($0) }, id: \.self) { id in Button(names[id]) { buttons.append(id); saveButtons() } } }
             }
             Button("Restore Overlay Defaults") {
-                scale = 1; position = "topLeft"; enabled = false; buttons = [2,3,1,6,7]
+                scale = 1; position = "topLeft"; buttons = [2,3,1,6,7]
                 saveButtons(); notify()
             }
         }
         .onChange(of: scale) { _, _ in notify() }
         .onChange(of: position) { _, _ in notify() }
-        .onChange(of: enabled) { _, _ in notify() }
     }
     private func move(_ id: Int, by delta: Int) {
         guard let index = buttons.firstIndex(of: id), buttons.indices.contains(index + delta) else { return }
