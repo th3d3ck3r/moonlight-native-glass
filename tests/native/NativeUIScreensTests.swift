@@ -110,7 +110,8 @@ import XCTest
         window.buttons[XCUIIdentifierCloseWindow].click()
         XCTAssertFalse(window.exists)
         let dock = XCUIApplication(bundleIdentifier: "com.apple.dock")
-        let icon = dock.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Moonlight")).firstMatch
+        // Dock exposes macOS items by title, rather than their empty label.
+        let icon = dock.dockItems["MoonlightNative"]
         XCTAssertTrue(icon.waitForExistence(timeout: 5), "Frontend Dock icon missing")
         icon.click()
         XCTAssertTrue(window.waitForExistence(timeout: 5), "Dock click must reopen the library when no stream window exists")
