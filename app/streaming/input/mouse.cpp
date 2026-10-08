@@ -3,9 +3,6 @@
 #include <Limelight.h>
 #include "SDL_compat.h"
 #include "streaming/streamutils.h"
-#ifdef Q_OS_MACOS
-#include "native/nativeoverlay.h"
-#endif
 
 void SdlInputHandler::notifyMouseLeave()
 {
@@ -300,14 +297,6 @@ void SdlInputHandler::updatePointerRegionLock()
         Uint32 fullscreenFlags = SDL_GetWindowFlags(m_Window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
         m_PointerRegionLockActive = (fullscreenFlags == SDL_WINDOW_FULLSCREEN) ||
                                     (fullscreenFlags != 0 && SDL_GetNumVideoDisplays() == 1);
-#ifdef Q_OS_MACOS
-        // Native absolute input stays within the captured window. The existing
-        // Release Input/controls paths remove the region, and an explicit
-        // pointer-lock shortcut still takes precedence over this default.
-        if (nativeOverlayConfigured() && m_AbsoluteMouseMode) {
-            m_PointerRegionLockActive = true;
-        }
-#endif
     }
 
     // If region lock is enabled, grab the cursor so it can't accidentally leave our window.
@@ -327,11 +316,6 @@ void SdlInputHandler::updatePointerRegionLock()
 
         // SDL 2.0.18 lets us lock the cursor to a specific region
         SDL_SetWindowMouseRect(m_Window, &dst);
-#ifdef Q_OS_MACOS
-        // A confinement rectangle alone does not grab the cursor. Cocoa must
-        // also grab the focused native stream window in absolute input mode.
-        if (nativeOverlayConfigured()) SDL_SetWindowMouseGrab(m_Window, SDL_TRUE);
-#endif
 #elif SDL_VERSION_ATLEAST(2, 0, 15)
         // SDL 2.0.15 only lets us lock the cursor to the whole window
         SDL_SetWindowMouseGrab(m_Window, SDL_TRUE);
@@ -343,9 +327,6 @@ void SdlInputHandler::updatePointerRegionLock()
         // Allow the cursor to leave the bounds of our video region or window
 #if SDL_VERSION_ATLEAST(2, 0, 18)
         SDL_SetWindowMouseRect(m_Window, nullptr);
-#ifdef Q_OS_MACOS
-        if (nativeOverlayConfigured()) SDL_SetWindowMouseGrab(m_Window, SDL_FALSE);
-#endif
 #elif SDL_VERSION_ATLEAST(2, 0, 15)
         SDL_SetWindowMouseGrab(m_Window, SDL_FALSE);
 #else
