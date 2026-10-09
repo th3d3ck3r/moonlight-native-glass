@@ -101,6 +101,22 @@ int main(int argc, char** argv) {
         pump();
         check([NSStringFromClass([nativeWindow.delegate class]) isEqualToString:@"MLStreamWindowDelegate"], "Adapter did not attach to the opened SDL window");
         const Uint32 windowID = SDL_GetWindowID(window);
+        // The new status menu uses the same token-checked distributed transport,
+        // and must enqueue work instead of changing SDL from AppKit callbacks.
+        NSString* menuName=@"com.moonlight-stream.NativeGlass.menuAction";
+        SDL_FlushEvent(nativeOverlayEventType());
+        [[NSDistributedNotificationCenter defaultCenter] postNotificationName:menuName object:@"wrong-token" userInfo:@{@"action": @201} deliverImmediately:YES];
+        pump();
+        SDL_Event menuEvent;
+        check(SDL_PeepEvents(&menuEvent,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==0,"Wrong token queued a menu action");
+        [[NSDistributedNotificationCenter defaultCenter] postNotificationName:menuName object:[NSString stringWithUTF8String:token] userInfo:@{@"action": @201} deliverImmediately:YES];
+        pump();
+        check(SDL_PeepEvents(&menuEvent,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==1 && menuEvent.user.code==201,"Menu capture must reach the SDL action queue");
+        [[NSDistributedNotificationCenter defaultCenter] postNotificationName:menuName object:[NSString stringWithUTF8String:token] userInfo:@{@"action": @999} deliverImmediately:YES];
+        pump();
+        check(SDL_PeepEvents(&menuEvent,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==0,"Unsupported menu action was accepted");
+        nativePublishMenuState(window,true,false,true);
+
         for (int attempt = 0; attempt < 3; ++attempt) {
             SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
             [nativeWindow performClose:nil];

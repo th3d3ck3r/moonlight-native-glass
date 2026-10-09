@@ -11,7 +11,8 @@ import ScreenCaptureKit
     var perform: ((Int) -> Void)?
     var state = NativeMenuState() {
         didSet {
-            if state.token != oldValue.token || !state.exists { dismissPreview(); cachedThumbnail = nil }
+            if state.token != oldValue.token || !state.exists { dismissPreview(); cacheTask?.cancel(); cachedThumbnail = nil }
+            if streaming && state.exists && state.visible && (!oldValue.visible || oldValue.windowNumber == 0 && state.windowNumber != 0) { cacheVisibleThumbnail() }
             if let activeMenu { refreshMenu(activeMenu) }
         }
     }
@@ -30,6 +31,9 @@ import ScreenCaptureKit
         } catch { return nil }
     }
     private var stateObservation: AnyCancellable?
+    private var startedObservation: AnyCancellable?
+    private var streaming = false
+    private var cacheTask: Task<Void, Never>?
     private var activeMenu: NSMenu?
     private var hoverTask: Task<Void, Never>?
     private var closeTask: Task<Void, Never>?
@@ -79,7 +83,27 @@ import ScreenCaptureKit
         item.button?.image = exists ? (fullMoon ?? crescent) : crescent
         let state = exists ? "stream window open" : "no stream window"
         item.button?.setAccessibilityLabel("Moonlight Native Glass — " + state)
-        item.button?.toolTip = "Moonlight: " + state + ". Click to restore the stream window or open Moonlight. Right-click for Settings and Quit."
+        item.button?.toolTip = nil
+        item.button?.setAccessibilityHelp("Click to restore the stream window or open the library. Right-click for stream actions and settings.")
+    }
+    func bindStarted(to publisher: Published<Bool>.Publisher) {
+        startedObservation = publisher.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] started in
+            self?.streaming = started
+            if started { self?.cacheVisibleThumbnail() }
+        }
+    }
+    private func cacheVisibleThumbnail() {
+        cacheTask?.cancel()
+        guard state.exists, state.visible, state.windowNumber != 0, CGPreflightScreenCaptureAccess() else { return }
+        let token = state.token
+        cacheTask = Task { [weak self] in
+            // One snapshot at startup/restore supplies a hidden-window fallback. No live
+            // capture loop, decoder hooks or background frame subscription.
+            try? await Task.sleep(for: .milliseconds(1000))
+            guard !Task.isCancelled, let self, state.exists, state.token == token, state.visible else { return }
+            let image = await thumbnailProvider(state.windowNumber)
+            if !Task.isCancelled, state.exists, state.token == token, let image { cachedThumbnail = image }
+        }
     }
     func bindState(to publisher: Published<NativeMenuState>.Publisher) {
         stateObservation = publisher.receive(on: DispatchQueue.main).sink { [weak self] in self?.state = $0 }
@@ -129,7 +153,11 @@ import ScreenCaptureKit
         view.setAccessibilityLabel("Restore stream window")
         view.entered = { [weak self] in self?.hovering = true; self?.closeTask?.cancel() }
         view.exited = { [weak self] in self?.endHover() }
-        view.clicked = { [weak self] in self?.dismissPreview(); self?.open?() }
+        let token = state.token
+        view.clicked = { [weak self] in
+            guard let self, state.exists, state.token == token else { return }
+            dismissPreview(); open?()
+        }
         panel.contentView = view
         let anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? anchor
@@ -191,7 +219,9 @@ import ScreenCaptureKit
         case -2: settings?()
         case -3: NSWorkspace.shared.open(URL(fileURLWithPath: "/tmp"))
         case -4: about?()
-        case -5: CGRequestScreenCaptureAccess()
+        case -5:
+            CGRequestScreenCaptureAccess()
+            cacheVisibleThumbnail()
         case -6: NSApp.terminate(nil)
         case 200: if state.exists { if state.visible { perform?(200) } else { open?() } }
         case 209:

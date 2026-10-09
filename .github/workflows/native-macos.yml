@@ -127,6 +127,11 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
+      - name: Test menu and thumbnail lifecycle before UI capture
+        run: |
+          mkdir -p build
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
+          build/status-icon-tests macos-native/Resources
       - name: Capture composited native UI with XCTest
         run: |
           xcodebuild -project tests/native/NativeUITests.xcodeproj -scheme NativeUITests -destination 'platform=macOS' -derivedDataPath build/ui-tests -resultBundlePath build/native-ui.xcresult test

@@ -88,7 +88,7 @@ func nativeArgument(_ name: String) -> String? { nil }
                         emit({'event': 'hosts', 'hosts': [{'id': 'incomplete'}]})
                     elif command == 'finishTest':
                         emit({'event': 'connectionTest', 'result': 0})
-                    emit({'event': 'settings', 'values': {'fixtureStep': command}, 'schema': []})
+                    emit({'event': 'settings', 'values': {'fixtureStep': command, 'windowMode': request.get('values', {}).get('windowMode', 0)}, 'schema': []})
             """.write(to: executable, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
             return executable
@@ -145,6 +145,12 @@ func nativeArgument(_ name: String) -> String? { nil }
         delayed.confirmQuit()
         try await wait { delayed.streamStarted }
         precondition(delayed.streamActive, "Confirmation dismissal cancelled an accepted launch")
+        delayed.streamWindowExists = true
+        for (action, expected) in [(204, 2), (205, 0), (206, 1)] {
+            delayed.menuAction(action)
+            try await wait { (delayed.values["windowMode"] as? NSNumber)?.intValue == expected && delayed.values["fixtureStep"] as? String == "settings" }
+            precondition(delayed.streamActive && delayed.streamStarted, "Selecting next window mode ended the active stream")
+        }
         delayed.message = nil
         delayed.quitRequired = "Previous game"
         delayed.dismissQuitConfirmation()

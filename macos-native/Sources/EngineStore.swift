@@ -93,7 +93,6 @@ struct PairingRequest: Identifiable {
     @Published var menuState = NativeMenuState()
     @Published var streamWindowExists = false
     private var streamWindowToken: String?
-    private var pendingWindowMode: Int?
     @Published var streamActive = false
     @Published var streamStarted = false
     @Published var quitRequired: String?
@@ -183,7 +182,7 @@ struct PairingRequest: Identifiable {
                 let schema = try decodeEngineValue(event["schema"] ?? [], as: [PreferenceField].self)
                 values = event["values"] as? [String: Any] ?? [:]
                 fields = schema
-                if pendingWindowMode == nil { menuState.nextMode = [1: 2, 0: 1, 2: 0][(values["windowMode"] as? NSNumber)?.intValue ?? 0] ?? 1 }
+                menuState.nextMode = [1: 2, 0: 1, 2: 0][(values["windowMode"] as? NSNumber)?.intValue ?? 0] ?? 1
             case "artwork":
                 if let host = event["host"] as? String, let app = event["app"] as? Int, let url = event["url"] as? String,
                    let h = computers.firstIndex(where: { $0.id == host }), let a = computers[h].apps.firstIndex(where: { $0.id == app }) {
@@ -321,13 +320,7 @@ struct PairingRequest: Identifiable {
             self.streamWindowExists = false; self.streamWindowToken = nil; self.menuState = NativeMenuState()
             self.stream = nil; self.streamActive = false; self.streamStarted = false; self.quitRequired = nil
             self.status = "Stream ended"
-            if !self.shuttingDown {
-                self.send("resume")
-                if let mode = self.pendingWindowMode {
-                    self.pendingWindowMode = nil
-                    self.set("windowMode", mode)
-                }
-            }
+            if !self.shuttingDown { self.send("resume") }
             if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil { self.fail("The streaming engine exited unexpectedly (\(code)). Please save its crash report and engine log.") }
         }
         stream = helper
@@ -340,7 +333,10 @@ struct PairingRequest: Identifiable {
         if (204...206).contains(action) {
             guard streamWindowExists else { return }
             menuState.nextMode = action - 204
-            pendingWindowMode = [2, 0, 1][action - 204]
+            // Discovery remains responsive while polling is paused. Save through
+            // its normal validated transaction; the streaming helper has its own
+            // preference snapshot, so this takes effect only on the next launch.
+            set("windowMode", [2, 0, 1][action - 204])
             return
         }
         guard streamWindowExists, let token = streamWindowToken else { return }

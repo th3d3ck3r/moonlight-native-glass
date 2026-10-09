@@ -12,12 +12,14 @@ void configureNativeBackgroundApplication()
 #import <SDL.h>
 #import <SDL_syswm.h>
 #include <cstdio>
+#include <string>
 #include "nativeoverlay.h"
 #include "nativetitlebar.h"
 #include "nativeapplication.h"
 
 static NSString* const MLRestoreStreamWindow = @"com.moonlight-stream.NativeGlass.restoreStreamWindow";
 static Uint32 restoreEventType;
+static std::string lastMenuState;
 Uint32 nativeRestoreStreamWindowEventType() { return restoreEventType; }
 
 static NSWindow* nativeSDLWindow(SDL_Window* window)
@@ -172,7 +174,7 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
     id value = notification.userInfo[@"action"];
     if (![value isKindOfClass:[NSNumber class]]) return;
     int action = [value intValue];
-    if (action == 100 || (action >= 200 && action <= 212)) nativeOverlayPerformAction(action);
+    if (action == 100 || action == 200 || action == 201 || action == 202 || action == 203 || action == 207 || action == 208 || action == 209 || action == 210 || action == 212) nativeOverlayPerformAction(action);
 }
 - (void)restoreWindow
 {
@@ -220,14 +222,19 @@ void nativePublishMenuState(SDL_Window* window, bool captured, bool statistics, 
     Uint32 fullscreen = flags & SDL_WINDOW_FULLSCREEN_DESKTOP;
     if (flags & SDL_WINDOW_HIDDEN) fullscreen = streamWindowAccess.windowDelegate.hiddenFullscreenFlags;
     const int mode = !fullscreen ? 0 : SDL_GetHintBoolean(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, SDL_FALSE) ? 2 : 1;
-    std::fprintf(stdout, "{\"event\":\"menuState\",\"windowNumber\":%ld,\"visible\":%s,\"captured\":%s,\"statistics\":%s,\"controls\":%s,\"muted\":%s,\"mode\":%d}\n",
+    char message[512];
+    std::snprintf(message, sizeof(message), "{\"event\":\"menuState\",\"windowNumber\":%ld,\"visible\":%s,\"captured\":%s,\"statistics\":%s,\"controls\":%s,\"muted\":%s,\"mode\":%d}\n",
         (long)cocoa.windowNumber, (flags & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED)) ? "false" : "true",
         captured ? "true" : "false", statistics ? "true" : "false", nativeOverlayControlsVisible() ? "true" : "false", muted ? "true" : "false", mode);
+    if (lastMenuState == message) return;
+    lastMenuState = message;
+    std::fputs(message, stdout);
     std::fflush(stdout);
 }
 void configureNativeStreamWindow(const char* token)
 {
     configureNativeBackgroundApplication();
+    lastMenuState.clear();
     nativeTitlebarSetCapture(false);
     nativeTitlebarSetStatistics(false);
     nativeTitlebarSetConnection(NativeConnectionState::Connecting);
