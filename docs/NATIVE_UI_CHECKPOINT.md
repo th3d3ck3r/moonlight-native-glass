@@ -324,3 +324,22 @@ offline during diagnosis; GitHub API/workflow access continues to work.
   dumps enabled on the disposable CI runner. On failure, LLDB examines the
   original core and captures all thread stacks plus loaded images. Only text
   diagnostics are uploaded, not raw core memory. Application code is unchanged.
+
+### Ordinary extended validation completed
+
+- Run `37885722307`, job `113675172114`, completed SUCCESS on October 9 at
+  04:59 UTC. It exercised all 2000 ordinary immediate-shutdown cycles, alternating
+  test/discovery modes, with the packaged A6 Universal helper and inherited Qt
+  SDK environment. All helper startup/settings/persistence/recovery checks also
+  passed. No injected module or live debugger was used. No crash/core was observed.
+- Text diagnostics artifact `11597030099` contains the complete ordinary test
+  log. The accompanying native UI run `37885722414`, job `113675172176`, passed;
+  full builds were deliberately skipped because application source was unchanged.
+- Combined evidence now includes 2000 ordinary cycles and 1000 debugger-controlled
+  cycles without recurrence, plus the original A6 full build validation. This is
+  stronger test evidence but does not explain or erase the earlier ordinary
+  SIGILL at cycle 184 in run `37878935283`. Keep that intermittent failure open;
+  do not call it conclusively fixed or publish Preview 16 as a cleared release.
+- No new application code was changed in this diagnostic round. The test ZIP
+  already provided remains the source-matched A6 native UI build 16. Physical
+  Intel/live-host acceptance (including actual thumbnail capture) remains next.
