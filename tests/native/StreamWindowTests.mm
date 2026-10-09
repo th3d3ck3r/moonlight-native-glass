@@ -258,6 +258,8 @@ int main(int argc, char** argv) {
             check(SDL_GetKeyboardFocus()!=window,"Menu-focus fixture must actually leave the stream");
             input.notifyFocusLost(); input.notifyFocusLost();
             check(input.m_NativeCaptureBeforeFocusLoss,"Duplicate focus loss must preserve capture intent");
+            input.notifyFocusGained();
+            check(SDL_GetKeyboardFocus()!=window && input.m_NativeCaptureBeforeFocusLoss,"Stale focus gain must not steal focus or consume capture intent");
             nativeRestoreStreamWindow(windowID);
             input.notifyFocusGained(); pump();
             check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Menu return must restore actual SDL capture and mouse focus");

@@ -359,3 +359,6 @@ offline during diagnosis; GitHub API/workflow access continues to work.
 - Local boundary and whitespace checks passed. Full macOS builds and integration
   tests are required before delivering preview 17. RC1 and public releases stay
   unchanged. The earlier intermittent shutdown SIGILL remains unexplained.
+
+- Focus gain additionally checks actual SDL keyboard focus, so a stale queued
+  event cannot steal focus from another window or consume saved capture intent.

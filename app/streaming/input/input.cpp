@@ -317,7 +317,8 @@ void SdlInputHandler::notifyFocusLost()
 void SdlInputHandler::notifyFocusGained()
 {
 #ifdef Q_OS_MACOS
-    if (nativeOverlayConfigured() && m_NativeCaptureBeforeFocusLoss && !m_NativeControlsVisible) {
+    if (nativeOverlayConfigured() && SDL_GetKeyboardFocus() == m_Window &&
+        m_NativeCaptureBeforeFocusLoss && !m_NativeControlsVisible) {
         // Returning from the frontend's menu must restore both mouse focus and
         // the prior capture intent. Keyboard focus alone does not repair SDL's
         // relative mouse routing after a status-item click.
