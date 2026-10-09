@@ -32,7 +32,11 @@ void stopNativeStreamWindow();
 bool initializeNativeHelperTls()
 {
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    return OPENSSL_init_ssl(0, nullptr) == 1;
+    // Qt can retain internal TLS workers into process-global teardown. OpenSSL's
+    // atexit cleanup assumes no thread is still using its global locks/providers.
+    // Give that shared state process lifetime instead: normal Qt/SDL/manager
+    // cleanup still runs, and the OS reclaims crypto state when this helper exits.
+    return OPENSSL_init_ssl(OPENSSL_INIT_NO_ATEXIT, nullptr) == 1;
 #else
     return true;
 #endif
