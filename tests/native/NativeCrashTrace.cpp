@@ -1,6 +1,8 @@
 // CI-only injected diagnostics. Never compiled into or shipped with the app.
 #include <csignal>
 #include <execinfo.h>
+#include <mach-o/dyld.h>
+#include <cstring>
 #include <unistd.h>
 static void fatalTrace(int signalNumber)
 {
@@ -9,6 +11,13 @@ static void fatalTrace(int signalNumber)
     void* frames[64];
     const int count = backtrace(frames, 64);
     backtrace_symbols_fd(frames, count, STDERR_FILENO);
+    for (uint32_t i = 0; i < _dyld_image_count(); ++i) {
+        const char* name = _dyld_get_image_name(i);
+        if (name && (strstr(name, "crypto") || strstr(name, "ssl") || strstr(name, "QtNetwork"))) {
+            write(STDERR_FILENO, name, strlen(name));
+            write(STDERR_FILENO, "\n", 1);
+        }
+    }
     std::signal(signalNumber, SIG_DFL);
     raise(signalNumber);
 }
