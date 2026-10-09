@@ -1,140 +1,135 @@
 <div align="center">
 
-![Moonlight Native Glass — Native UI Preview](readme-assets/images/native-glass-banner.svg)
+![Moonlight Native Glass](https://raw.githubusercontent.com/th3d3ck3r/moonlight-native-glass/native-ui/readme-assets/images/native-glass-banner.svg)
 
 # 🌙 Moonlight Native Glass
 
 ### Your games. Your Mac. A native interface.
 
-**SwiftUI / AppKit · Moonlight Qt 6.2.0 · Intel + Universal · Manual updates**
+**RC1 · Native UI build 15 · Moonlight Qt 6.2.0 · Intel + Universal · Manual updates**
 
+[![Release candidate](https://img.shields.io/badge/release-RC1-orange)](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-rc1)
 [![Native macOS validation](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml/badge.svg?branch=native-ui)](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml)
-[![Moonlight Qt 6.2.0](https://img.shields.io/badge/engine-Moonlight_Qt_6.2.0-blue)](https://github.com/moonlight-stream/moonlight-qt/releases/tag/v6.2.0)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-silver)
 ![Manual updates](https://img.shields.io/badge/updates-Manual_only-8A2BE2)
-[![GPLv3](https://img.shields.io/badge/license-GPLv3-blue)](LICENSE)
+[![GPLv3](https://img.shields.io/badge/license-GPLv3-blue)](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/LICENSE)
 
 A native macOS frontend for Sunshine and compatible GameStream hosts.
-Liquid Glass navigation and controls on **macOS 26+**, regular native styling on **macOS 15**, and system light/dark appearance throughout.
+Liquid Glass navigation and controls on **macOS 26+**, standard native styling on **macOS 15**, and system light/dark appearance throughout.
 
-[📦 Downloads](#-downloads) · [✨ Features](#-features) · [🖼️ Preview](#-preview) · [🧪 Validation](#-validation) · [🛠️ Build](#-build)
+[📦 Download RC1](#-download-rc1) · [✨ Features](#-features) · [🖼️ Screenshots](#-screenshots) · [🧪 Testing](#-testing-and-known-limitations) · [🛠️ Build](#-build)
 
 </div>
 
-## 📦 Downloads
+## 📦 Download RC1
 
-**Native UI Preview 4 is available. Requires macOS 15 or later.**
+**Release Candidate 1 is a testing release with remaining issues under investigation. Requires macOS 15 or later.**
 
-| Your Mac | Package |
+| Your Mac | Download |
 |---|---|
-| 🖥️ **Intel** | [⬇️ Download Intel ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/Moonlight-Native-Glass-Preview-4-x86_64.zip) |
-| 🍎 **Intel + Apple Silicon** | [⬇️ Download Universal ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/Moonlight-Native-Glass-Preview-4-universal.zip) |
+| 🖥️ **Intel** | [Download Intel ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/Moonlight-Native-Glass-RC1-x86_64.zip) |
+| 🍎 **Apple Silicon or Intel** | [Download Universal ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/Moonlight-Native-Glass-RC1-universal.zip) |
 
-[Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-6.2-preview-4) · [SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/SHA256SUMS.txt) · [Validation runs](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml) · [Checkpoint](docs/NATIVE_UI_CHECKPOINT.md)
+[Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-rc1) · [SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/SHA256SUMS.txt) · [Previous previews](https://github.com/th3d3ck3r/moonlight-native-glass/releases)
 
-English interface. Manual updates only. Preview packages use verified **ad-hoc signatures**, not Developer ID signing or notarization.
+1. Download and extract the ZIP for your Mac.
+2. Move **Moonlight Native Glass.app** into Applications and open it through Finder.
+3. Allow Local Network access, add or discover your host, then pair it in this app.
 
-### 🌙 Separate stream-window build — Preview 5
+Packages are **ad-hoc signed and verified**, but **not Developer ID signed or notarized**. macOS may require approval before opening. Updates are manual; download a new package when you choose.
 
-**Optional build with close-to-menu-bar stream windows.** Closing an already opened windowed stream hides its existing window and keeps the session connected. Click the crescent to restore it. If no stream window has opened, the icon opens the regular app. Right-click for Settings and Quit.
-
-| Your Mac | Separate package |
-|---|---|
-| 🖥️ **Intel** | [⬇️ Preview 5 Intel ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-5/Moonlight-Native-Glass-Preview-5-x86_64.zip) |
-| 🍎 **Intel + Apple Silicon** | [⬇️ Preview 5 Universal ZIP](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-5/Moonlight-Native-Glass-Preview-5-universal.zip) |
-
-[Preview 5 release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-6.2-preview-5) · [Checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-5/SHA256SUMS.txt) · [Build checks `e96caef`](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37692872366) · [UI checks](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37693779148)
-
-Full Intel/Universal builds, native UI checks and a real SDL window lifecycle test passed. Live host streaming, audio/input after hide/restore and physical Intel Tahoe behavior still need testing. Preview 4 downloads above remain available.
-
-<details>
-<summary>Preview 5 menu bar screenshot</summary>
-
-![Preview 5 secondary-click menu — sample-content app](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-5/menu-bar.png)
-
-</details>
+RC1 promotes the exact tested **native UI build 15** binaries with **Moonlight engine 6.2.0**. About still identifies that native UI build as Preview 15; the RC1 release label does not change the engine version or rebuild the application.
 
 ## ✨ Features
 
 | Area | What this app provides |
 |---|---|
-| 🫧 **Native interface** | SwiftUI/AppKit sidebar, toolbar, library, Settings and sheets; matching crescent app/engine icons |
-| 🌙 **Menu bar** | Close the library and keep Moonlight available; reopen the window, open Settings or quit from the crescent icon |
-| 🌓 **Appearance** | System light/dark mode; native Liquid Glass controls on Tahoe; standard controls on macOS 15 |
-| 🖥️ **Computers** | Discovery, manual address, pairing, wake, rename, remove and connection details |
-| 🎮 **Library** | Host artwork, search, keyboard/controller navigation, game launch, hide and quit |
-| ⚙️ **Settings** | Five native panes; resolution dropdown with 720p, 1080p, 1440p, 4K and detected Native dimensions |
-| 🎬 **Streaming** | Original Moonlight Qt 6.2 Session/SDL window, renderer and codec capability checks |
-| 🔊 **Input and audio** | Stock Moonlight keyboard, mouse, controller and audio paths |
-| 📦 **Updates** | One English edition. Download new versions when you choose. |
+| 🫧 **Native interface** | SwiftUI/AppKit library, sidebar, toolbar, Settings and sheets |
+| 🌙 **Menu bar** | Restore an existing stream window, reopen the library, open Settings and quit; rounded crescent/full-moon states |
+| 🌓 **Appearance** | System light/dark mode, Liquid Glass on Tahoe and native controls on macOS 15 |
+| 🖥️ **Computers** | Discovery, manual address, pairing, wake, rename, removal and connection details |
+| 🎮 **Library** | Host artwork, search, keyboard/controller navigation, game launch, hide/show and quit |
+| ⚙️ **Settings** | Video, Audio, Input, Network, Advanced, Overlay and Shortcuts; changes save automatically |
+| 🎬 **Streaming** | Moonlight Qt 6.2.0 Session/SDL window and stock codec, renderer and hardware capability checks |
+| 🎛️ **Stream controls** | Native controls, statistics/status surfaces, customizable buttons and shortcuts; windowed title-bar controls |
+| 📦 **Updates** | One English edition; manual installation and updates |
 
-The frontend is native; a bundled Qt helper still handles discovery, pairing, preferences and streaming. The streaming, backend, settings, common-c and mDNS source remains unchanged from the 6.2.0 baseline. Codec, HDR and hardware decoding availability depends on your Mac and host.
+A bundled Moonlight Qt helper handles discovery, pairing, preferences and streaming. Stock backend, settings policy, common-c, mDNS, decoding and timing implementations remain intact. Small reviewed macOS presentation/input hooks connect the native controls and window lifecycle to the engine; a source-boundary check guards those changes. Codec, HDR and hardware-decoding availability depends on your Mac and host.
 
-This is a separate project from Enhanced. Enhanced-only microphone, clipboard and AWDL extensions are not included. Preferences and pairing credentials are isolated from stock Moonlight and Enhanced; pair your host in this app.
+This is a separate project from Enhanced. Enhanced-only microphone, clipboard and AWDL extensions are not included. Preferences and pairing credentials are isolated from stock Moonlight and Enhanced; pair your host here.
 
-## 🖼️ Preview
+### 🎛️ Window and stream actions
 
-**Actual app screenshots from macOS CI, using sample computers and games. These are not mockups or proof of live streaming.**
+| Default shortcut | Action |
+|---|---|
+| **Control–Option–Shift–Q** | Hide the existing stream window while keeping the session connected |
+| **Control–Option–Shift–O** | Show or hide stream controls |
+| **Control–Option–Shift–B** | Disconnect the stream without quitting the host game |
+| **Start + Select + L1 + R1** | Stock controller disconnect shortcut |
+
+Closing the red button in a windowed stream also hides that window. Use the menu bar icon to restore it. Full Screen and Borderless Full Screen hide/restore are covered by automated tests. Shortcuts can be customized in Settings. **Disconnect and Exit** also quits the host game; it is different from plain Disconnect.
+
+### 🛠️ What changed for RC1
+
+- Corrected fullscreen hide/reopen so Borderless Full Screen exits its Space before hiding and re-enters through the SDL event loop.
+- Suppressed native title controls during fullscreen and hidden-window transitions.
+- Preserved fullscreen input-capture intent through hide/restore and checked actual relative mouse event routing.
+- Rounded both menu bar icon states while preserving the artwork.
+- Separated the About panel's native UI build number from the bundled engine version.
+- Fixed native helper ownership so it is cleaned up before Qt platform/logger teardown; repeated immediate shutdown checks now pass.
+- Expanded settings, helper failure/cancellation, persistence and invalid/stale-host recovery coverage.
+
+## 🖼️ Screenshots
+
+**Actual composited app captures from macOS CI using sample hosts and games. They show the interface, not live streaming performance.**
 
 | Light | Dark |
 |---|---|
-| ![Native library in light appearance](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/main-light.png) | ![Native library in dark appearance](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/main-dark.png) |
+| ![Native library in light appearance](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/main-light.png) | ![Native library in dark appearance](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/main-dark.png) |
 
 <details>
-<summary>Native Settings screenshot</summary>
+<summary>Settings, stream customization and shortcuts</summary>
 
-![Native Video Settings with sample preferences](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/settings-video.png)
+![Video Settings](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/settings-video.png)
+![Overlay customization](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/settings-overlay.png)
+![Shortcut Settings](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/settings-shortcuts.png)
 
 </details>
 
 <details>
-<summary>About and new app icon</summary>
+<summary>About and menu bar access</summary>
 
-![About panel with crescent icon and creator credit](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/about-dark.png)
-
-</details>
-
-<details>
-<summary>Menu bar access</summary>
-
-![Moonlight menu bar actions](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-6.2-preview-4/menu-bar.png)
+![About panel](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/about-dark.png)
+![Menu bar actions](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-rc1/menu-bar.png)
 
 </details>
 
-## 🧪 Validation
+## 🧪 Testing and known limitations
 
-| Check | Verified state |
+[Validation run 37795784286](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37795784286) passed all three required jobs at application/test source **`7202a71c`**.
+
+| Check | Result |
 |---|---|
-| Full Intel + Universal app builds | Passed at `007bbc5` · [validation run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37682529752) |
-| Nested binaries, architectures and signatures | Passed signature, identity, permission and dependency audits of 105 Mach-O files; frontend/engine icons match |
-| Engine bridge and settings persistence | Passed real helper validation, including resolution transaction/restart persistence and invalid-input rejection |
-| Native UI screenshots | 17 Release-mode XCTest captures passed: light/dark/compact, loading/empty/offline/unpaired, sheets and five Settings panes; resolution selection and menu bar close/reopen/Settings/Quit checked; screenshots inspected |
-| Physical Intel Tahoe pairing and streaming | **Not tested for this new app** |
-| Intel CPU/GPU usage and frame pacing | **Not measured**; compilation does not prove performance parity |
+| Intel + Universal builds | Complete builds passed; signatures, permissions, identities, dependencies and 105 Mach-O files audited |
+| Native UI | All five XCTest tests passed, including library/settings/sheets, About, Dock reopening, menu bar Settings/Quit and screenshot export |
+| Fullscreen/window lifecycle | Both stock macOS fullscreen modes passed startup, known-color Metal presentation, desktop return and repeated hide/reopen; native focus and relative mouse routing passed |
+| Settings and helper lifecycle | Every exported setting's schema/type checks, advertised enum choices, boolean roundtrip, atomic validation, restart persistence and eight immediate launch/exit cycles passed |
+| Recovery and controls | Invalid addresses/stale host requests, transport failures, launch cancellation/retry, shortcuts, overlay layout and rounded status-icon pixels passed |
+| Physical host and Intel coverage | CI runtime checks use Apple Silicon; Intel is cross-built. Live-host behavior and physical Intel acceptance are not certified by these tests |
+| Streaming performance | CPU/GPU usage, decode latency and frame pacing were **not benchmarked** |
 
-`master` retains the stock Moonlight Qt **v6.2.0** application code from `de2467e433821664cdd2224aad8c89a625be1ad9`; its README presents this fork. Native development and build instructions live on [`native-ui`](https://github.com/th3d3ck3r/moonlight-native-glass/tree/native-ui). The earlier Enhanced repository and releases are untouched.
+**Known limitations:** RC1 still has remaining errors to iron out. Successful discovery, pairing, host actions, audio/input, reconnects, sleep/wake and display changes need real-device acceptance. Optional physical exclusive fullscreen (`I_WANT_BUGGY_FULLSCREEN`) retains upstream limitations; the normal macOS Full Screen and Borderless Full Screen modes are the tested paths. Packages are not notarized.
 
-<details>
-<summary>Intel Tahoe test checklist and known limits</summary>
-
-- Launch through Finder; approve Local Network access and verify discovery/manual address.
-- Pair and confirm status/games appear without reopening; relaunch to check persistence.
-- Select 720p, 1080p, 1440p, 4K and Native; verify dimensions and resolution persistence, including scaled Retina and external displays.
-- Launch/resume/disconnect a game; test H.264/HEVC hardware decode, audio and controller/keyboard/mouse input.
-- Close the library and reopen it from the crescent menu bar icon; check Settings, Quit and closing the library during a stream.
-- Check resizing, fullscreen, display switching, light/dark mode, Reduce Transparency, Reduce Motion and increased contrast.
-- Compare stock 6.2.0 and this app on the same Mac, host and settings: CPU/GPU usage, decode time, frame pacing and network statistics.
-
-The bundled helper's Local Network attribution, multi-display behavior and interrupted-launch cleanup need physical testing. Disconnect with **Control–Option–Shift–Q** or **Start + Select + L1 + R1**. The streaming overlay remains the stock engine's overlay.
-
-</details>
+Report problems through [GitHub Issues](https://github.com/th3d3ck3r/moonlight-native-glass/issues) with your macOS version, Intel/Apple Silicon model, host software/version, window mode, reproduction steps and relevant logs. **Open Engine Logs** is available in the app menu. See the [audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/docs/NATIVE_APP_AUDIT.md) and [development checkpoint](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/docs/NATIVE_UI_CHECKPOINT.md) for detailed coverage.
 
 ## 🛠️ Build
+
+The [`native-ui` branch](https://github.com/th3d3ck3r/moonlight-native-glass/tree/native-ui) contains the native app. `master` retains the stock Moonlight Qt 6.2.0 application sources; its README presents this project.
 
 <details>
 <summary>Build Intel or Universal on a Mac</summary>
 
-Use Xcode 26+, Qt 6.11.2 and Python 3. Start with a recursive checkout on `native-ui`:
+Use Xcode 26+, Qt 6.11.2 and Python 3 with a recursive checkout:
 
 ```bash
 git clone --recurse-submodules --branch native-ui https://github.com/th3d3ck3r/moonlight-native-glass.git
@@ -144,7 +139,7 @@ bash scripts/build-native-macos.sh universal
 # bash scripts/build-native-macos.sh x86_64
 ```
 
-The script builds the stock Qt engine, compiles the frontend for macOS 15+, bundles both, signs ad-hoc and audits nested dependencies. CI also checks protocol framing, actual engine persistence and native UI windows.
+The script builds the Qt engine and native frontend, bundles them for macOS 15+, signs ad-hoc and audits dependencies. Run the UI tests with:
 
 ```bash
 xcodebuild -project tests/native/NativeUITests.xcodeproj \
@@ -153,13 +148,4 @@ xcodebuild -project tests/native/NativeUITests.xcodeproj \
 
 </details>
 
-## 🫧 Roadmap
-
-| Stage | Status |
-|---|---|
-| Native sidebar, library, Settings and sheets | Implemented |
-| Tahoe controls + macOS 15 fallback | Implemented; physical accessibility checks remain |
-| Intel + Universal preview packages | Preview 4 published · experimental |
-| Physical streaming and performance comparison | Required before calling this a stable replacement |
-
-Built on [Moonlight Qt](https://github.com/moonlight-stream/moonlight-qt) and [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c). See [GPL-3.0 license](LICENSE) and [original upstream documentation](docs/UPSTREAM_README.md).
+Built on [Moonlight Qt](https://github.com/moonlight-stream/moonlight-qt) and [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c). See the [GPL-3.0 license](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/LICENSE) and [upstream documentation](https://github.com/th3d3ck3r/moonlight-native-glass/blob/native-ui/docs/UPSTREAM_README.md).
