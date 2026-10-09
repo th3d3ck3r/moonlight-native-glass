@@ -25,6 +25,7 @@ public:
     ~NativeBridge() override;
 
 private:
+    void beginShutdown();
     void send(QJsonObject event);
     void error(QString message);
     void readInput();
@@ -47,6 +48,7 @@ private:
     QHash<QString, QString> m_ArtworkUrls;
     QSet<QString> m_ArtworkRequested;
     QSet<NvComputer*> m_DeletingComputers;
+    bool m_Stopping = false;
     bool m_Polling = false;
     bool m_StreamMode = false;
     bool m_TestMode = false;

@@ -85,6 +85,8 @@ class Bridge:
                 print("HELPER LLDB SHUTDOWN:", result.stdout, flush=True)
                 if "EXC_BAD_ACCESS" in result.stdout or "SIGSEGV" in result.stdout:
                     break
+        self.reader.join(timeout=5)
+        assert not self.reader.is_alive(), "Helper stdout reader did not stop"
         self.diagnostics.close()
         assert self.p.returncode == 0, self.p.returncode
 
@@ -181,6 +183,18 @@ with tempfile.TemporaryDirectory() as root:
             assert live.wait("hosts")["hosts"] == []
     finally:
         live.close()
+    if os.environ.get("MOONLIGHT_NATIVE_SKIP_TERMINAL_CHECK") != "1":
+        terminal = Bridge(root)
+        terminal.wait("ready"); terminal.wait("settings"); terminal.wait("hosts")
+        # Requests already framed in the same read must be ignored after shutdown.
+        # Starting new work after aboutToQuit bypasses the backend's one-time
+        # cancellation signal and exposes adapter callbacks during destruction.
+        terminal.p.stdin.write('{"command":"shutdown"}\n{"command":"snapshot"}\n{"command":"unknown-after-shutdown"}\n')
+        terminal.p.stdin.flush()
+        terminal.p.wait(timeout=30)
+        terminal.close()
+        assert terminal.events.empty(), "Helper processed commands after terminal shutdown"
+        print("PASS: shutdown is terminal for queued requests and adapter callbacks", flush=True)
     for cycle in range(int(os.environ.get("MOONLIGHT_NATIVE_SHUTDOWN_CYCLES", "8"))):
         print("Immediate helper shutdown cycle", cycle, "test mode" if cycle % 2 == 0 else "discovery mode", flush=True)
         repeated = Bridge(root, test_mode=(cycle % 2 == 0))

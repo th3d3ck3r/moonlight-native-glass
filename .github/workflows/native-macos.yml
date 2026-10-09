@@ -98,6 +98,7 @@ jobs:
           mkdir -p build/previews
           xcrun clang++ -std=c++17 -dynamiclib -g tests/native/NativeCrashTrace.cpp -o build/helper-backtrace.dylib
           python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
+          env -u MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight'
       - name: Test actual menu bar icon state
         if: matrix.architecture == 'universal'
         run: |

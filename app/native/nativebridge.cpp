@@ -50,6 +50,7 @@ NativeBridge::NativeBridge(const QStringList& args, QObject* parent) : QObject(p
         return;
     }
     connect(m_Input, &QSocketNotifier::activated, this, [this] { readInput(); });
+    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &NativeBridge::beginShutdown);
     connect(m_Manager.get(), &ComputerManager::computerStateChanged, this, [this] { snapshot(); });
     connect(m_Manager.get(), &ComputerManager::computerAddCompleted, this, [this](QVariant success, QVariant blocked) {
         send({{"event", "hostAdded"}, {"success", success.toBool()}, {"blockedPorts", blocked.toInt()}});
@@ -57,6 +58,7 @@ NativeBridge::NativeBridge(const QStringList& args, QObject* parent) : QObject(p
         snapshot();
     });
     connect(m_Manager.get(), &ComputerManager::pairingCompleted, this, [this](NvComputer* computer, QString message) {
+        if (m_Stopping) return;
         m_Pairing = false;
         // A successful handshake is authoritative; do not leave the UI on the
         // pre-pairing snapshot while waiting for the next server-info poll.
@@ -80,6 +82,7 @@ NativeBridge::NativeBridge(const QStringList& args, QObject* parent) : QObject(p
     });
     createArtworkManager();
     QTimer::singleShot(0, this, [this, args] {
+        if (m_Stopping) return;
         send({{"event", "ready"}, {"protocol", 1}, {"engineVersion", QCoreApplication::applicationVersion()}});
         if (m_StreamMode) startStream(args);
         else {
@@ -90,9 +93,26 @@ NativeBridge::NativeBridge(const QStringList& args, QObject* parent) : QObject(p
     });
 }
 
-NativeBridge::~NativeBridge() { if (m_StreamMode) stopNativeStreamWindow(); }
+void NativeBridge::beginShutdown()
+{
+    if (m_Stopping) return;
+    m_Stopping = true;
+    m_Input->setEnabled(false);
+    // Stop adapter callbacks before C++ members are destroyed. QObject's base
+    // destructor disconnects later, after those manager/window members are gone.
+    m_Input->disconnect(this);
+    if (m_Manager) m_Manager->disconnect(this);
+    if (m_Artwork) m_Artwork->disconnect();
+    if (m_Launcher) m_Launcher->disconnect(this);
+}
+NativeBridge::~NativeBridge()
+{
+    beginShutdown();
+    if (m_StreamMode) stopNativeStreamWindow();
+}
 
 void NativeBridge::send(QJsonObject event) {
+    if (m_Stopping) return;
     const QByteArray data = QJsonDocument(event).toJson(QJsonDocument::Compact) + '\n';
     // Pipe writes are serialized on the main thread. Ignore SIGPIPE in main;
     // a vanished frontend ends this helper instead of retaining discovery.
@@ -102,10 +122,11 @@ void NativeBridge::send(QJsonObject event) {
 void NativeBridge::error(QString message) { send({{"event", "error"}, {"message", message}}); }
 
 void NativeBridge::readInput() {
+    if (m_Stopping) return;
     char chunk[4096];
     for (;;) {
         const ssize_t count = read(STDIN_FILENO, chunk, sizeof(chunk));
-        if (count == 0) { m_Input->setEnabled(false); QCoreApplication::quit(); return; }
+        if (count == 0) { beginShutdown(); QCoreApplication::quit(); return; }
         if (count < 0) {
             if (errno == EINTR) continue;
             if (errno != EAGAIN && errno != EWOULDBLOCK) { error("Command channel failed."); QCoreApplication::exit(1); }
@@ -121,6 +142,7 @@ void NativeBridge::readInput() {
             const auto document = QJsonDocument::fromJson(line, &parseError);
             if (parseError.error != QJsonParseError::NoError || !document.isObject()) error("Invalid JSON command.");
             else command(document.object());
+            if (m_Stopping) return;
         }
     }
 }
@@ -148,8 +170,9 @@ NvComputer* NativeBridge::findComputer(QString uuid) {
 }
 
 void NativeBridge::command(const QJsonObject& request) {
+    if (m_Stopping) return;
     const QString action = request["command"].toString();
-    if (action == "shutdown") { QCoreApplication::quit(); return; }
+    if (action == "shutdown") { beginShutdown(); QCoreApplication::quit(); return; }
     if (m_StreamMode) {
         if (action == "confirmQuit" && m_Launcher && !m_Streaming) m_Launcher->quitRunningApp();
         else error("This command is unavailable during streaming.");
@@ -260,6 +283,7 @@ void NativeBridge::command(const QJsonObject& request) {
 void NativeBridge::createArtworkManager() {
     m_Artwork.reset(new BoxArtManager());
     connect(m_Artwork.get(), &BoxArtManager::boxArtLoadComplete, m_Artwork.get(), [this](NvComputer* computer, NvApp app, QUrl url) {
+        if (m_Stopping) return;
         QReadLocker guard(&computer->lock);
         const QString key = artKey(computer->uuid, app.id);
         m_ArtworkUrls[key] = url.toString();
@@ -268,6 +292,7 @@ void NativeBridge::createArtworkManager() {
 }
 
 void NativeBridge::snapshot() {
+    if (m_Stopping) return;
     if (m_StreamMode) return;
     QJsonArray hosts;
     for (auto computer : availableComputers()) {
@@ -357,7 +382,7 @@ void NativeBridge::startStream(const QStringList& args) {
     // A hidden window conveys upstream's display-selection contract. It never
     // owns or wraps the SDL streaming video surface and loads no QML frontend.
     m_Launcher = new CliStartStream::Launcher(args[3], appId, m_Preferences, this);
-    connect(m_Launcher, &CliStartStream::Launcher::failed, this, [this](QString message) { error(message); QCoreApplication::exit(1); });
+    connect(m_Launcher, &CliStartStream::Launcher::failed, this, [this](QString message) { if (!m_Stopping) { error(message); QCoreApplication::exit(1); } });
     connect(m_Launcher, &CliStartStream::Launcher::searchingComputer, this, [this] { send({{"event", "stage"}, {"message", "Connecting to computer…"}}); });
     connect(m_Launcher, &CliStartStream::Launcher::searchingApp, this, [this] { send({{"event", "stage"}, {"message", "Loading game…"}}); });
     connect(m_Launcher, &CliStartStream::Launcher::appQuitRequired, this, [this](QString app) { send({{"event", "quitRequired"}, {"app", app}}); });
