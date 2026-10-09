@@ -163,9 +163,11 @@ func nativeArgument(_ name: String) -> String? { nil }
             let unavailable = Computer(id: computer.id, name: computer.name, online: online, unknown: unknown, paired: paired,
                 runningApp: 0, address: "", localAddress: "", serverVersion: "", gpu: "", supported: supported, apps: [game])
             let guarded = EngineStore(executable: helper)
-            guarded.ready = true
+            guarded.start()
+            try await wait { guarded.ready }
             guarded.startStream(unavailable, game: game)
-            precondition(!guarded.streamActive,"Controller or stale UI must not launch an unavailable or unpaired host")
+            precondition(!guarded.streamActive && guarded.message == nil,"Controller or stale UI must reject an unavailable or unpaired host before sending pause")
+            guarded.shutdown()
         }
         let silent = EngineStore(executable: try fixture("silent"))
         silent.start()

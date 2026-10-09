@@ -39,8 +39,23 @@ been tested by the user. Preview 18 includes its mouse-focus fixes.
 | Audio and controllers | Read native mute/pause and frontend controller ownership boundaries; stock audio/controller engine retained | No speakers, microphone, gamepads or rumble acceptance |
 | Backend/network/streaming core | Source boundary check against the pinned upstream baseline; inspect native integration, build complete engine and bundle dependency/signature/architecture audits | Compile/static checks do not establish live network or decode correctness |
 
-Validation results are pending until both complete builds, native integration
-checks and UI tests pass. This is an audit of custom app code, integration paths
+Full validation passed for application source `5d53239f2d01b2951766285ba54cfad4ff150ce6`
+in run `37894048789`: Intel, Universal and native UI jobs all completed SUCCESS.
+Native focus/shortcut and separate-process menu routing tests passed. Both native
+window modes presented real composited Metal output and restored after hiding.
+The native lifetime fixture passed under AddressSanitizer/UndefinedBehaviorSanitizer;
+logs contained no sanitizer error or undefined-behavior report. This instruments
+native adapters and fixture methods, not the full decoder/network engine; process
+global AppKit leak detection was disabled. Both bundle audits checked 105 Mach-O
+files. Real adapter schema/type, atomic validation, settings persistence, recovery
+and 100 diagnostic plus 100 ordinary immediate-shutdown cycles passed. No live
+streaming session was used in that stress test. A follow-up strengthens the invalid
+host guard test against a live process fixture; application source is unchanged.
+
+Intel artifact `11599678354` and Universal `11600160812` were verified unexpired.
+The downloaded Intel application ZIP matched its CI checksum, native build 18
+and engine 6.2.0: SHA-256
+`5a06bbb3238f78f62222dda07ac03d060d9442df2fc63c5b356cd4ec7193a0f1`. This is an audit of custom app code, integration paths
 and protected upstream boundaries, not a formal proof of every upstream engine
 path. Testing reduces risk; it cannot guarantee no unexpected behavior.
 

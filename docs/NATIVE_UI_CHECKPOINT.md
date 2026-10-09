@@ -402,3 +402,24 @@ offline during diagnosis; GitHub API/workflow access continues to work.
   intermittent SIGILL from previous ordinary stress also remains unexplained.
 - Full app review/testing and both complete builds are pending. Preview 18 is
   private/unreleased; do not publish or alter RC1/master/public README.
+
+### Preview 18 complete builds and audit
+
+- Application source `5d53239f2d01b2951766285ba54cfad4ff150ce6`, run
+  `37894048789`: Intel job `113701344983`, Universal `113701344661`,
+  native UI `113701344933` all SUCCESS. Production shortcut/focus methods and
+  all whitelisted separate-process menu actions passed. Modal confirmation,
+  stale token, thumbnail fallbacks and settings/helper lifecycle checks passed.
+- Native SDL window fixture also passed under ASan/UBSan with no runtime-error
+  report; no full engine sanitization or process-global AppKit leak assertion.
+  Fullscreen/borderless composited Metal checks passed. Both 105-Mach-O audits
+  passed. Real helper stress passed 100 diagnostic and 100 ordinary cycles.
+- Intel artifact `11599678354`, Universal `11600160812`, both unexpired.
+  Verified Intel inner ZIP build 18 / engine 6.2.0, SHA-256
+  `5a06bbb3238f78f62222dda07ac03d060d9442df2fc63c5b356cd4ec7193a0f1`.
+- Audit and explicit untested list: docs/NATIVE_APP_AUDIT_PREVIEW_18.md.
+  The reported live E-shortcut error 11 remains unconfirmed without a user
+  crash stack/host reproduction; retain the earlier intermittent SIGILL evidence.
+- A final UI probe strengthens invalid-host launch coverage using a live process
+  fixture and makes future UBSan findings fail immediately. It changes tests/CI
+  and documentation only; the verified application code/artifacts are unchanged.

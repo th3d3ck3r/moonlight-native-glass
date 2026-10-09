@@ -79,7 +79,7 @@ jobs:
       - name: Audit native window and input lifetime with sanitizers
         if: matrix.architecture == 'universal'
         run: |
-          xcrun clang++ -std=c++17 -fno-objc-arc -g -fno-omit-frame-pointer -fsanitize=address,undefined \
+          xcrun clang++ -std=c++17 -fno-objc-arc -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all \
             -I libs/mac/include/SDL2 -I app/native -I build \
             app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
@@ -147,6 +147,11 @@ jobs:
           mkdir -p build
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
           build/status-icon-tests macos-native/Resources
+      - name: Test frontend lifecycle during UI probes
+        if: contains(github.event.head_commit.message, '[ui probe]')
+        run: |
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
+          build/engine-store-tests
       - name: Capture composited native UI with XCTest
         run: |
           xcodebuild -project tests/native/NativeUITests.xcodeproj -scheme NativeUITests -destination 'platform=macOS' -derivedDataPath build/ui-tests -resultBundlePath build/native-ui.xcresult test
