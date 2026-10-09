@@ -31,7 +31,6 @@ jobs:
           MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB: ${{ github.workspace }}/build/probe-backtrace.dylib
           MOONLIGHT_NATIVE_SHUTDOWN_CYCLES: '1000'
           MOONLIGHT_NATIVE_SKIP_TERMINAL_CHECK: '1'
-          MallocScribble: '1'
         run: |
-          xcrun clang++ -std=c++17 -dynamiclib -g tests/native/NativeCrashTrace.cpp -o build/probe-backtrace.dylib
+          xcrun clang++ -std=c++17 -dynamiclib -undefined dynamic_lookup -g tests/native/NativeCrashTrace.cpp -o build/probe-backtrace.dylib
           python3 tests/native/bridge_smoke.py 'build/probe/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight'

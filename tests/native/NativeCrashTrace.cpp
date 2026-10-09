@@ -4,6 +4,19 @@
 #include <mach-o/dyld.h>
 #include <cstring>
 #include <unistd.h>
+extern "C" void OPENSSL_cleanup();
+static void traceCryptoCleanup()
+{
+    const char label[] = "NATIVE HELPER OPENSSL CLEANUP\n";
+    write(STDERR_FILENO, label, sizeof(label) - 1);
+    void* frames[32];
+    backtrace_symbols_fd(frames, backtrace(frames, 32), STDERR_FILENO);
+    OPENSSL_cleanup();
+}
+__attribute__((used, section("__DATA,__interpose"))) static const struct {
+    const void* replacement;
+    const void* original;
+} cleanupInterpose = {reinterpret_cast<const void*>(traceCryptoCleanup), reinterpret_cast<const void*>(OPENSSL_cleanup)};
 static void fatalTrace(int signalNumber)
 {
     const char label[] = "NATIVE HELPER FATAL BACKTRACE\n";
