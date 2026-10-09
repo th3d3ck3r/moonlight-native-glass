@@ -4,19 +4,8 @@
 #include <mach-o/dyld.h>
 #include <cstring>
 #include <unistd.h>
-extern "C" void OPENSSL_cleanup();
-static void traceCryptoCleanup()
-{
-    const char label[] = "NATIVE HELPER OPENSSL CLEANUP\n";
-    write(STDERR_FILENO, label, sizeof(label) - 1);
-    void* frames[32];
-    backtrace_symbols_fd(frames, backtrace(frames, 32), STDERR_FILENO);
-    OPENSSL_cleanup();
-}
-__attribute__((used, section("__DATA,__interpose"))) static const struct {
-    const void* replacement;
-    const void* original;
-} cleanupInterpose = {reinterpret_cast<const void*>(traceCryptoCleanup), reinterpret_cast<const void*>(OPENSSL_cleanup)};
+#include <cstdlib>
+static bool stopOnFault = false;
 static void fatalTrace(int signalNumber)
 {
     const char label[] = "NATIVE HELPER FATAL BACKTRACE\n";
@@ -31,11 +20,15 @@ static void fatalTrace(int signalNumber)
             write(STDERR_FILENO, "\n", 1);
         }
     }
+    if (stopOnFault) raise(SIGSTOP);
     std::signal(signalNumber, SIG_DFL);
     raise(signalNumber);
 }
 __attribute__((constructor)) static void installTrace()
 {
+    stopOnFault = std::getenv("MOONLIGHT_NATIVE_STOP_ON_FAULT") != nullptr;
+    std::signal(SIGILL, fatalTrace);
+    std::signal(SIGBUS, fatalTrace);
     std::signal(SIGSEGV, fatalTrace);
     std::signal(SIGABRT, fatalTrace);
 }

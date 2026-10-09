@@ -3,6 +3,7 @@ import json
 import os
 import pathlib
 import queue
+import signal
 import subprocess
 import sys
 import tempfile
@@ -49,7 +50,23 @@ class Bridge:
     def close(self):
         if self.p.poll() is None:
             self.send({"command": "shutdown"})
-            self.p.wait(timeout=30)
+            try:
+                self.p.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                if not os.environ.get("MOONLIGHT_NATIVE_STOP_ON_FAULT"):
+                    raise
+                # Fatal diagnostics stop the original process so we can inspect
+                # all threads, including the thread doing teardown, not a retry.
+                commands = ["lldb", "--batch", "-o", f"process attach --pid {self.p.pid}",
+                            "-o", "thread backtrace all", "-o", "process detach"]
+                result = subprocess.run(commands, stdout=subprocess.PIPE,
+                                        stderr=subprocess.STDOUT, text=True, timeout=60)
+                print("HELPER ORIGINAL ALL-THREAD STACK:", result.stdout, flush=True)
+                try:
+                    os.kill(self.p.pid, signal.SIGCONT)
+                except ProcessLookupError:
+                    pass
+                self.p.wait(timeout=30)
         if self.p.returncode != 0:
             self.diagnostics.seek(0)
             print("HELPER STDERR:", self.diagnostics.read(), flush=True)

@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [normal, trace]
+        mode: [trace]
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -35,6 +35,7 @@ jobs:
         env:
           MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB: ${{ matrix.mode == 'trace' && format('{0}/build/probe-backtrace.dylib', github.workspace) || '' }}
           MOONLIGHT_NATIVE_SHUTDOWN_CYCLES: '1000'
+          MOONLIGHT_NATIVE_STOP_ON_FAULT: '1'
         run: |
           xcrun clang++ -std=c++17 -dynamiclib -undefined dynamic_lookup -g tests/native/NativeCrashTrace.cpp -o build/probe-backtrace.dylib
           python3 tests/native/bridge_smoke.py 'build/probe/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight'
