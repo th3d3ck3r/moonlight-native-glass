@@ -23,6 +23,18 @@ with tempfile.TemporaryDirectory() as root:
         launch.SetEnvironmentEntries([k + "=" + v for k, v in environment.items()], False)
         launch.SetWorkingDirectory(root)
         launch.SetLaunchFlags(lldb.eLaunchFlagDebug)
+        input_path = pathlib.Path(root) / "input.fifo"
+        input_path.unlink(missing_ok=True)
+        os.mkfifo(input_path)
+        input_fd = os.open(input_path, os.O_RDWR | os.O_NONBLOCK)
+        output_path = pathlib.Path(root) / "stdout.jsonl"
+        errors_path = pathlib.Path(root) / "stderr.log"
+        output_path.write_text("")
+        errors_path.write_text("")
+        launch.AddOpenFileAction(0, str(input_path), True, False)
+        launch.AddOpenFileAction(1, str(output_path), False, True)
+        launch.AddOpenFileAction(2, str(errors_path), False, True)
+        output_offset = 0
         error = lldb.SBError()
         process = target.Launch(launch, error)
         assert error.Success() and process.IsValid(), str(error)
@@ -34,8 +46,10 @@ with tempfile.TemporaryDirectory() as root:
         configured = cycle != 0
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
-            diagnostics = (diagnostics + (process.GetSTDERR(65536) or ""))[-16000:]
-            buffer += process.GetSTDOUT(65536) or ""
+            diagnostics = errors_path.read_text(errors="replace")[-16000:]
+            current_output = output_path.read_text(errors="replace")
+            buffer += current_output[output_offset:]
+            output_offset = len(current_output)
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
                 try:
@@ -68,15 +82,21 @@ with tempfile.TemporaryDirectory() as root:
                 break
             elif not shutdown and {"ready", "settings", "hosts"} <= received:
                 if not configured:
-                    process.PutSTDIN('{"command":"settings","values":{"enableMdns":false}}\n')
+                    os.write(input_fd, b'{"command":"settings","values":{"enableMdns":false}}\n')
                 else:
                     time.sleep((cycle % 16) * 0.005)
-                    process.PutSTDIN('{"command":"shutdown"}\n')
+                    os.write(input_fd, b'{"command":"shutdown"}\n')
                     shutdown = True
             time.sleep(0.005)
         else:
+            print("TIMEOUT STATE:", process.GetState(), "EVENTS:", received,
+                  "STDOUT:", current_output, "STDERR:", diagnostics, flush=True)
+            result = lldb.SBCommandReturnObject()
+            debugger.GetCommandInterpreter().HandleCommand("thread backtrace all", result)
+            print(result.GetOutput(), result.GetError(), flush=True)
             process.Kill()
             raise RuntimeError("Helper timed out at cycle " + str(cycle))
+        os.close(input_fd)
 pathlib.Path("build/lldb-shutdown-pass").touch()
 print("PASS: original-process debugger shutdown stress", flush=True)
 lldb.SBDebugger.Destroy(debugger)
