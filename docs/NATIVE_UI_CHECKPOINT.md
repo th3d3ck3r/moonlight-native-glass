@@ -236,3 +236,73 @@ standard and Retina sizes were visually reviewed in addition to pixel checks.
   a stable/bug-free release. Future work should obtain reproduction details and
   preserve protected stock backend/decoder/settings/timing implementations.
   Physical host/Intel coverage and performance are not certified by CI.
+
+
+## Unreleased Preview 16 — October 9, 2026; shutdown investigation open
+
+User authorized more menu controls, a thumbnail-only hover preview clickable to
+restore the stream, and fixing the reported helper error while implementing this.
+Keep RC1, master, public README and release/tag assets untouched. No Xcode ZIP.
+The user has authorized offering the current build for physical testing while the
+intermittent shutdown failure is investigated.
+
+Implemented native UI build 16 (engine metadata remains 6.2.0):
+- Stream hide/restore, independent library opening, controls, explicit capture/
+  release input, statistics, mute/unmute, session disconnect, and confirmed
+  disconnect-and-exit-host-game. Confirmation defaults to Cancel and rechecks
+  the session identity before routing commands.
+- Windowed/fullscreen/borderless preferences are labeled Next Stream because
+  pinned SDL reads its macOS fullscreen policy at video initialization.
+- Settings, engine logs, About and existing guarded Quit. Stream actions and
+  checked labels follow the current stream state.
+- 1.5-second hover delay, nonactivating image-only NSPanel, click/VoiceOver
+  restore, 350ms pointer travel grace, cancellation on menu opening/pointer exit/
+  stream replacement/end, and generation guards against stale async captures.
+- ScreenCaptureKit window snapshots (640px width), cached successful fallback
+  when hidden, explicit Allow Stream Thumbnails permission action. No continuous
+  capture or streaming frame hook. Without a successful image, no preview.
+- Both menu icon states have a cached 4px rounded mask at 18px; original assets
+  and Dock icon remain intact.
+
+Application fix source a6c7b7bb5d086afb00fd2b9fa66e17d55ae3a273:
+- NativeBridge terminal shutdown rejects further framed requests and disconnects
+  adapter callbacks before member destruction. Main retains early bridge teardown.
+- Packaged native helpers restrict Qt plugin paths to their canonical PlugIns
+  directory, verified despite inherited build-SDK QT_PLUGIN_PATH.
+- Native helper initializes OpenSSL before Qt using OPENSSL_INIT_NO_ATEXIT.
+  Per-object Qt/SDL/manager cleanup remains normal; shared crypto globals have
+  process lifetime. Stock network/decoder/settings/timing/common-c are unchanged.
+  The change reduces a teardown risk but is NOT a proven complete crash fix.
+
+Validation and unresolved evidence:
+- Full build run 37878107640 succeeded in Intel, Universal and native UI jobs.
+  Five UI XTests, menu/thumbnail/status-icon tests, helper preference/protocol/
+  recovery checks, terminal-batch regression, actual Metal fullscreen/borderless
+  hide/restore/input fixtures, boundary checks and both 105-Mach-O bundle audits
+  passed. 100 diagnostic plus 100 ordinary repeated shutdown cycles passed.
+- Older baseline failed SIGSEGV; run 37875169429 captured a Qt TLS worker inside
+  CRYPTO_THREAD_read_lock / OBJ_sn2nid / TLS server hello while shutting down.
+  Plugin contamination and crypto global teardown were investigated.
+- Extended current-source run 37878935283: ordinary job failed at cycle 184 with
+  SIGILL (-4); diagnostic-injected job passed 1000. Do not treat diagnostic-only
+  passes or short ordinary passes as resolution of this ordinary failure.
+- Minimal diagnostic run 37879803954 passed 1000, with no fault captured.
+- Persistent original-process LLDB probe run 37883034972 timed out at first cycle;
+  test I/O was corrected in 2898be748f7d35335957ff3a1e4a497c53e08724.
+  Run 37883272349 is the follow-up. This changes diagnostics only, not the app.
+- Actual physical Intel/live-host behavior, hidden live Metal thumbnail capture
+  under Screen Recording permission, and native streaming performance remain
+  unverified. CI image injection verifies thumbnail behavior, not real capture.
+- Preview 16 is available for user testing with the known intermittent shutdown
+  failure disclosed. It is not cleared for release.
+
+Current test artifacts (verified unexpired and source-matched):
+[Intel](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37878107640/artifacts/11593168821)
+and [Universal](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37878107640/artifacts/11593232681).
+These are unreleased ad-hoc-signed artifacts. Do not deliver earlier local ZIPs
+from a10/9920 source or silently replace RC1.
+
+Next: inspect the original ordinary fault's full-thread stack; make an evidence-
+based fix within native adapter scope; rerun complete builds and extended ordinary
+stress. Record failures as well as passes. Local execution environment became
+offline during diagnosis; GitHub API/workflow access continues to work.
