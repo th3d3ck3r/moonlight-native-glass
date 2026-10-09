@@ -78,3 +78,7 @@ struct NativeMenuState: Equatable {
     var mode = 0
     var nextMode = 0
 }
+
+func nativeEngineLogDirectory() -> URL {
+    FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/MoonlightNativeGlass", isDirectory: true)
+}

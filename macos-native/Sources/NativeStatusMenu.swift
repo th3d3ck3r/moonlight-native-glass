@@ -42,6 +42,8 @@ import ScreenCaptureKit
     private(set) var previewPanel: NSPanel?
     private var hovering = false
     private var previewGeneration = UUID()
+    var captureAllowed: () -> Bool = { CGPreflightScreenCaptureAccess() }
+    private(set) var previewUnavailable = false
     var hoverDelay: Duration = .milliseconds(1500)
     private let crescent: NSImage?
     private let fullMoon: NSImage?
@@ -120,10 +122,13 @@ import ScreenCaptureKit
             guard let self else { return }
             try? await Task.sleep(for: hoverDelay)
             guard !Task.isCancelled, hovering, state.exists, state.token == token else { return }
+            // Show the cached image or a useful restore target at the promised
+            // delay, even if ScreenCaptureKit is slow, denied or has no window.
+            previewUnavailable = cachedThumbnail == nil
+            showThumbnail(cachedThumbnail ?? unavailableThumbnail())
             let image = await thumbnailProvider(state.windowNumber)
             guard !Task.isCancelled, hovering, state.exists, state.token == token, previewGeneration == generation else { return }
-            if let image { cachedThumbnail = image }
-            if let cachedThumbnail { showThumbnail(cachedThumbnail) }
+            if let image { cachedThumbnail = image; previewUnavailable = false; showThumbnail(image) }
         }
     }
     func endHover() {
@@ -138,6 +143,18 @@ import ScreenCaptureKit
     func dismissPreview() {
         previewGeneration = UUID(); hoverTask?.cancel(); closeTask?.cancel()
         previewPanel?.orderOut(nil); previewPanel = nil
+    }
+    private func unavailableThumbnail() -> NSImage {
+        let message = captureAllowed() ? "Preview unavailable" : "Allow Screen Recording for previews"
+        return NSImage(size: NSSize(width: 280, height: 158), flipped: false) { rect in
+            NSColor.windowBackgroundColor.setFill(); rect.fill()
+            let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
+            (message as NSString).draw(in: NSRect(x: 12, y: 70, width: 256, height: 36), withAttributes: [
+                .font: NSFont.systemFont(ofSize: 13, weight: .medium), .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
+            ("Click to restore stream" as NSString).draw(in: NSRect(x: 12, y: 42, width: 256, height: 22), withAttributes: [
+                .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: paragraph])
+            return true
+        }
     }
     private func showThumbnail(_ image: NSImage) {
         guard let button = item.button, let window = button.window else { return }
@@ -187,7 +204,9 @@ import ScreenCaptureKit
         entry("Disconnect", 212, state.exists)
         entry("Disconnect and Exit Host Game…", 209, state.exists)
         menu.addItem(.separator())
-        if !CGPreflightScreenCaptureAccess() { entry("Allow Stream Thumbnails…", -5) }
+        // Keep this row present while permissions change, so an open menu's
+        // item positions and tags never shift under the pointer.
+        entry(CGPreflightScreenCaptureAccess() ? "Screen Recording Settings…" : "Allow Stream Thumbnails…", -5)
         entry("Settings…", -2); entry("Open Engine Logs", -3); entry("About Moonlight Native Glass", -4)
         menu.addItem(.separator()); entry("Quit Moonlight Native Glass", -6)
         return menu
@@ -217,10 +236,14 @@ import ScreenCaptureKit
         switch tag {
         case -1: library?()
         case -2: settings?()
-        case -3: NSWorkspace.shared.open(URL(fileURLWithPath: "/tmp"))
+        case -3:
+            try? FileManager.default.createDirectory(at: nativeEngineLogDirectory(), withIntermediateDirectories: true)
+            NSWorkspace.shared.open(nativeEngineLogDirectory())
         case -4: about?()
         case -5:
-            CGRequestScreenCaptureAccess()
+            if CGPreflightScreenCaptureAccess() || !CGRequestScreenCaptureAccess(), let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                NSWorkspace.shared.open(url)
+            }
             cacheVisibleThumbnail()
         case -6: NSApp.terminate(nil)
         case 200: if state.exists { if state.visible { perform?(200) } else { open?() } }

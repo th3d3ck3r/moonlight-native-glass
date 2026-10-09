@@ -380,3 +380,25 @@ offline during diagnosis; GitHub API/workflow access continues to work.
   Downloaded Intel inner ZIP confirms native UI build 17, engine 6.2.0 and
   SHA-256 `a50644642a4eafca77f2caae7c9a693a49269ae074d7e7890e02287e1c14374f`.
   RC1/master/public README/releases unchanged; Preview 17 is an unreleased test.
+
+### Preview 18 reported shortcut/menu/thumbnail failures
+
+- User has not tested 17. Build 16 reported error 11 after Ctrl-Alt-Shift-E;
+  hover showed no thumbnail and menu disconnect/host-exit appeared ineffective.
+- Native menu disconnect actions now dispatch session cleanup directly rather
+  than queueing another generic SDL_QUIT. The E shortcut and overlay Disconnect
+  use that same route. The helper waits for readyForDeletion, deletes Session
+  while Qt/SDL are alive, then exits; native E no longer asks for earlier process
+  exit. Stock Qt shortcuts, cleanup implementation and streaming engine remain.
+- Menu transport uses whitelisted action-specific notification names and the
+  stream token, without payload conversion; real separate-process routing tests
+  cover every supported action and reject wrong tokens/unknown actions.
+- Hover displays a cached image or clickable permission/unavailable fallback
+  after the delay, before awaiting capture. Capture denial is no longer silent.
+  Permission row remains present to avoid shifting open menu items. Logs now
+  retain helper stderr and distinguish termination signals from exit codes.
+- No live host teardown or user crash stack is available: these are fixes for
+  identified paths, not conclusive proof that error 11 cannot recur. A separate
+  intermittent SIGILL from previous ordinary stress also remains unexplained.
+- Full app review/testing and both complete builds are pending. Preview 18 is
+  private/unreleased; do not publish or alter RC1/master/public README.

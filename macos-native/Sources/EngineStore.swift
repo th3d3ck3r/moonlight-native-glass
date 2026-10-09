@@ -11,6 +11,8 @@ final class EngineChannel {
     private let readQueue = DispatchQueue(label: "moonlight.native.events")
     var onEvent: (([String: Any]) -> Void)?
     var onExit: ((Int32) -> Void)?
+    private(set) var diagnosticURL: URL?
+    private var diagnosticHandle: FileHandle?
     private var closed = false
     var stopRequested: Bool { closed }
 
@@ -23,7 +25,15 @@ final class EngineChannel {
         process.currentDirectoryURL = executable.deletingLastPathComponent()
         process.standardInput = input
         process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
+        // Keep real helper diagnostics instead of discarding the only evidence
+        // of a streaming teardown fault. Logging never enters the JSON pipe.
+        let directory = nativeEngineLogDirectory()
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let role = arguments.contains("stream") ? "stream" : "discovery"
+        let log = directory.appendingPathComponent("\(role)-\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString).log")
+        if FileManager.default.createFile(atPath: log.path, contents: nil), let handle = try? FileHandle(forWritingTo: log) {
+            diagnosticURL = log; diagnosticHandle = handle; process.standardError = handle
+        } else { process.standardError = FileHandle.standardError }
 
     }
     func start() throws {
@@ -50,9 +60,14 @@ final class EngineChannel {
                 }
             }
             self.process.waitUntilExit()
+            try? self.diagnosticHandle?.close()
+            self.diagnosticHandle = nil
             let code = self.process.terminationStatus
             DispatchQueue.main.async { [weak self] in self?.onExit?(code) }
         }
+    }
+    var terminationDescription: String {
+        process.terminationReason == .uncaughtSignal ? "signal \(process.terminationStatus)" : "exit \(process.terminationStatus)"
     }
     func send(_ request: [String: Any]) throws {
         guard process.isRunning, !closed else { throw CocoaError(.fileWriteUnknown) }
@@ -162,7 +177,7 @@ struct PairingRequest: Identifiable {
                 self.launchDeadline?.cancel()
                 self.pendingStream = nil; self.streamActive = false; self.streamStarted = false
             }
-            if !self.shuttingDown { self.fail("The streaming engine stopped (exit \(code)). Use Refresh to restart it.") }
+            if !self.shuttingDown { self.fail("The streaming engine stopped (\(helper.terminationDescription)). Use Refresh to restart it.") }
         }
         channel = helper
         do { try helper.start() } catch { channel = nil; fail("Could not start the bundled streaming engine: \(error.localizedDescription)") }
@@ -321,7 +336,7 @@ struct PairingRequest: Identifiable {
             self.stream = nil; self.streamActive = false; self.streamStarted = false; self.quitRequired = nil
             self.status = "Stream ended"
             if !self.shuttingDown { self.send("resume") }
-            if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil { self.fail("The streaming engine exited unexpectedly (\(code)). Please save its crash report and engine log.") }
+            if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil { self.fail("The streaming engine stopped unexpectedly (\(helper.terminationDescription)). Open Engine Logs from the menu bar and save the stream log and macOS crash report.") }
         }
         stream = helper
         do { try helper.start() } catch {
@@ -340,8 +355,8 @@ struct PairingRequest: Identifiable {
             return
         }
         guard streamWindowExists, let token = streamWindowToken else { return }
-        DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.moonlight-stream.NativeGlass.menuAction"),
-            object: token, userInfo: ["action": action], deliverImmediately: true)
+        DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.moonlight-stream.NativeGlass.menuAction.\(action)"),
+            object: token, userInfo: nil, deliverImmediately: true)
     }
     func restoreStreamWindow() {
         guard streamWindowExists, let token = streamWindowToken else { return }

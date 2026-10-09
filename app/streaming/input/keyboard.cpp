@@ -221,7 +221,7 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
         setCaptureActive(m_NativeCaptureBeforeControls);
     }
     // Explicit menu actions remain available when a shortcut binding is disabled.
-    if (action == 201 || action == 202 || action == 203 || action == 208 || action == 209 || action == 212) {
+    if (action == 201 || action == 202 || action == 203 || action == 208) {
         raiseAllKeys();
         if (action == 201) {
             // A menu click can restore keyboard focus while SDL still considers
@@ -235,15 +235,14 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
         else if (action == 202) setCaptureActive(false);
         else if (action == 203 || action == 208)
             Session::get()->getOverlayManager().setOverlayState(Overlay::OverlayDebug, action == 203);
-        else if (action == 209) { Session::get()->setShouldExit(true); performSpecialKeyCombo(KeyComboQuit); }
-        else performSpecialKeyCombo(KeyComboQuit);
         return;
     }
-    if (action == 12) {
-        // Plain Disconnect follows the stock quit action without forcing the
-        // host game to exit. Keep the separate quit-and-exit action intact.
+    if (action == 209 || action == 212 || action == 12 ||
+        (action == KeyComboQuitAndExit && m_SpecialKeyCombos[action].enabled)) {
+        // Route native buttons and the E shortcut through the same session
+        // disconnect boundary. Its owner exits only after cleanup finishes.
         raiseAllKeys();
-        performSpecialKeyCombo(KeyComboQuit);
+        nativeOverlayPerformAction(action == 12 || action == 212 ? 212 : 209);
         return;
     }
     if (action == KeyComboQuit && m_SpecialKeyCombos[action].enabled) {

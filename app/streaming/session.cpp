@@ -2044,10 +2044,13 @@ void Session::exec()
             else if (action == 207) {
                 nativeUserMuted = !nativeUserMuted;
                 m_AudioMuted = nativeUserMuted || (m_Preferences->muteOnFocusLoss && !(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS));
-            } else if (action == 212) {
-                // Explicit Disconnect overrides auto-quit for this session only.
-                m_Preferences->quitAppAfter = false;
-                m_InputHandler->handleNativeOverlayAction(action);
+            } else if (action == 209 || action == 212) {
+                // End this session directly. Do not enqueue a second generic
+                // quit or request process exit before readyForDeletion: the
+                // adapter owns the helper's lifetime after deferred cleanup.
+                m_Preferences->quitAppAfter = action == 209;
+                m_InputHandler->raiseAllKeys();
+                goto DispatchDeferredCleanup;
             } else if (action != 210) {
                 if (action == 201 || action == 100) nativeRestoreStreamWindow(SDL_GetWindowID(m_Window));
                 m_InputHandler->handleNativeOverlayAction(action);

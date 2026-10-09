@@ -171,9 +171,11 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 - (void)menuAction:(NSNotification*)notification
 {
     if (![notification.object isEqualToString:self.token] || !self.windowDelegate.windowID) return;
-    id value = notification.userInfo[@"action"];
-    if (![value isKindOfClass:[NSNumber class]]) return;
-    int action = [value intValue];
+    NSString* prefix = @"com.moonlight-stream.NativeGlass.menuAction.";
+    if (![notification.name hasPrefix:prefix]) return;
+    NSString* suffix = [notification.name substringFromIndex:prefix.length];
+    int action = suffix.intValue;
+    if (![suffix isEqualToString:[NSString stringWithFormat:@"%d", action]]) return;
     if (action == 100 || action == 200 || action == 201 || action == 202 || action == 203 || action == 207 || action == 208 || action == 209 || action == 210 || action == 212) nativeOverlayPerformAction(action);
 }
 - (void)restoreWindow
@@ -240,8 +242,10 @@ void configureNativeStreamWindow(const char* token)
     nativeTitlebarSetConnection(NativeConnectionState::Connecting);
     streamWindowAccess = [[MLStreamWindowAccess alloc] init];
     streamWindowAccess.token = [NSString stringWithUTF8String:token];
-    [[NSDistributedNotificationCenter defaultCenter] addObserver:streamWindowAccess selector:@selector(menuAction:)
-        name:@"com.moonlight-stream.NativeGlass.menuAction" object:streamWindowAccess.token suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
+    for (int action : {100, 200, 201, 202, 203, 207, 208, 209, 210, 212})
+        [[NSDistributedNotificationCenter defaultCenter] addObserver:streamWindowAccess selector:@selector(menuAction:)
+            name:[NSString stringWithFormat:@"com.moonlight-stream.NativeGlass.menuAction.%d", action]
+            object:streamWindowAccess.token suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
     [[NSNotificationCenter defaultCenter] addObserver:streamWindowAccess selector:@selector(windowBecameKey:)
                                                 name:NSWindowDidBecomeKeyNotification object:nil];
     [[NSDistributedNotificationCenter defaultCenter] addObserver:streamWindowAccess selector:@selector(restore:)

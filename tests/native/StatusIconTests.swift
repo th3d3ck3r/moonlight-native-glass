@@ -82,7 +82,8 @@ import Combine
         menu.menuAction(connectedMenu.items.first { $0.title == "Release Input" }!)
         menu.menuAction(connectedMenu.items.first { $0.title == "Hide Statistics" }!)
         menu.menuAction(connectedMenu.items.first { $0.title == "Open Library" }!)
-        precondition(actions == [202, 208] && libraries == 1)
+        menu.menuAction(connectedMenu.items.first { $0.title == "Disconnect" }!)
+        precondition(actions == [202, 208, 212] && libraries == 1)
         let thumbnail = NSImage(size: NSSize(width: 320, height: 180), flipped: false) { rect in
             NSColor.systemBlue.setFill(); rect.fill(); return true
         }
@@ -105,7 +106,11 @@ import Combine
         menu.state = NativeMenuState(exists: true, token: "replacement", windowNumber: 100)
         precondition(menu.previewPanel == nil, "Replacement must dismiss the old stream thumbnail")
         menu.beginHover(); for _ in 0..<5 { flush() }
-        precondition(menu.previewPanel == nil, "Previous stream image must never leak into the new stream")
+        precondition(menu.previewPanel?.isVisible == true && menu.previewUnavailable, "Replacement without an image must show a restore fallback, never the previous stream image")
+        menu.captureAllowed = { false }
+        menu.dismissPreview(); menu.beginHover(); for _ in 0..<5 { flush() }
+        precondition(menu.previewPanel?.isVisible == true && menu.previewUnavailable, "Missing permission must still show a clickable restore fallback")
+        menu.dismissPreview()
         menu.thumbnailProvider = { _ in try? await Task.sleep(for: .milliseconds(120)); return thumbnail }
         menu.beginHover(); flush()
         menu.state = NativeMenuState()

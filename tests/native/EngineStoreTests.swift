@@ -175,6 +175,20 @@ func nativeArgument(_ name: String) -> String? { nil }
         try await wait { !malformed.ready && malformed.pairing == nil }
         precondition(malformed.message != nil, "Invalid typed event retained an unusable ready engine")
         malformed.shutdown()
+        for (command, expected) in [("exit 11", "exit 11"), ("kill -TERM $$", "signal 15")] {
+            let diagnostic = folder.appendingPathComponent("diagnostic-fixture")
+            try "#!/bin/sh\necho 'helper diagnostic marker' >&2\n\(command)\n".write(to: diagnostic, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: diagnostic.path)
+            let channel = EngineChannel(executable: diagnostic, arguments: [])
+            var ended = false
+            channel.onExit = { _ in ended = true }
+            try channel.start()
+            try await wait { ended }
+            precondition(channel.terminationDescription == expected,"Signals and exit codes must not be conflated")
+            let log = try String(contentsOf: channel.diagnosticURL!, encoding: .utf8)
+            precondition(log.contains("helper diagnostic marker"),"Helper stderr must survive process exit")
+            try? FileManager.default.removeItem(at: channel.diagnosticURL!)
+        }
         print("PASS: helper exit, missing/broken-pipe sends, busy guard, live rejection, cancelled/replacement replies, confirmation dismissal, quiet cancellation, launch deadline, malformed events")
     }
 }

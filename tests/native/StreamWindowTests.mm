@@ -50,6 +50,12 @@ static bool fixtureFullscreenTransition(SDL_Window* window, Uint32 flags) {
 }
 // Use the actual production focus handlers, not a second implementation of
 // their decisions. Capture uses real SDL; key releases have no host in this test.
+// No host/network exists in this fixture; only focus and action routing run.
+namespace Overlay { enum { OverlayDebug }; }
+struct FixtureOverlays { void setOverlayState(int, bool) {} };
+struct Session { static Session* get() { static Session value; return &value; } FixtureOverlays& getOverlayManager() { return overlays; } FixtureOverlays overlays; };
+static constexpr int BUTTON_LEFT=1,BUTTON_MIDDLE=2,BUTTON_RIGHT=3,BUTTON_X1=4,BUTTON_X2=5,BUTTON_ACTION_RELEASE=0;
+static void LiSendMouseButtonEvent(int,int) {}
 class SdlInputHandler {
 public:
     explicit SdlInputHandler(SDL_Window* window) : m_Window(window) {}
@@ -57,6 +63,12 @@ public:
     bool m_AbsoluteMouseMode = false;
     bool m_NativeCaptureBeforeFocusLoss = false;
     bool m_NativeControlsVisible = false;
+    bool m_NativeCaptureBeforeControls = false;
+#include "NativeKeyCombos.inc"
+    struct Combo { bool enabled = true; };
+    Combo m_SpecialKeyCombos[KeyComboMax];
+    void performSpecialKeyCombo(KeyCombo) { check(false,"Native disconnect must not request stock process quit"); }
+    void handleNativeOverlayAction(int action);
     bool isCaptureActive() { return SDL_GetRelativeMouseMode(); }
     void setCaptureActive(bool active) {
         check(SDL_SetRelativeMouseMode(active ? SDL_TRUE : SDL_FALSE) == 0, "Fixture capture failed");
@@ -93,6 +105,12 @@ static void checkRelativeMotion(SDL_Window* window) {
 }
 int main(int argc, char** argv) {
     @autoreleasepool {
+        if (argc == 4 && std::string(argv[1]) == "--menu") {
+            [[NSDistributedNotificationCenter defaultCenter] postNotificationName:
+                [NSString stringWithFormat:@"com.moonlight-stream.NativeGlass.menuAction.%s",argv[3]]
+                object:[NSString stringWithUTF8String:argv[2]] userInfo:nil deliverImmediately:YES];
+            return 0;
+        }
         if (argc == 3 && std::string(argv[1]) == "--restore") {
             [[NSDistributedNotificationCenter defaultCenter] postNotificationName:restoreName
                 object:[NSString stringWithUTF8String:argv[2]] userInfo:nil deliverImmediately:YES];
@@ -125,18 +143,34 @@ int main(int argc, char** argv) {
         const Uint32 windowID = SDL_GetWindowID(window);
         // The new status menu uses the same token-checked distributed transport,
         // and must enqueue work instead of changing SDL from AppKit callbacks.
-        NSString* menuName=@"com.moonlight-stream.NativeGlass.menuAction";
-        SDL_FlushEvent(nativeOverlayEventType());
-        [[NSDistributedNotificationCenter defaultCenter] postNotificationName:menuName object:@"wrong-token" userInfo:@{@"action": @201} deliverImmediately:YES];
-        pump();
-        SDL_Event menuEvent;
-        check(SDL_PeepEvents(&menuEvent,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==0,"Wrong token queued a menu action");
-        [[NSDistributedNotificationCenter defaultCenter] postNotificationName:menuName object:[NSString stringWithUTF8String:token] userInfo:@{@"action": @201} deliverImmediately:YES];
-        pump();
-        check(SDL_PeepEvents(&menuEvent,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==1 && menuEvent.user.code==201,"Menu capture must reach the SDL action queue");
-        [[NSDistributedNotificationCenter defaultCenter] postNotificationName:menuName object:[NSString stringWithUTF8String:token] userInfo:@{@"action": @999} deliverImmediately:YES];
-        pump();
-        check(SDL_PeepEvents(&menuEvent,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==0,"Unsupported menu action was accepted");
+        for (int action : {100,200,201,202,203,207,208,209,210,212,999}) {
+            for (bool validToken : {false,true}) {
+                SDL_FlushEvent(nativeOverlayEventType());
+                NSTask* sender = [[NSTask alloc] init];
+                sender.executableURL = [NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[0]]];
+                sender.arguments = @[@"--menu", validToken ? [NSString stringWithUTF8String:token] : @"wrong-token", [NSString stringWithFormat:@"%d",action]];
+                check([sender launchAndReturnError:nullptr],"Menu sender failed");
+                [sender waitUntilExit]; [sender release]; pump(.15);
+                SDL_Event menuEvent;
+                const int count=SDL_PeepEvents(&menuEvent,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType());
+                check(count==(validToken && action!=999 ? 1 : 0),"Cross-process menu routing must accept exactly supported actions with the current token");
+                if (count) check(menuEvent.user.code==action,"Cross-process menu action changed its meaning");
+            }
+        }
+        SdlInputHandler routing(window);
+        for (int action : {int(SdlInputHandler::KeyComboQuitAndExit),12,209,212}) {
+            SDL_FlushEvent(nativeOverlayEventType());
+            routing.handleNativeOverlayAction(action);
+            SDL_Event event;
+            check(SDL_PeepEvents(&event,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==1,"E shortcut and buttons must queue native disconnect");
+            check(event.user.code==(action==12 || action==212 ? 212 : 209),"Disconnect must preserve host-exit intent");
+        }
+        routing.m_SpecialKeyCombos[SdlInputHandler::KeyComboQuitAndExit].enabled=false;
+        routing.handleNativeOverlayAction(SdlInputHandler::KeyComboQuitAndExit);
+        SDL_Event disabled;
+        check(SDL_PeepEvents(&disabled,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==0,"Disabled E shortcut must not disconnect");
+        routing.handleNativeOverlayAction(209);
+        check(SDL_PeepEvents(&disabled,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==1,"Explicit exit remains available with shortcut disabled");
         nativePublishMenuState(window,true,false,true);
 
         for (int attempt = 0; attempt < 3; ++attempt) {

@@ -407,7 +407,7 @@ void NativeBridge::startStream(const QStringList& args) {
         connect(session, &Session::displayLaunchError, this, [this](QString message) { error(message); });
         connect(session, &Session::connectionStarted, this, [this] { m_Streaming = true; send({{"event", "streaming"}}); });
         connect(session, &Session::sessionFinished, this, [this](int ports) { send({{"event", "finished"}, {"portTest", ports}}); });
-        connect(session, &Session::readyForDeletion, this, [session] { session->deleteLater(); QCoreApplication::quit(); });
+        connect(session, &Session::readyForDeletion, this, [session] { delete session; QCoreApplication::quit(); });
         if (!session->initialize(m_Window.get())) {
             error("The streaming session could not initialize. See the engine log for details.");
             session->deleteLater(); QCoreApplication::exit(1); return;

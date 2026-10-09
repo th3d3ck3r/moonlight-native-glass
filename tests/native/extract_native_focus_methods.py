@@ -7,8 +7,9 @@ import pathlib
 
 source = pathlib.Path("app/streaming/input/input.cpp").read_text()
 methods = []
-for name in ("notifyFocusLost", "notifyFocusGained"):
-    start = source.index("void SdlInputHandler::" + name + "()")
+for name in ("notifyFocusLost", "notifyFocusGained", "handleNativeOverlayAction"):
+    source = pathlib.Path("app/streaming/input/keyboard.cpp" if name == "handleNativeOverlayAction" else "app/streaming/input/input.cpp").read_text()
+    start = source.index("void SdlInputHandler::" + name + "(")
     body = source.index("{", start)
     depth = 1
     end = body + 1
@@ -18,3 +19,8 @@ for name in ("notifyFocusLost", "notifyFocusGained"):
     methods.append(source[start:end])
 pathlib.Path("build").mkdir(exist_ok=True)
 pathlib.Path("build/NativeFocusMethods.inc").write_text("\n\n".join(methods))
+
+header = pathlib.Path("app/streaming/input/input.h").read_text()
+start = header.index("    enum KeyCombo {")
+end = header.index("};", start) + 2
+pathlib.Path("build/NativeKeyCombos.inc").write_text(header[start:end])
