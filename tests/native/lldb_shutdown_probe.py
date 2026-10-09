@@ -19,7 +19,9 @@ with tempfile.TemporaryDirectory() as root:
     environment["MOONLIGHT_NATIVE_TEST_ROOT"] = root
     for cycle in range(int(os.environ.get("MOONLIGHT_NATIVE_SHUTDOWN_CYCLES", "1000"))):
         arguments = ["native"] + (["test"] if cycle % 2 == 0 else [])
+        listener = lldb.SBListener("native-shutdown-" + str(cycle))
         launch = lldb.SBLaunchInfo(arguments)
+        launch.SetListener(listener)
         launch.SetEnvironmentEntries([k + "=" + v for k, v in environment.items()], False)
         launch.SetWorkingDirectory(root)
         launch.SetLaunchFlags(lldb.eLaunchFlagDebug)
@@ -43,6 +45,7 @@ with tempfile.TemporaryDirectory() as root:
         diagnostics = ""
         received = set()
         last_stop_id = None
+        configuration_sent = False
         shutdown = False
         configured = cycle != 0
         deadline = time.monotonic() + 30
@@ -61,8 +64,13 @@ with tempfile.TemporaryDirectory() as root:
                 received.add(name)
                 if name == "settings" and event["values"]["enableMdns"] is False:
                     configured = True
+            notification = lldb.SBEvent()
+            restarted = False
+            while listener.GetNextEvent(notification):
+                if lldb.SBProcess.EventIsProcessEvent(notification):
+                    restarted = lldb.SBProcess.GetRestartedFromEvent(notification)
             state = process.GetState()
-            if state in (lldb.eStateStopped, lldb.eStateCrashed) and process.GetStopID() != last_stop_id:
+            if state in (lldb.eStateStopped, lldb.eStateCrashed) and not restarted and process.GetStopID() != last_stop_id:
                 last_stop_id = process.GetStopID()
                 fatal = state == lldb.eStateCrashed
                 for thread in process:
@@ -84,9 +92,10 @@ with tempfile.TemporaryDirectory() as root:
                 assert shutdown and process.GetExitStatus() == 0, (cycle, process.GetExitStatus(), diagnostics)
                 break
             if not shutdown and {"ready", "settings", "hosts"} <= received:
-                if not configured:
+                if not configured and not configuration_sent:
+                    configuration_sent = True
                     os.write(input_fd, b'{"command":"settings","values":{"enableMdns":false}}\n')
-                else:
+                elif configured:
                     time.sleep((cycle % 16) * 0.005)
                     os.write(input_fd, b'{"command":"shutdown"}\n')
                     shutdown = True
