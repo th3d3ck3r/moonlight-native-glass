@@ -362,3 +362,21 @@ offline during diagnosis; GitHub API/workflow access continues to work.
 
 - Focus gain additionally checks actual SDL keyboard focus, so a stale queued
   event cannot steal focus from another window or consume saved capture intent.
+
+### Preview 17 final validation
+
+- Source `7f3cc0e80642fd003d06c044a9682595883eacf7`, run `37890126899`:
+  Intel job `113689010436`, Universal job `113689010430`, and native UI job
+  `113689010337` all completed SUCCESS. Production focus handlers compiled
+  against real SDL passed duplicate loss, stale gain, actual mouse focus/motion,
+  explicit release and controls-visible checks across all existing window modes.
+- Fullscreen/borderless startup and composited Metal hide/restore, overlays,
+  protocol/failure recovery, menu/thumbnail lifecycle, settings persistence and
+  100 diagnostic plus 100 ordinary helper shutdown cycles passed. Both bundle
+  audits validated all 105 Mach-O files. These are CI tests, not live host or
+  physical Intel streaming acceptance. The user's exact menu trigger still needs
+  confirmation, and the earlier intermittent shutdown SIGILL remains unexplained.
+- Verified unexpired Intel artifact `11597853266`, Universal `11598163427`.
+  Downloaded Intel inner ZIP confirms native UI build 17, engine 6.2.0 and
+  SHA-256 `a50644642a4eafca77f2caae7c9a693a49269ae074d7e7890e02287e1c14374f`.
+  RC1/master/public README/releases unchanged; Preview 17 is an unreleased test.
