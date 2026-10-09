@@ -42,6 +42,7 @@ with tempfile.TemporaryDirectory() as root:
         buffer = ""
         diagnostics = ""
         received = set()
+        last_stop_id = None
         shutdown = False
         configured = cycle != 0
         deadline = time.monotonic() + 30
@@ -61,7 +62,8 @@ with tempfile.TemporaryDirectory() as root:
                 if name == "settings" and event["values"]["enableMdns"] is False:
                     configured = True
             state = process.GetState()
-            if state in (lldb.eStateStopped, lldb.eStateCrashed):
+            if state in (lldb.eStateStopped, lldb.eStateCrashed) and process.GetStopID() != last_stop_id:
+                last_stop_id = process.GetStopID()
                 fatal = state == lldb.eStateCrashed
                 for thread in process:
                     reason = thread.GetStopReason()
@@ -76,11 +78,12 @@ with tempfile.TemporaryDirectory() as root:
                     print("ORIGINAL HELPER ALL THREADS:", result.GetOutput(), result.GetError(), flush=True)
                     process.Kill()
                     raise RuntimeError("Original helper fault at cycle " + str(cycle))
-                process.Continue()
+                continuation = process.Continue()
+                print("Debugger continue:", str(continuation), flush=True)
             elif state == lldb.eStateExited:
                 assert shutdown and process.GetExitStatus() == 0, (cycle, process.GetExitStatus(), diagnostics)
                 break
-            elif not shutdown and {"ready", "settings", "hosts"} <= received:
+            if not shutdown and {"ready", "settings", "hosts"} <= received:
                 if not configured:
                     os.write(input_fd, b'{"command":"settings","values":{"enableMdns":false}}\n')
                 else:
@@ -91,6 +94,7 @@ with tempfile.TemporaryDirectory() as root:
         else:
             print("TIMEOUT STATE:", process.GetState(), "EVENTS:", received,
                   "STDOUT:", current_output, "STDERR:", diagnostics, flush=True)
+            process.Stop()
             result = lldb.SBCommandReturnObject()
             debugger.GetCommandInterpreter().HandleCommand("thread backtrace all", result)
             print(result.GetOutput(), result.GetError(), flush=True)
