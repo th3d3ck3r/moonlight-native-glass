@@ -11,6 +11,12 @@ import time
 
 executable = sys.argv[1]
 
+def helper_environment(root):
+    env = {**os.environ, "MOONLIGHT_NATIVE_TEST_ROOT": root}
+    if os.environ.get("MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB"):
+        env["DYLD_INSERT_LIBRARIES"] = os.environ["MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB"]
+    return env
+
 class Bridge:
     def __init__(self, root, test_mode=True):
         self.events = queue.Queue()
@@ -19,7 +25,7 @@ class Bridge:
         self.diagnostics = tempfile.TemporaryFile(mode="w+t")
         self.p = subprocess.Popen([executable, "native"] + (["test"] if test_mode else []), stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, stderr=self.diagnostics,
-                                  env={**os.environ, "MOONLIGHT_NATIVE_TEST_ROOT": root}, text=True)
+                                  env=helper_environment(root), text=True)
         def read():
             for line in self.p.stdout:
                 try:
@@ -175,7 +181,8 @@ with tempfile.TemporaryDirectory() as root:
             assert live.wait("hosts")["hosts"] == []
     finally:
         live.close()
-    for cycle in range(8):
+    for cycle in range(int(os.environ.get("MOONLIGHT_NATIVE_SHUTDOWN_CYCLES", "8"))):
+        print("Immediate helper shutdown cycle", cycle, "test mode" if cycle % 2 == 0 else "discovery mode", flush=True)
         repeated = Bridge(root, test_mode=(cycle % 2 == 0))
         try:
             repeated.wait("ready")
