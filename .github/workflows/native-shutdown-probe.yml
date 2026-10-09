@@ -1,4 +1,4 @@
-name: Native helper shutdown diagnosis
+name: Native helper extended shutdown validation
 on:
   push:
     branches: [native-ui]
@@ -8,6 +8,11 @@ permissions:
   contents: read
 jobs:
   diagnose:
+    name: Shutdown (${{ matrix.mode }})
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [normal, trace]
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -20,17 +25,16 @@ jobs:
           version: '6.11.2'
           cache: true
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
-      - name: Obtain previously validated helper without rebuilding
+      - name: Obtain fixed helper without rebuilding
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run download 37873793016 -R th3d3ck3r/moonlight-native-glass -n Native-Glass-Preview-16-universal -D build/probe-artifact
+          gh run download 37878107640 -R th3d3ck3r/moonlight-native-glass -n Native-Glass-Preview-16-universal -D build/probe-artifact
           unzip -q build/probe-artifact/Moonlight-Native-Glass-Preview-16-universal.zip -d build/probe
       - name: Capture fatal stacks during repeated immediate shutdown
         env:
-          MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB: ${{ github.workspace }}/build/probe-backtrace.dylib
+          MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB: ${{ matrix.mode == 'trace' && format('{0}/build/probe-backtrace.dylib', github.workspace) || '' }}
           MOONLIGHT_NATIVE_SHUTDOWN_CYCLES: '1000'
-          MOONLIGHT_NATIVE_SKIP_TERMINAL_CHECK: '1'
         run: |
           xcrun clang++ -std=c++17 -dynamiclib -undefined dynamic_lookup -g tests/native/NativeCrashTrace.cpp -o build/probe-backtrace.dylib
           python3 tests/native/bridge_smoke.py 'build/probe/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight'
