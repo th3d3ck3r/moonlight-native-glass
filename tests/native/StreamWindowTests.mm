@@ -48,6 +48,28 @@ static bool fixtureFullscreenTransition(SDL_Window* window, Uint32 flags) {
     }
     return true;
 }
+// Use the actual production focus handlers, not a second implementation of
+// their decisions. Capture uses real SDL; key releases have no host in this test.
+class SdlInputHandler {
+public:
+    explicit SdlInputHandler(SDL_Window* window) : m_Window(window) {}
+    SDL_Window* m_Window;
+    bool m_AbsoluteMouseMode = false;
+    bool m_NativeCaptureBeforeFocusLoss = false;
+    bool m_NativeControlsVisible = false;
+    bool isCaptureActive() { return SDL_GetRelativeMouseMode(); }
+    void setCaptureActive(bool active) {
+        check(SDL_SetRelativeMouseMode(active ? SDL_TRUE : SDL_FALSE) == 0, "Fixture capture failed");
+        m_NativeCaptureBeforeFocusLoss = false;
+    }
+    void raiseAllKeys() {}
+    void notifyFocusLost();
+    void notifyFocusGained();
+};
+#ifndef Q_OS_MACOS
+#define Q_OS_MACOS
+#endif
+#include "NativeFocusMethods.inc"
 static void checkRelativeMotion(SDL_Window* window) {
     SDL_FlushEvent(SDL_MOUSEMOTION);
     // Route actual native motion through SDL's Cocoa event handler. The first
@@ -230,6 +252,25 @@ int main(int argc, char** argv) {
             // while keeping the nonempty-rect assertion for visible controls.
             check(NSEqualRects(cocoa(window).mouseConfinementRect,freshRelativeRect),"Done must restore the same Cocoa pointer state as fresh relative capture");
             checkRelativeMotion(window);
+            SdlInputHandler input(window);
+            [other makeKeyAndOrderFront:nil]; pump();
+            SDL_WarpMouseGlobal(0,0); pump();
+            check(SDL_GetKeyboardFocus()!=window,"Menu-focus fixture must actually leave the stream");
+            input.notifyFocusLost(); input.notifyFocusLost();
+            check(input.m_NativeCaptureBeforeFocusLoss,"Duplicate focus loss must preserve capture intent");
+            nativeRestoreStreamWindow(windowID);
+            input.notifyFocusGained(); pump();
+            check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Menu return must restore actual SDL capture and mouse focus");
+            checkRelativeMotion(window);
+            input.setCaptureActive(false);
+            [other makeKeyAndOrderFront:nil]; pump();
+            input.notifyFocusLost(); input.notifyFocusLost();
+            nativeRestoreStreamWindow(windowID);
+            input.notifyFocusGained(); pump();
+            check(!SDL_GetRelativeMouseMode(),"Explicit Release Input must survive menu focus changes");
+            input.m_NativeCaptureBeforeFocusLoss=true; input.m_NativeControlsVisible=true;
+            input.notifyFocusGained();
+            check(!SDL_GetRelativeMouseMode(),"Focus gain must not recapture while local controls are open");
             SDL_SetRelativeMouseMode(SDL_FALSE); SDL_ShowCursor(SDL_ENABLE);
             [other orderOut:nil]; [other release];
             SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);

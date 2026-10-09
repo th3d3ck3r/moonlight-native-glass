@@ -223,7 +223,16 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
     // Explicit menu actions remain available when a shortcut binding is disabled.
     if (action == 201 || action == 202 || action == 203 || action == 208 || action == 209 || action == 212) {
         raiseAllKeys();
-        if (action == 201 || action == 202) setCaptureActive(action == 201);
+        if (action == 201) {
+            // A menu click can restore keyboard focus while SDL still considers
+            // the mouse outside the stream. Reuse Done's release/warp/focus
+            // sequence before enabling relative mode, rather than trusting its
+            // enabled flag alone.
+            setCaptureActive(false);
+            nativeOverlayRestoreStreamFocus(m_Window);
+            setCaptureActive(true);
+        }
+        else if (action == 202) setCaptureActive(false);
         else if (action == 203 || action == 208)
             Session::get()->getOverlayManager().setOverlayState(Overlay::OverlayDebug, action == 203);
         else if (action == 209) { Session::get()->setShouldExit(true); performSpecialKeyCombo(KeyComboQuit); }

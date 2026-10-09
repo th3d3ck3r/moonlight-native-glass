@@ -287,7 +287,10 @@ void SdlInputHandler::notifyFocusLost()
         raiseAllKeys();
         return;
     }
-    const bool captureBeforeFocusLoss = isCaptureActive();
+    // More than one AppKit/menu focus-loss event can arrive before the stream
+    // regains focus. Preserve the first event's intent after relative capture
+    // has already been released; an explicit Release Input still clears it.
+    const bool captureBeforeFocusLoss = isCaptureActive() || m_NativeCaptureBeforeFocusLoss;
 #endif
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
     // This lets user to interact with our window's title bar and with the buttons in it.
@@ -313,6 +316,16 @@ void SdlInputHandler::notifyFocusLost()
 
 void SdlInputHandler::notifyFocusGained()
 {
+#ifdef Q_OS_MACOS
+    if (nativeOverlayConfigured() && m_NativeCaptureBeforeFocusLoss && !m_NativeControlsVisible) {
+        // Returning from the frontend's menu must restore both mouse focus and
+        // the prior capture intent. Keyboard focus alone does not repair SDL's
+        // relative mouse routing after a status-item click.
+        setCaptureActive(false);
+        nativeOverlayRestoreStreamFocus(m_Window);
+        setCaptureActive(true);
+    }
+#endif
 }
 
 bool SdlInputHandler::isCaptureActive()

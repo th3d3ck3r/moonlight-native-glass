@@ -343,3 +343,19 @@ offline during diagnosis; GitHub API/workflow access continues to work.
 - No new application code was changed in this diagnostic round. The test ZIP
   already provided remains the source-matched A6 native UI build 16. Physical
   Intel/live-host acceptance (including actual thumbnail capture) remains next.
+
+### Preview 17 mouse focus regression work
+
+- User reports the mouse issue fixed in build 15 returned in build 16, possibly
+  after menu bar interaction; exact physical-host trigger is not confirmed.
+- Capture Input now uses Done's release/restore-mouse-focus/recapture sequence.
+  Native focus loss preserves capture intent across duplicate events, and focus
+  gain restores that intent unless controls are visible or input was explicitly
+  released. These are native presentation/input hooks; engine version stays 6.2.0.
+- SDL/AppKit regression coverage compiles the actual production focus methods,
+  using real SDL capture and window focus plus a no-host key-release sink. It
+  checks duplicate loss, restored relative mouse motion, explicit release and
+  visible controls in each existing window mode. Live streaming remains untested.
+- Local boundary and whitespace checks passed. Full macOS builds and integration
+  tests are required before delivering preview 17. RC1 and public releases stay
+  unchanged. The earlier intermittent shutdown SIGILL remains unexplained.
