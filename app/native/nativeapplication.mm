@@ -129,6 +129,7 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 @property(nonatomic, copy) NSString* token;
 - (void)windowBecameKey:(NSNotification*)notification;
 - (void)restore:(NSNotification*)notification;
+- (void)menuAction:(NSNotification*)notification;
 - (void)restoreWindow;
 @end
 
@@ -164,6 +165,14 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
     event.type = restoreEventType;
     event.user.windowID = self.windowDelegate.windowID;
     SDL_PushEvent(&event);
+}
+- (void)menuAction:(NSNotification*)notification
+{
+    if (![notification.object isEqualToString:self.token] || !self.windowDelegate.windowID) return;
+    id value = notification.userInfo[@"action"];
+    if (![value isKindOfClass:[NSNumber class]]) return;
+    int action = [value intValue];
+    if (action == 100 || (action >= 200 && action <= 212)) nativeOverlayPerformAction(action);
 }
 - (void)restoreWindow
 {
@@ -203,6 +212,19 @@ void nativeRestoreStreamWindow(Uint32 windowID)
     if (windowID && streamWindowAccess.windowDelegate.windowID == windowID)
         [streamWindowAccess restoreWindow];
 }
+void nativePublishMenuState(SDL_Window* window, bool captured, bool statistics, bool muted)
+{
+    NSWindow* cocoa = nativeSDLWindow(window);
+    if (!cocoa || !streamWindowAccess || streamWindowAccess.windowDelegate.windowID != SDL_GetWindowID(window)) return;
+    Uint32 flags = SDL_GetWindowFlags(window);
+    Uint32 fullscreen = flags & SDL_WINDOW_FULLSCREEN_DESKTOP;
+    if (flags & SDL_WINDOW_HIDDEN) fullscreen = streamWindowAccess.windowDelegate.hiddenFullscreenFlags;
+    const int mode = !fullscreen ? 0 : SDL_GetHintBoolean(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, SDL_FALSE) ? 2 : 1;
+    std::fprintf(stdout, "{\"event\":\"menuState\",\"windowNumber\":%ld,\"visible\":%s,\"captured\":%s,\"statistics\":%s,\"controls\":%s,\"muted\":%s,\"mode\":%d}\n",
+        (long)cocoa.windowNumber, (flags & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED)) ? "false" : "true",
+        captured ? "true" : "false", statistics ? "true" : "false", nativeOverlayControlsVisible() ? "true" : "false", muted ? "true" : "false", mode);
+    std::fflush(stdout);
+}
 void configureNativeStreamWindow(const char* token)
 {
     configureNativeBackgroundApplication();
@@ -211,6 +233,8 @@ void configureNativeStreamWindow(const char* token)
     nativeTitlebarSetConnection(NativeConnectionState::Connecting);
     streamWindowAccess = [[MLStreamWindowAccess alloc] init];
     streamWindowAccess.token = [NSString stringWithUTF8String:token];
+    [[NSDistributedNotificationCenter defaultCenter] addObserver:streamWindowAccess selector:@selector(menuAction:)
+        name:@"com.moonlight-stream.NativeGlass.menuAction" object:streamWindowAccess.token suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
     [[NSNotificationCenter defaultCenter] addObserver:streamWindowAccess selector:@selector(windowBecameKey:)
                                                 name:NSWindowDidBecomeKeyNotification object:nil];
     [[NSDistributedNotificationCenter defaultCenter] addObserver:streamWindowAccess selector:@selector(restore:)

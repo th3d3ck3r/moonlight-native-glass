@@ -87,9 +87,14 @@ import XCTest
         item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         XCTAssertTrue(window.waitForExistence(timeout: 5), "Primary status click did not reopen the library without a stream window")
         item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
-        let menu = app.menus.containing(.menuItem, identifier: "Open Moonlight or Stream").firstMatch
-        XCTAssertTrue(menu.menuItems["Open Moonlight or Stream"].waitForExistence(timeout: 5))
+        let menu = app.menus.containing(.menuItem, identifier: "Open Library").firstMatch
+        XCTAssertTrue(menu.menuItems["Open Library"].waitForExistence(timeout: 5))
         XCTAssertTrue(menu.menuItems["Settings…"].exists)
+        XCTAssertFalse(menu.menuItems["Restore Stream Window"].isEnabled)
+        XCTAssertFalse(menu.menuItems["Capture Input"].isEnabled)
+        XCTAssertFalse(menu.menuItems["Disconnect"].isEnabled)
+        XCTAssertTrue(menu.menuItems["Open Engine Logs"].exists)
+        XCTAssertTrue(menu.menuItems["About Moonlight Native Glass"].exists)
         XCTAssertTrue(menu.menuItems["Quit Moonlight Native Glass"].exists)
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "menu-bar"

@@ -97,7 +97,7 @@ jobs:
       - name: Test actual menu bar icon state
         if: matrix.architecture == 'universal'
         run: |
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
           build/status-icon-tests macos-native/Resources build/status-icon-previews
       - uses: actions/upload-artifact@v6
         if: matrix.architecture == 'universal'
@@ -107,13 +107,13 @@ jobs:
           if-no-files-found: error
       - name: Package preview artifact
         run: |
-          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-15-${{ matrix.architecture }}.zip'
-          shasum -a 256 'build/Moonlight-Native-Glass-Preview-15-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
+          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-16-${{ matrix.architecture }}.zip'
+          shasum -a 256 'build/Moonlight-Native-Glass-Preview-16-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
       - uses: actions/upload-artifact@v6
         with:
-          name: Native-Glass-Preview-15-${{ matrix.architecture }}
+          name: Native-Glass-Preview-16-${{ matrix.architecture }}
           path: |
-            build/Moonlight-Native-Glass-Preview-15-${{ matrix.architecture }}.zip
+            build/Moonlight-Native-Glass-Preview-16-${{ matrix.architecture }}.zip
             build/SHA256-${{ matrix.architecture }}.txt
           if-no-files-found: error
 

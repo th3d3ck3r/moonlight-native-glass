@@ -8,3 +8,4 @@ void nativeSetStreamFullscreenTransition(bool (*transition)(SDL_Window*, Uint32)
 bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window);
 Uint32 nativeRestoreStreamWindowEventType();
 void nativeRestoreStreamWindow(Uint32 windowID);
+void nativePublishMenuState(SDL_Window* window, bool captured, bool statistics, bool muted);

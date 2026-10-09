@@ -65,3 +65,16 @@ struct PreferenceField: Identifiable, Codable {
 func decodeEngineValue<T: Decodable>(_ value: Any, as type: T.Type) throws -> T {
     try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: value))
 }
+
+struct NativeMenuState: Equatable {
+    var exists = false
+    var token: String?
+    var windowNumber: UInt32 = 0
+    var visible = false
+    var captured = false
+    var statistics = false
+    var controls = false
+    var muted = false
+    var mode = 0
+    var nextMode = 0
+}

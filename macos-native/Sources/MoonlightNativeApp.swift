@@ -91,17 +91,21 @@ private struct NativeStatusActions: View {
         Color.clear.frame(width: 0, height: 0).onAppear {
             if delegate.statusMenu == nil { delegate.statusMenu = NativeStatusMenu() }
             delegate.statusMenu?.bind(to: store.$streamWindowExists)
-            let openPrimaryWindow: () -> Void = {
-                if store.streamWindowExists { store.restoreStreamWindow() }
-                else {
+            delegate.statusMenu?.bindState(to: store.$menuState)
+            let openLibrary: () -> Void = {
                     openWindow(id: "library")
                     if let window = store.libraryWindow {
                         if window.isMiniaturized { window.deminiaturize(nil) }
                         window.makeKeyAndOrderFront(nil)
                     }
                     NSApp.activate(ignoringOtherApps: true)
-                }
             }
+            let openPrimaryWindow: () -> Void = {
+                if store.streamWindowExists { store.restoreStreamWindow() } else { openLibrary() }
+            }
+            delegate.statusMenu?.library = openLibrary
+            delegate.statusMenu?.perform = { store.menuAction($0) }
+            delegate.statusMenu?.about = { showNativeAboutPanel() }
             delegate.openPrimaryWindow = openPrimaryWindow
             delegate.statusMenu?.open = openPrimaryWindow
             delegate.statusMenu?.controls = { store.showStreamControls() }
@@ -115,7 +119,7 @@ private struct NativeStatusActions: View {
 // Keep these credits fixed across builds. AppKit reads the build number from
 // CFBundleVersion for the preview number; release notes belong on GitHub.
 func showNativeAboutPanel() {
-    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "15"
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "16"
     let engineBundle = Bundle(url: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app"))
     let engineVersion = engineBundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "6.2.0"

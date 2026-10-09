@@ -270,6 +270,7 @@ void nativeOverlayDetach() {
     // Detach now rather than relying on eventual object destruction.
     [controller invalidate]; [controller release]; controller=nil;
 }
+bool nativeOverlayControlsVisible() { return controller.showingControls; }
 void nativeOverlaySetControlsVisible(bool visible) { controller.showingControls=visible; [controller refresh]; }
 void nativeOverlayBeginControlsInput(SDL_Window* window) {
     if (!window || controlsWindow) return;

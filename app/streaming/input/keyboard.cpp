@@ -220,6 +220,16 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
         if (m_NativeCaptureBeforeControls) nativeOverlayRestoreStreamFocus(m_Window);
         setCaptureActive(m_NativeCaptureBeforeControls);
     }
+    // Explicit menu actions remain available when a shortcut binding is disabled.
+    if (action == 201 || action == 202 || action == 203 || action == 208 || action == 209 || action == 212) {
+        raiseAllKeys();
+        if (action == 201 || action == 202) setCaptureActive(action == 201);
+        else if (action == 203 || action == 208)
+            Session::get()->getOverlayManager().setOverlayState(Overlay::OverlayDebug, action == 203);
+        else if (action == 209) { Session::get()->setShouldExit(true); performSpecialKeyCombo(KeyComboQuit); }
+        else performSpecialKeyCombo(KeyComboQuit);
+        return;
+    }
     if (action == 12) {
         // Plain Disconnect follows the stock quit action without forcing the
         // host game to exit. Keep the separate quit-and-exit action intact.

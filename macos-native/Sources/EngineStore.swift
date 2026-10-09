@@ -90,8 +90,10 @@ struct PairingRequest: Identifiable {
     @Published var pairing: PairingRequest?
     @Published var testingConnection = false
     @Published var addingHost = false
+    @Published var menuState = NativeMenuState()
     @Published var streamWindowExists = false
     private var streamWindowToken: String?
+    private var pendingWindowMode: Int?
     @Published var streamActive = false
     @Published var streamStarted = false
     @Published var quitRequired: String?
@@ -181,6 +183,7 @@ struct PairingRequest: Identifiable {
                 let schema = try decodeEngineValue(event["schema"] ?? [], as: [PreferenceField].self)
                 values = event["values"] as? [String: Any] ?? [:]
                 fields = schema
+                if pendingWindowMode == nil { menuState.nextMode = [1: 2, 0: 1, 2: 0][(values["windowMode"] as? NSNumber)?.intValue ?? 0] ?? 1 }
             case "artwork":
                 if let host = event["host"] as? String, let app = event["app"] as? Int, let url = event["url"] as? String,
                    let h = computers.firstIndex(where: { $0.id == host }), let a = computers[h].apps.firstIndex(where: { $0.id == app }) {
@@ -285,14 +288,27 @@ struct PairingRequest: Identifiable {
         let x = Int(bounds.midX), y = Int(bounds.midY)
         let token = UUID().uuidString
         streamWindowToken = token
+        menuState = NativeMenuState(token: token, nextMode: [1: 2, 0: 1, 2: 0][(values["windowMode"] as? NSNumber)?.intValue ?? 0] ?? 1)
         streamWindowExists = false
         let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y), token])
         helper.onEvent = { [weak self, weak helper] event in
             guard let self, !self.shuttingDown, self.stream === helper else { return }
             switch event["event"] as? String {
             case "stage": self.status = event["message"] as? String ?? "Starting stream…"
-            case "windowOpened": self.streamWindowExists = true
-            case "windowClosed": self.streamWindowExists = false
+            case "windowOpened":
+                self.streamWindowExists = true
+                self.menuState.exists = true
+                self.menuAction(210)
+            case "windowHidden": self.menuState.visible = false
+            case "windowClosed": self.streamWindowExists = false; self.menuState = NativeMenuState()
+            case "menuState":
+                self.menuState.windowNumber = (event["windowNumber"] as? NSNumber)?.uint32Value ?? 0
+                self.menuState.visible = event["visible"] as? Bool ?? false
+                self.menuState.captured = event["captured"] as? Bool ?? false
+                self.menuState.statistics = event["statistics"] as? Bool ?? false
+                self.menuState.controls = event["controls"] as? Bool ?? false
+                self.menuState.muted = event["muted"] as? Bool ?? false
+                self.menuState.mode = event["mode"] as? Int ?? 0
             case "streaming": self.streamStarted = true; self.status = "Streaming \(game.name)"
             case "warning": self.warnings.append(event["message"] as? String ?? "")
             case "quitRequired": self.quitRequired = event["app"] as? String
@@ -302,10 +318,16 @@ struct PairingRequest: Identifiable {
         }
         helper.onExit = { [weak self, weak helper] code in
             guard let self, let helper, self.stream === helper else { return }
-            self.streamWindowExists = false; self.streamWindowToken = nil
+            self.streamWindowExists = false; self.streamWindowToken = nil; self.menuState = NativeMenuState()
             self.stream = nil; self.streamActive = false; self.streamStarted = false; self.quitRequired = nil
             self.status = "Stream ended"
-            if !self.shuttingDown { self.send("resume") }
+            if !self.shuttingDown {
+                self.send("resume")
+                if let mode = self.pendingWindowMode {
+                    self.pendingWindowMode = nil
+                    self.set("windowMode", mode)
+                }
+            }
             if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil { self.fail("The streaming engine exited unexpectedly (\(code)). Please save its crash report and engine log.") }
         }
         stream = helper
@@ -313,6 +335,17 @@ struct PairingRequest: Identifiable {
             stream = nil; streamWindowToken = nil; streamActive = false
             send("resume"); fail(error.localizedDescription)
         }
+    }
+    func menuAction(_ action: Int) {
+        if (204...206).contains(action) {
+            guard streamWindowExists else { return }
+            menuState.nextMode = action - 204
+            pendingWindowMode = [2, 0, 1][action - 204]
+            return
+        }
+        guard streamWindowExists, let token = streamWindowToken else { return }
+        DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.moonlight-stream.NativeGlass.menuAction"),
+            object: token, userInfo: ["action": action], deliverImmediately: true)
     }
     func restoreStreamWindow() {
         guard streamWindowExists, let token = streamWindowToken else { return }

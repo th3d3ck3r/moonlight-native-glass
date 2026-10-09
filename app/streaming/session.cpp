@@ -1991,6 +1991,14 @@ void Session::exec()
 
     // Hijack this thread to be the SDL main thread. We have to do this
     // because we want to suspend all Qt processing until the stream is over.
+#ifdef Q_OS_MACOS
+    // Native menu state and explicit mute are session-local presentation controls.
+    bool nativeUserMuted = false;
+    auto publishNativeMenu = [&] {
+        nativePublishMenuState(m_Window, m_InputHandler->isCaptureActive(),
+            m_OverlayManager.isOverlayEnabled(Overlay::OverlayDebug), nativeUserMuted);
+    };
+#endif
     SDL_Event event;
     for (;;) {
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
@@ -2027,12 +2035,28 @@ void Session::exec()
 #ifdef Q_OS_MACOS
         if (event.type == nativeRestoreStreamWindowEventType()) {
             nativeRestoreStreamWindow(event.user.windowID);
+            publishNativeMenu();
             continue;
         }
         if (event.type == nativeOverlayEventType() && nativeOverlayConfigured()) {
-            m_InputHandler->handleNativeOverlayAction(event.user.code);
+            const int action = event.user.code;
+            if (action == 200) nativeHideStreamWindow(m_Window);
+            else if (action == 207) {
+                nativeUserMuted = !nativeUserMuted;
+                m_AudioMuted = nativeUserMuted || (m_Preferences->muteOnFocusLoss && !(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS));
+            } else if (action == 212) {
+                // Explicit Disconnect overrides auto-quit for this session only.
+                m_Preferences->quitAppAfter = false;
+                m_InputHandler->handleNativeOverlayAction(action);
+            } else if (action != 210) {
+                if (action == 201 || action == 100) nativeRestoreStreamWindow(SDL_GetWindowID(m_Window));
+                m_InputHandler->handleNativeOverlayAction(action);
+            }
+            publishNativeMenu();
             continue;
         }
+        if (nativeOverlayConfigured() && (event.type == SDL_KEYUP || event.type == SDL_WINDOWEVENT))
+            nativeOverlayPerformAction(210);
 #endif
         switch (event.type) {
         case SDL_QUIT:
@@ -2092,6 +2116,9 @@ void Session::exec()
             case SDL_WINDOWEVENT_FOCUS_GAINED:
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = false;
+#ifdef Q_OS_MACOS
+                    m_AudioMuted = nativeUserMuted;
+#endif
                 }
                 m_InputHandler->notifyFocusGained();
                 break;
