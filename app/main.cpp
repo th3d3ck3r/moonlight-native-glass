@@ -438,6 +438,10 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName("Moonlight");
 #ifdef Q_OS_DARWIN
     if (argc > 1 && QString::fromUtf8(argv[1]) == "native") {
+        // OpenSSL otherwise registers its process-exit cleanup lazily, possibly
+        // after Qt's TLS/thread globals. Initialize first so reverse-order exit
+        // cleanup cannot release crypto state ahead of those later Qt globals.
+        if (!initializeNativeHelperTls()) return 1;
         QCoreApplication::setApplicationName("Moonlight Native Glass");
         if (argc < 3 || QString::fromUtf8(argv[2]) != "stream") {
             QCoreApplication::setAttribute(Qt::AA_PluginApplication);

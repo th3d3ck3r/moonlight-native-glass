@@ -16,6 +16,10 @@ class QQuickWindow;
 class NvComputer;
 namespace CliStartStream { class Launcher; }
 
+// Register OpenSSL's automatic cleanup before Qt can create TLS workers and
+// process-global TLS state. Retain the stock providers/configuration/backends.
+bool initializeNativeHelperTls();
+
 // macOS-only presentation adapter. The transport and Session implementations
 // remain upstream's; stdout carries versioned JSON lines, never shell commands.
 class NativeBridge : public QObject

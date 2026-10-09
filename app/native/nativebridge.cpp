@@ -24,9 +24,19 @@
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
+#include <openssl/ssl.h>
 
 void configureNativeStreamWindow(const char* token);
 void stopNativeStreamWindow();
+
+bool initializeNativeHelperTls()
+{
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    return OPENSSL_init_ssl(0, nullptr) == 1;
+#else
+    return true;
+#endif
+}
 
 namespace {
 QString artKey(const QString& uuid, int id) { return uuid + ':' + QString::number(id); }
