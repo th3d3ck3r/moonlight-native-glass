@@ -91,8 +91,12 @@ jobs:
         run: bash scripts/build-native-macos.sh '${{ matrix.architecture }}'
       - name: Test real engine bridge and persistence
         if: matrix.architecture == 'universal'
+        env:
+          MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB: ${{ github.workspace }}/build/helper-backtrace.dylib
+          MOONLIGHT_NATIVE_SHUTDOWN_CYCLES: '100'
         run: |
           mkdir -p build/previews
+          xcrun clang++ -std=c++17 -dynamiclib -g tests/native/NativeCrashTrace.cpp -o build/helper-backtrace.dylib
           python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
       - name: Test actual menu bar icon state
         if: matrix.architecture == 'universal'
