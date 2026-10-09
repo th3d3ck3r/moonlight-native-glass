@@ -49,13 +49,17 @@ native adapters and fixture methods, not the full decoder/network engine; proces
 global AppKit leak detection was disabled. Both bundle audits checked 105 Mach-O
 files. Real adapter schema/type, atomic validation, settings persistence, recovery
 and 100 diagnostic plus 100 ordinary immediate-shutdown cycles passed. No live
-streaming session was used in that stress test. A follow-up strengthens the invalid
-host guard test against a live process fixture; application source is unchanged.
+streaming session was used in that stress test. Follow-up run `37895058759`,
+job `113704430040`, also passed: invalid-host guards were checked against a live
+process fixture, helper diagnostic logs and signal/exit distinctions passed, and
+all five native UI XCTest cases passed again. Application source is unchanged.
 
 Intel artifact `11599678354` and Universal `11600160812` were verified unexpired.
 The downloaded Intel application ZIP matched its CI checksum, native build 18
 and engine 6.2.0: SHA-256
-`5a06bbb3238f78f62222dda07ac03d060d9442df2fc63c5b356cd4ec7193a0f1`. This is an audit of custom app code, integration paths
+`5a06bbb3238f78f62222dda07ac03d060d9442df2fc63c5b356cd4ec7193a0f1`.
+
+This is an audit of custom app code, integration paths
 and protected upstream boundaries, not a formal proof of every upstream engine
 path. Testing reduces risk; it cannot guarantee no unexpected behavior.
 

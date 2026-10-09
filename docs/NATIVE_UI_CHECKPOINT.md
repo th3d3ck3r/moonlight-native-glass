@@ -423,3 +423,10 @@ offline during diagnosis; GitHub API/workflow access continues to work.
 - A final UI probe strengthens invalid-host launch coverage using a live process
   fixture and makes future UBSan findings fail immediately. It changes tests/CI
   and documentation only; the verified application code/artifacts are unchanged.
+
+- Final follow-up run `37895058759`, UI job `113704430040`, completed SUCCESS:
+  strengthened live-process invalid-host guard, retained stderr diagnostics,
+  signal/exit distinction, menu/thumbnail confirmations and all five native UI
+  XCTest cases passed. Full builds were skipped because application source was
+  unchanged from the fully validated run `37894048789`. Build 18 is ready for
+  user testing with the audit's live-host/hardware limitations disclosed.
