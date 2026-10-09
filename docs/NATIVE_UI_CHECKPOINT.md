@@ -306,3 +306,21 @@ Next: inspect the original ordinary fault's full-thread stack; make an evidence-
 based fix within native adapter scope; rerun complete builds and extended ordinary
 stress. Record failures as well as passes. Local execution environment became
 offline during diagnosis; GitHub API/workflow access continues to work.
+
+### Follow-up original-process diagnostics
+
+- Local execution recovered; checkout was fast-forwarded to the saved remote
+  changes. The Intel A6 artifact was downloaded and its SHA-256 matched the CI
+  checksum: `94157da9dde16e26ae8f64bce619c8affa00720ed1ce74005b4da3a1e2b6561f`.
+  The user received the actual inner application ZIP as an unreleased test build.
+  Bundle metadata confirms native UI build 16 and engine 6.2.0.
+- Debugger protocol fixes ultimately consumed LLDB state events through an
+  explicit listener. Run `37883768248` printed all 1000 cycles and
+  `PASS: original-process debugger shutdown stress` at 04:45:06 UTC. The job
+  was cancelled at its 20-minute limit while destroying the diagnostic debugger
+  after that pass. This is completed test evidence, not a green workflow result,
+  and it does not resolve the prior ordinary-run SIGILL at cycle 184.
+- The next probe runs 2000 ordinary, uninstrumented shutdown cycles with OS core
+  dumps enabled on the disposable CI runner. On failure, LLDB examines the
+  original core and captures all thread stacks plus loaded images. Only text
+  diagnostics are uploaded, not raw core memory. Application code is unchanged.

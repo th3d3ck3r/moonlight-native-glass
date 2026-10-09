@@ -1,4 +1,4 @@
-name: Native helper original-process debugger probe
+name: Native helper ordinary shutdown core probe
 on:
   push:
     branches: [native-ui]
@@ -26,10 +26,36 @@ jobs:
         run: |
           gh run download 37878107640 -R th3d3ck3r/moonlight-native-glass -n Native-Glass-Preview-16-universal -D build/probe-artifact
           unzip -q build/probe-artifact/Moonlight-Native-Glass-Preview-16-universal.zip -d build/probe
-      - name: Inspect original helper faults with every thread
+      - name: Exercise ordinary shutdowns and inspect original core dumps
         env:
-          MOONLIGHT_NATIVE_PROBE_EXECUTABLE: ${{ github.workspace }}/build/probe/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight
-          MOONLIGHT_NATIVE_SHUTDOWN_CYCLES: '1000'
+          MOONLIGHT_NATIVE_SHUTDOWN_CYCLES: '2000'
         run: |
-          lldb --batch -o "script exec(open('tests/native/lldb_shutdown_probe.py').read())"
-          test -f build/lldb-shutdown-pass
+          # Keep the helper uninstrumented. Capture its original process state
+          # only if the OS observes a fatal signal, without a retry or injection.
+          sudo mkdir -p /cores
+          sudo chmod 1777 /cores
+          sudo sysctl -w kern.coredump=1
+          ulimit -c unlimited
+          helper="$PWD/build/probe/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight"
+          status=0
+          python tests/native/bridge_smoke.py "$helper" > build/ordinary-shutdown.log 2>&1 || status=$?
+          tail -n 90 build/ordinary-shutdown.log
+          if [ "$status" -ne 0 ]; then
+            for core in /cores/core.*; do
+              if [ -f "$core" ]; then
+                lldb --batch --core "$core" -o 'thread backtrace all' -o 'image list' "$helper" >> build/ordinary-crash.txt 2>&1 || true
+              fi
+            done
+            /usr/bin/log show --last 5m --style compact --predicate 'process == "Moonlight"' > build/ordinary-system.log 2>&1 || true
+            if [ -f build/ordinary-crash.txt ]; then cat build/ordinary-crash.txt; fi
+          fi
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ordinary-shutdown-diagnostics
+          path: |
+            build/ordinary-shutdown.log
+            build/ordinary-crash.txt
+            build/ordinary-system.log
+          retention-days: 7
