@@ -211,3 +211,28 @@ Later checkpoint/audit commits contain documentation only. Next step is physical
 Intel/live-host acceptance; no release is published by this task. Fullscreen
 and icon captures are attached to the same successful run. Both icon states at
 standard and Retina sizes were visually reviewed in addition to pixel checks.
+
+
+## RC1 published — October 8, 2026
+
+- User authorized RC1 publication and README updates while acknowledging remaining errors.
+- [RC1](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-rc1)
+  is public with `prerelease=true`, `draft=false`, Intel/Universal ZIPs, SHA-256
+  checksums and 13 composited interface screenshots. Tag targets publication
+  commit `baa4d9fb8924ee2ece8de02884bb9622314c928a`.
+- Promotes unchanged validated application/test source `7202a71c`, native UI
+  build 15 and Moonlight engine 6.2.0 from run `37795784286`. Distribution ZIP
+  filenames are RC1; About still identifies Native UI Preview 15. No executable,
+  resource, signature or engine version was changed for this promotion.
+- [Publication run 37868422420](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/37868422420)
+  passed exact-source, all-three-job, application-input, master-baseline and
+  original package checksum checks, uploaded draft assets, then published.
+- README on both native-ui and master now links RC1, current screenshots and
+  install instructions, explains seven Settings panes and correct hide/controls/
+  disconnect shortcuts, reviewed engine hooks, test coverage and known limits.
+  Master commit `de9fcf6951beaa46553b40f849747e9fd81c85de` changes README only.
+  All ten README release-asset links were verified against published assets.
+- Remaining reported errors are unspecified; do not invent fixes or call RC1
+  a stable/bug-free release. Future work should obtain reproduction details and
+  preserve protected stock backend/decoder/settings/timing implementations.
+  Physical host/Intel coverage and performance are not certified by CI.
