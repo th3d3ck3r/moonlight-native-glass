@@ -1,20 +1,15 @@
-name: Native helper extended shutdown validation
+name: Native helper original-process debugger probe
 on:
   push:
     branches: [native-ui]
-    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeCrashTrace.cpp, tests/native/bridge_smoke.py]
+    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/lldb_shutdown_probe.py]
 permissions:
   actions: read
   contents: read
 jobs:
   diagnose:
-    name: Shutdown (${{ matrix.mode }})
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: [trace]
     runs-on: macos-26
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: maxim-lobanov/setup-xcode@v1
@@ -25,17 +20,16 @@ jobs:
           version: '6.11.2'
           cache: true
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
-      - name: Obtain fixed helper without rebuilding
+      - name: Obtain packaged helper without rebuilding
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh run download 37878107640 -R th3d3ck3r/moonlight-native-glass -n Native-Glass-Preview-16-universal -D build/probe-artifact
           unzip -q build/probe-artifact/Moonlight-Native-Glass-Preview-16-universal.zip -d build/probe
-      - name: Capture fatal stacks during repeated immediate shutdown
+      - name: Inspect original helper faults with every thread
         env:
-          MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB: ${{ matrix.mode == 'trace' && format('{0}/build/probe-backtrace.dylib', github.workspace) || '' }}
+          MOONLIGHT_NATIVE_PROBE_EXECUTABLE: ${{ github.workspace }}/build/probe/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight
           MOONLIGHT_NATIVE_SHUTDOWN_CYCLES: '1000'
-          MOONLIGHT_NATIVE_STOP_ON_FAULT: '1'
         run: |
-          xcrun clang++ -std=c++17 -dynamiclib -undefined dynamic_lookup -g tests/native/NativeCrashTrace.cpp -o build/probe-backtrace.dylib
-          python3 tests/native/bridge_smoke.py 'build/probe/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight'
+          lldb --batch -o "script exec(open('tests/native/lldb_shutdown_probe.py').read())"
+          test -f build/lldb-shutdown-pass
