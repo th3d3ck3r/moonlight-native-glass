@@ -779,6 +779,13 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
 
 #ifdef Q_OS_DARWIN
+    if (app.arguments().value(1) == "native") {
+        // A packaged helper must not mix its TLS plugins with an installed Qt
+        // SDK's plugins (for example inherited QT_PLUGIN_PATH). Leave unpackaged
+        // development builds on Qt's ordinary lookup policy.
+        const QString plugins = QDir(app.applicationDirPath()).absoluteFilePath("../PlugIns");
+        if (QDir(plugins).exists()) QCoreApplication::setLibraryPaths({QDir(plugins).canonicalPath()});
+    }
     if (app.arguments().value(1) == "native" && app.arguments().value(2) != "stream") {
         configureNativeBackgroundApplication();
     }

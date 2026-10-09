@@ -93,7 +93,8 @@ NativeBridge::NativeBridge(const QStringList& args, QObject* parent) : QObject(p
     createArtworkManager();
     QTimer::singleShot(0, this, [this, args] {
         if (m_Stopping) return;
-        send({{"event", "ready"}, {"protocol", 1}, {"engineVersion", QCoreApplication::applicationVersion()}});
+        send({{"event", "ready"}, {"protocol", 1}, {"engineVersion", QCoreApplication::applicationVersion()},
+              {"pluginPaths", QJsonArray::fromStringList(QCoreApplication::libraryPaths())}});
         if (m_StreamMode) startStream(args);
         else {
             preferences();

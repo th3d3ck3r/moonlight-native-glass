@@ -93,7 +93,11 @@ class Bridge:
 with tempfile.TemporaryDirectory() as root:
     bridge = Bridge(root)
     try:
-        assert bridge.wait("ready")["protocol"] == 1
+        ready = bridge.wait("ready")
+        assert ready["protocol"] == 1
+        if os.environ.get("MOONLIGHT_NATIVE_SKIP_TERMINAL_CHECK") != "1":
+            plugins = (pathlib.Path(executable).resolve().parent / "../PlugIns").resolve()
+            assert ready["pluginPaths"] == [str(plugins)], ready
         # Verify the real packaged helper's AppKit policy, not just plist text.
         subprocess.run(["swift", "-e", "import AppKit; "
                         f"guard let app = NSRunningApplication(processIdentifier: {bridge.p.pid}) "
