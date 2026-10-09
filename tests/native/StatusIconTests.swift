@@ -84,6 +84,17 @@ import Combine
         menu.menuAction(connectedMenu.items.first { $0.title == "Open Library" }!)
         menu.menuAction(connectedMenu.items.first { $0.title == "Disconnect" }!)
         precondition(actions == [202, 208, 212] && libraries == 1)
+        let exitItem = connectedMenu.items.first { $0.tag == 209 }!
+        for (reply, replaceStream) in [(NSApplication.ModalResponse.alertFirstButtonReturn,false),(.alertSecondButtonReturn,false),(.alertSecondButtonReturn,true)] {
+            let before = actions.count
+            DispatchQueue.main.async {
+                if replaceStream { menu.state.token = "replaced-during-confirmation" }
+                NSApp.stopModal(withCode: reply)
+            }
+            menu.menuAction(exitItem)
+            precondition(actions.count == before + (reply == .alertSecondButtonReturn && !replaceStream ? 1 : 0),"Only confirmed exit for the same stream may send the host-exit action")
+        }
+        menu.state.token = "first-stream"
         let thumbnail = NSImage(size: NSSize(width: 320, height: 180), flipped: false) { rect in
             NSColor.systemBlue.setFill(); rect.fill(); return true
         }

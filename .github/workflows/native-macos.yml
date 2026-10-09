@@ -76,6 +76,15 @@ jobs:
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
           build/stream-window-tests
+      - name: Audit native window and input lifetime with sanitizers
+        if: matrix.architecture == 'universal'
+        run: |
+          xcrun clang++ -std=c++17 -fno-objc-arc -g -fno-omit-frame-pointer -fsanitize=address,undefined \
+            -I libs/mac/include/SDL2 -I app/native -I build \
+            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-sanitizer-tests
+          ASAN_OPTIONS=detect_leaks=0 build/stream-window-sanitizer-tests
       - uses: actions/upload-artifact@v6
         if: always() && matrix.architecture == 'universal'
         with:

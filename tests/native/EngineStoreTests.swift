@@ -159,6 +159,14 @@ func nativeArgument(_ name: String) -> String? { nil }
         precondition(delayed.message == nil, "Intentional launch cancellation was reported as a crash")
         delayed.shutdown()
 
+        for (online, unknown, paired, supported) in [(false,false,true,true),(true,true,true,true),(true,false,false,true),(true,false,true,false)] {
+            let unavailable = Computer(id: computer.id, name: computer.name, online: online, unknown: unknown, paired: paired,
+                runningApp: 0, address: "", localAddress: "", serverVersion: "", gpu: "", supported: supported, apps: [game])
+            let guarded = EngineStore(executable: helper)
+            guarded.ready = true
+            guarded.startStream(unavailable, game: game)
+            precondition(!guarded.streamActive,"Controller or stale UI must not launch an unavailable or unpaired host")
+        }
         let silent = EngineStore(executable: try fixture("silent"))
         silent.start()
         try await wait { silent.ready }

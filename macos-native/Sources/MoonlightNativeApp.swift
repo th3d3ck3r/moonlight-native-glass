@@ -67,7 +67,10 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 Button("Refresh Computers") { store.refresh() }.keyboardShortcut("r")
             }
             CommandGroup(after: .appSettings) {
-                Button("Open Engine Logs") { NSWorkspace.shared.open(URL(fileURLWithPath: "/tmp", isDirectory: true)) }
+                Button("Open Engine Logs") {
+                    try? FileManager.default.createDirectory(at: nativeEngineLogDirectory(), withIntermediateDirectories: true)
+                    NSWorkspace.shared.open(nativeEngineLogDirectory())
+                }
                 Button("View Preview Releases…") {
                     NSWorkspace.shared.open(URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass/releases")!)
                 }

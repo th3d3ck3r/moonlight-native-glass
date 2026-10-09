@@ -280,7 +280,8 @@ struct PairingRequest: Identifiable {
         send("settings", ["values": ["width": width, "height": height]])
     }
     func startStream(_ computer: Computer, game: Game) {
-        guard ready, !streamActive, pairing == nil, !addingHost, !testingConnection, !preview else { return }
+        guard ready, !streamActive, pairing == nil, !addingHost, !testingConnection, !preview,
+              computer.online, !computer.unknown, computer.paired, computer.supported else { return }
         streamActive = true; streamStarted = false; warnings = []
         status = "Preparing \(game.name)…"
         let requestID = UUID().uuidString
