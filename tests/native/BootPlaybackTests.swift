@@ -2,6 +2,13 @@ import AppKit
 import AVFoundation
 
 @main struct BootPlaybackTests {
+    @MainActor final class ReportingView: NSView {
+        var report: ((NSWindow?) -> Void)?
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            report?(window)
+        }
+    }
     @MainActor static func require(_ condition: @autoclosure () -> Bool, _ message: String) {
         if !condition() { fatalError(message) }
     }
@@ -31,7 +38,12 @@ import AVFoundation
         let first = NativeBootPresentation(enabled: true, resource: resource, reduceMotion: false)
         let firstWindow = window()
         let content = firstWindow.contentView!
+        let reporter = ReportingView(frame: .zero)
+        reporter.report = { first.watchWindow($0) }
+        content.addSubview(reporter)
         first.watchWindow(firstWindow)
+        first.watchWindow(firstWindow)
+        wait(3) { firstWindow.contentView !== content }
         let container = firstWindow.contentView!
         require(container !== content && content.superview === container,
                 "Movie and disabled library must be siblings in the same window")

@@ -15,6 +15,7 @@ import SwiftUI
     private weak var watchedWindow: NSWindow?
     private var hostingView: NSHostingView<NativeBootView>?
     private var escapeMonitor: Any?
+    private var attachmentScheduled = false
     private var deadline: Task<Void, Never>?
     private var fadeCompletion: Task<Void, Never>?
     private var started = false
@@ -67,12 +68,25 @@ import SwiftUI
     }
 
     func watchWindow(_ window: NSWindow?) {
+        guard phase == .playing, let window, hostingView == nil, !attachmentScheduled else { return }
+        // Window accessors run during AppKit/SwiftUI hierarchy enumeration.
+        // Reparent only after that pass; moving the library reports its window
+        // again, so retain the guard until the entire attachment has completed.
+        attachmentScheduled = true
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self else { return }
+            defer { self.attachmentScheduled = false }
+            self.attachWindow(window)
+        }
+    }
+
+    private func attachWindow(_ window: NSWindow?) {
         guard phase == .playing, let window, let content = window.contentView else { return }
         if hostingView == nil {
             // NavigationSplitView owns the native window content hierarchy on
             // macOS; a sibling SwiftUI ZStack view is not reliably presented.
-            // Attach above that hierarchy, in the same window, without changing
-            // its content controller, frame, toolbar or stream routing.
+            // Retain that hierarchy inside a container in the same window,
+            // preserving the frame, toolbar and stream routing.
             // The library's hosting view is disabled during playback. Keep
             // the movie outside that hosting hierarchy so both its layer and
             // its controls remain visible and interactive.

@@ -10,6 +10,8 @@ import XCTest
         XCTAssertTrue(window.waitForExistence(timeout: 10))
         let skip = window.buttons["native-boot-skip"]
         XCTAssertTrue(skip.waitForExistence(timeout: 5), "Boot playback must appear in the library window")
+        // Capture visible artwork after the movie's initial fade-in.
+        Thread.sleep(forTimeInterval: 1)
         let frame = window.frame
         XCTAssertEqual(app.windows.count, 1, "Boot must not create a second window")
         let boot = XCTAttachment(screenshot: window.screenshot())
