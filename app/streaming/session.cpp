@@ -2005,11 +2005,22 @@ void Session::exec()
         nativePublishMenuState(m_Window, m_InputHandler->isCaptureActive(),
             m_OverlayManager.isOverlayEnabled(Overlay::OverlayDebug), nativeUserMuted);
     };
-    if (!nativeStartStreamMenuCommands())
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Native stream menu command channel could not start");
+    bool nativeMenuCommandsStarted = false;
 #endif
     SDL_Event event;
     for (;;) {
+#ifdef Q_OS_MACOS
+        // The overlay publishes its configured state only after reserving its
+        // SDL event type. Start the reader afterward, including the EOF path.
+        if (!nativeMenuCommandsStarted && nativeOverlayConfigured()) {
+            if (!nativeStartStreamMenuCommands()) {
+                emit displayLaunchError(tr("The stream menu command channel could not start."));
+                m_Preferences->quitAppAfter = false;
+                goto DispatchDeferredCleanup;
+            }
+            nativeMenuCommandsStarted = true;
+        }
+#endif
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
         // SDL 2.0.18 has a proper wait event implementation that uses platform
         // support to block on events rather than polling on Windows, macOS, X11,

@@ -168,6 +168,7 @@ func nativeArgument(_ name: String) -> String? { nil }
             try await wait { (delayed.values["windowMode"] as? NSNumber)?.intValue == expected && delayed.values["fixtureStep"] as? String == "settings" }
             precondition(delayed.streamActive && delayed.streamStarted, "Selecting next window mode ended the active stream")
         }
+        delayed.message = nil // Clear the earlier deliberately rejected launch.
         try await wait { delayed.streamWindowExists }
         for action in [213, 214, 212, 209] { delayed.menuAction(action) }
         let actionFile = delayedHelper.deletingLastPathComponent().appendingPathComponent("menu-actions")
