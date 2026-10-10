@@ -77,7 +77,7 @@ import Combine
         }
         let modes = connectedMenu.items.first { $0.title == "Window Mode (Next Stream)" }!.submenu!
         precondition(modes.items[2].state == .on && modes.items[0].state == .off)
-        var actions = [Int](), restores = 0, libraries = 0, captures = 0
+        var actions = [Int](), restores = 0, libraries = 0
         menu.perform = { actions.append($0) }; menu.open = { restores += 1 }; menu.library = { libraries += 1 }
         menu.menuAction(connectedMenu.items.first { $0.title == "Release Input" }!)
         menu.menuAction(connectedMenu.items.first { $0.title == "Hide Statistics" }!)
@@ -96,38 +96,25 @@ import Combine
             precondition(Array(actions.dropFirst(before)) == expected,"Confirmation must suspend input, restore on Cancel, and exit only the same stream")
         }
         menu.state.token = "first-stream"
-        let thumbnail = NSImage(size: NSSize(width: 320, height: 180), flipped: false) { rect in
-            NSColor.systemBlue.setFill(); rect.fill(); return true
-        }
-        menu.thumbnailProvider = { id in precondition(id == 99); captures += 1; return thumbnail }
-        menu.hoverDelay = .milliseconds(40)
-        menu.beginHover(); menu.endHover(); flush(); flush()
-        precondition(captures == 0 && menu.previewPanel == nil, "Leaving before delay must cancel capture")
-        let keyWindow = NSApp.keyWindow
-        menu.beginHover()
-        for _ in 0..<5 { flush() }
-        precondition(captures == 1 && menu.previewPanel?.isVisible == true, "Delayed hover must show thumbnail")
-        precondition(menu.previewPanel!.canBecomeKey == false && NSApp.keyWindow === keyWindow, "Thumbnail must not steal focus")
-        precondition(menu.previewPanel!.contentView!.accessibilityPerformPress(), "Thumbnail must be accessible and clickable")
-        precondition(restores == 1 && menu.previewPanel == nil)
-        // A window missing from shareable content reuses only this stream's last frame.
-        menu.thumbnailProvider = { _ in nil }
+        precondition(!button.trackingAreas.contains { ($0.owner as AnyObject?) === menu }, "Status item must install no hover tracking")
+        precondition(!menu.responds(to: NSSelectorFromString("mouseEnteredWithEvent:")), "Status menu must have no hover handler")
+        precondition(connectedMenu.items.allSatisfy { $0.tag != -5 }, "Removed thumbnails must leave no Screen Recording permission action")
+        button.performClick(nil)
+        precondition(restores == 1, "Primary status-item click must still restore/open the main window")
         menu.state.visible = false
-        menu.beginHover(); for _ in 0..<5 { flush() }
-        precondition(menu.previewPanel?.isVisible == true, "Hidden stream should retain cached thumbnail")
-        menu.state = NativeMenuState(exists: true, token: "replacement", windowNumber: 100)
-        precondition(menu.previewPanel == nil, "Replacement must dismiss the old stream thumbnail")
-        menu.beginHover(); for _ in 0..<5 { flush() }
-        precondition(menu.previewPanel?.isVisible == true && menu.previewUnavailable, "Replacement without an image must show a restore fallback, never the previous stream image")
-        menu.captureAllowed = { false }
-        menu.dismissPreview(); menu.beginHover(); for _ in 0..<5 { flush() }
-        precondition(menu.previewPanel?.isVisible == true && menu.previewUnavailable, "Missing permission must still show a clickable restore fallback")
-        menu.dismissPreview()
-        menu.thumbnailProvider = { _ in try? await Task.sleep(for: .milliseconds(120)); return thumbnail }
-        menu.beginHover(); flush()
+        let hiddenMenu = menu.makeMenu()
+        menu.menuAction(hiddenMenu.items.first { $0.title == "Restore Stream Window" }!)
+        precondition(restores == 2, "Hidden stream must still restore from its menu item")
+        let windowCount = NSApp.windows.count
+        for _ in 0..<20 { flush() }
+        precondition(NSApp.windows.count == windowCount, "Idle status item must not create a preview window")
         menu.state = NativeMenuState()
-        for _ in 0..<5 { flush() }
-        precondition(menu.previewPanel == nil, "A completed stale capture must not resurrect an ended stream")
-        print("Status icon, complete menu routing/state, hover delay/cancellation, focus, cached fallback, restore and stream replacement checks passed")
+        let finalMenu = menu.makeMenu()
+        for tag in [200, 100, 201, 203, 207, 209, 212] {
+            precondition(finalMenu.items.first { $0.tag == tag }?.isEnabled == false)
+        }
+        precondition(finalMenu.items.first { $0.title == "Settings…" }?.isEnabled == true)
+        precondition(finalMenu.items.first { $0.title == "Open Engine Logs" }?.isEnabled == true)
+        print("Status icon states, menu confirmations/input handoff, click/hidden restore and hover removal checks passed")
     }
 }

@@ -95,7 +95,6 @@ private struct NativeStatusActions: View {
             if delegate.statusMenu == nil { delegate.statusMenu = NativeStatusMenu() }
             delegate.statusMenu?.bind(to: store.$streamWindowExists)
             delegate.statusMenu?.bindState(to: store.$menuState)
-            delegate.statusMenu?.bindStarted(to: store.$streamStarted)
             let openLibrary: () -> Void = {
                     openWindow(id: "library")
                     if let window = store.libraryWindow {

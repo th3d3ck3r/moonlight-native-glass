@@ -142,7 +142,7 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
-      - name: Test menu and thumbnail lifecycle before UI capture
+      - name: Test menu, restore and removed hover before UI capture
         run: |
           mkdir -p build
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
