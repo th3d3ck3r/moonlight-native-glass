@@ -158,7 +158,7 @@ jobs:
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
           build/engine-store-tests
-      - name: Capture composited native UI with XCTest
+      - name: Test real boot playback and native window lifetime
         # The media fixture also runs in UI-only probes, before screenshots.
         # Compile the same production coordinator used by the actual app.
         run: |

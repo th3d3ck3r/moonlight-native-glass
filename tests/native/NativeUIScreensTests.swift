@@ -23,6 +23,12 @@ import XCTest
         XCTAssertTrue(window.buttons["Add Computer"].isHittable, "Library controls must become available after boot")
         let library = XCTAttachment(screenshot: window.screenshot())
         library.name = "library-after-boot"; library.lifetime = .keepAlways; add(library)
+        window.buttons["Add Computer"].click()
+        let sheet = window.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "Library sheet routing must survive the boot container")
+        sheet.buttons["Cancel"].click()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: sheet)
+        waitForExpectations(timeout: 5)
         app.terminate()
     }
 
