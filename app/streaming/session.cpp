@@ -2002,7 +2002,7 @@ void Session::exec()
     // Native menu state and explicit mute are session-local presentation controls.
     bool nativeUserMuted = false;
     auto publishNativeMenu = [&] {
-        nativePublishMenuState(m_Window, m_InputHandler->isCaptureActive(),
+        nativePublishMenuState(m_Window, m_InputHandler->nativeMenuCaptureIntent(),
             m_OverlayManager.isOverlayEnabled(Overlay::OverlayDebug), nativeUserMuted);
     };
     bool nativeMenuCommandsStarted = false;

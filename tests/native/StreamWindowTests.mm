@@ -73,6 +73,7 @@ public:
     Combo m_SpecialKeyCombos[KeyComboMax];
     void performSpecialKeyCombo(KeyCombo) { check(false,"Native disconnect must not request stock process quit"); }
     void handleNativeOverlayAction(int action);
+    bool nativeMenuCaptureIntent();
     bool isCaptureActive() { return SDL_GetRelativeMouseMode(); }
     void setCaptureActive(bool active) {
         check(SDL_SetRelativeMouseMode(active ? SDL_TRUE : SDL_FALSE) == 0, "Fixture capture failed");
@@ -205,6 +206,7 @@ int main(int argc, char** argv) {
         routing.setCaptureActive(true);
         routing.handleNativeOverlayAction(213);
         check(!routing.isCaptureActive() && routing.m_NativeMenuInputSuspended,"Menu must release relative capture");
+        check(routing.nativeMenuCaptureIntent(),"Temporary menu release must keep Release Input command stable");
         routing.handleNativeOverlayAction(213);
         routing.notifyFocusLost(); routing.notifyFocusGained();
         check(!routing.isCaptureActive(),"Menu focus changes must not recapture input");
@@ -218,6 +220,7 @@ int main(int argc, char** argv) {
         routing.setCaptureActive(false);
         routing.handleNativeOverlayAction(213); routing.handleNativeOverlayAction(214);
         check(!routing.isCaptureActive(),"Menu must respect explicitly released input");
+        check(!routing.nativeMenuCaptureIntent(),"Explicitly released input must keep Capture Input command stable");
         for (int action : {int(SdlInputHandler::KeyComboQuitAndExit),12,209,212}) {
             SDL_FlushEvent(nativeOverlayEventType());
             routing.handleNativeOverlayAction(action);

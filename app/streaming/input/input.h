@@ -86,6 +86,7 @@ class SdlInputHandler
 public:
 #ifdef Q_OS_MACOS
     void handleNativeOverlayAction(int action);
+    bool nativeMenuCaptureIntent();
 #endif
     explicit SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight);
 

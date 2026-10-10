@@ -330,6 +330,15 @@ void SdlInputHandler::notifyFocusGained()
 #endif
 }
 
+#ifdef Q_OS_MACOS
+bool SdlInputHandler::nativeMenuCaptureIntent()
+{
+    // Menu/dialog release is temporary. Keep the Release/Capture menu command
+    // stable until the user explicitly changes capture or dismisses the menu.
+    return m_NativeMenuInputSuspended ? m_NativeCaptureBeforeMenu : isCaptureActive();
+}
+#endif
+
 bool SdlInputHandler::isCaptureActive()
 {
     if (SDL_GetRelativeMouseMode()) {

@@ -7,9 +7,9 @@ import pathlib
 
 source = pathlib.Path("app/streaming/input/input.cpp").read_text()
 methods = []
-for name in ("notifyFocusLost", "notifyFocusGained", "handleNativeOverlayAction"):
+for name in ("notifyFocusLost", "notifyFocusGained", "handleNativeOverlayAction", "nativeMenuCaptureIntent"):
     source = pathlib.Path("app/streaming/input/keyboard.cpp" if name == "handleNativeOverlayAction" else "app/streaming/input/input.cpp").read_text()
-    start = source.index("void SdlInputHandler::" + name + "(")
+    start = source.index(("bool" if name == "nativeMenuCaptureIntent" else "void") + " SdlInputHandler::" + name + "(")
     body = source.index("{", start)
     depth = 1
     end = body + 1
