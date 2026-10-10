@@ -4,6 +4,7 @@ import SwiftUI
 struct LibraryView: View {
     @ObservedObject var store: EngineStore
     var interactive = true
+    var reportWindow: ((NSWindow?) -> Void)? = nil
     @Environment(\.openSettings) private var openSettings
     @State private var previewConfigured = false
     @State private var search = ""
@@ -70,6 +71,7 @@ struct LibraryView: View {
         .sheet(item: $details) { ComputerDetailsSheet(computer: $0) }
         .sheet(item: $rename) { RenameComputerSheet(store: store, computer: $0) }
         .background(NativeWindowAccessor { store.libraryWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-library"); $0?.setAccessibilityIdentifier("native-library")
+            reportWindow?($0)
             if store.preview { let compact = CommandLine.arguments.contains("--compact"); $0?.setContentSize(NSSize(width: compact ? 680 : 1080, height: compact ? 460 : 720)) } }.frame(width: 0, height: 0))
         .alert(item: Binding(get: { store.message?.settingsScene == false ? store.message : nil }, set: { store.message = $0 })) { message in Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK"))) }
         .confirmationDialog("Remove \(removal?.name ?? "computer")?", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } }), titleVisibility: .visible) {

@@ -3,6 +3,7 @@ import SwiftUI
 
 final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     weak var store: EngineStore?
+    weak var boot: NativeBootPresentation?
     var statusMenu: NativeStatusMenu?
     var openPrimaryWindow: (() -> Void)?
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -38,10 +39,11 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             alert.addButton(withTitle: "Cancel")
             if alert.runModal() != .alertFirstButtonReturn { return .terminateCancel }
         }
+        boot?.finishImmediately()
         store?.shutdown()
         return .terminateNow
     }
-    func applicationWillTerminate(_ notification: Notification) { store?.shutdown() }
+    func applicationWillTerminate(_ notification: Notification) { boot?.finishImmediately(); store?.shutdown() }
 }
 
 @main struct MoonlightNativeApp: App {
@@ -57,23 +59,13 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             (CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-reduce-motion")))
     var body: some Scene {
         Window("Moonlight Native Glass", id: "library") {
-            ZStack {
-                LibraryView(store: store, interactive: !boot.blocksLibrary)
+            LibraryView(store: store, interactive: !boot.blocksLibrary, reportWindow: { boot.watchWindow($0) })
                     .disabled(boot.blocksLibrary)
                     .allowsHitTesting(!boot.blocksLibrary)
                     .accessibilityHidden(boot.blocksLibrary)
-                if boot.blocksLibrary {
-                    NativeBootView(presentation: boot)
-                        .opacity(boot.phase == .fading ? 0 : 1)
-                        .zIndex(1)
-                }
-            }
                 .frame(minWidth: 680, minHeight: 460)
-                .toolbar(boot.blocksLibrary ? .hidden : .automatic, for: .windowToolbar)
                 .background(NativeStatusActions(store: store, delegate: delegate))
-                .background(NativeWindowAccessor { boot.watchWindow($0) }.frame(width: 0, height: 0))
-                .onAppear { delegate.store = store; store.start() }
-                .onDisappear { boot.finishImmediately() }
+                .onAppear { delegate.store = store; delegate.boot = boot; store.start() }
         }
         .defaultSize(width: 1080, height: 720)
         .commands {

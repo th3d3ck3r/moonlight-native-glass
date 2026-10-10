@@ -13,6 +13,7 @@ import SwiftUI
     private var motionNotification: NSObjectProtocol?
     private var windowNotification: NSObjectProtocol?
     private weak var watchedWindow: NSWindow?
+    private var hostingView: NSHostingView<NativeBootView>?
     private var deadline: Task<Void, Never>?
     private var fadeCompletion: Task<Void, Never>?
     private var started = false
@@ -65,7 +66,19 @@ import SwiftUI
     }
 
     func watchWindow(_ window: NSWindow?) {
-        guard phase == .playing, let window, window !== watchedWindow else { return }
+        guard phase == .playing, let window, let content = window.contentView else { return }
+        if hostingView == nil {
+            // NavigationSplitView owns the native window content hierarchy on
+            // macOS; a sibling SwiftUI ZStack view is not reliably presented.
+            // Attach above that hierarchy, in the same window, without changing
+            // its content controller, frame, toolbar or stream routing.
+            let host = NSHostingView(rootView: NativeBootView(presentation: self))
+            host.frame = content.bounds
+            host.autoresizingMask = [.width, .height]
+            content.addSubview(host, positioned: .above, relativeTo: nil)
+            hostingView = host
+        }
+        guard window !== watchedWindow else { return }
         if let windowNotification { NotificationCenter.default.removeObserver(windowNotification) }
         watchedWindow = window
         windowNotification = NotificationCenter.default.addObserver(
@@ -92,6 +105,7 @@ import SwiftUI
         player?.pause()
         player?.replaceCurrentItem(with: nil)
         player = nil; item = nil
+        hostingView?.removeFromSuperview(); hostingView = nil
         phase = .finished
     }
 
@@ -148,6 +162,7 @@ struct NativeBootView: View {
         ZStack(alignment: .bottomTrailing) {
             Color.black
             NativeBootMovie(player: presentation.player)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityHidden(true)
             Button("Skip") { presentation.finish() }
                 .keyboardShortcut(.escape, modifiers: [])
@@ -158,7 +173,8 @@ struct NativeBootView: View {
                 .accessibilityIdentifier("native-boot-skip")
                 .padding(20)
         }
-        .accessibilityIdentifier("native-boot-animation")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .opacity(presentation.phase == .fading ? 0 : 1)
         .onAppear { presentation.start() }
     }
 }
