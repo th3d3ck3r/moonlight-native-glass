@@ -48,6 +48,11 @@ jobs:
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
           build/engine-store-tests
+      - name: Test real boot playback and native window lifetime
+        if: matrix.architecture == 'universal'
+        run: |
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
+          build/boot-playback-tests "$PWD/macos-native/Resources/boot-animation.mp4"
       - name: Test native overlays and capture composited previews
         if: matrix.architecture == 'universal'
         run: |
@@ -145,6 +150,7 @@ jobs:
       - name: Test menu, restore and removed hover before UI capture
         run: |
           mkdir -p build
+          xcrun swift -e 'import AppKit; print("Runner Reduce Motion:", NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)'
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
           build/status-icon-tests macos-native/Resources
       - name: Test frontend lifecycle during UI probes
@@ -153,6 +159,12 @@ jobs:
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
           build/engine-store-tests
       - name: Capture composited native UI with XCTest
+        # The media fixture also runs in UI-only probes, before screenshots.
+        # Compile the same production coordinator used by the actual app.
+        run: |
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
+          build/boot-playback-tests "$PWD/macos-native/Resources/boot-animation.mp4"
+      - name: Capture native screens with XCTest
         run: |
           xcodebuild -project tests/native/NativeUITests.xcodeproj -scheme NativeUITests -destination 'platform=macOS' -derivedDataPath build/ui-tests -resultBundlePath build/native-ui.xcresult test
       - name: Collect native screenshots

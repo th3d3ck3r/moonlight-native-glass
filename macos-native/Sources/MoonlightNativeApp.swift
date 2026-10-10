@@ -55,8 +55,11 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             ? nil : CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-invalid-resource")
                 ? Bundle.main.url(forResource: "full-moon", withExtension: "png")
                 : Bundle.main.url(forResource: "boot-animation", withExtension: "mp4"),
-        reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ||
-            (CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-reduce-motion")))
+        // An explicit design playback probe must work even on CI machines
+        // configured to reduce system animation. Normal launches respect it.
+        reduceMotion: CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-preview")
+            ? CommandLine.arguments.contains("--boot-reduce-motion")
+            : NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
     var body: some Scene {
         Window("Moonlight Native Glass", id: "library") {
             LibraryView(store: store, interactive: !boot.blocksLibrary, reportWindow: { boot.watchWindow($0) })
