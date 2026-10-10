@@ -31,18 +31,20 @@ import AVFoundation
         let first = NativeBootPresentation(enabled: true, resource: resource, reduceMotion: false)
         let firstWindow = window()
         let content = firstWindow.contentView!
-        let originalSubviews = content.subviews.count
         first.watchWindow(firstWindow)
+        let container = firstWindow.contentView!
+        require(container !== content && content.superview === container,
+                "Movie and disabled library must be siblings in the same window")
         first.start()
         wait(5) { (first.player?.currentTime().seconds ?? 0) > 0.15 }
-        require(content.subviews.count == originalSubviews + 1, "Overlay must be attached to the actual window")
+        require(container.subviews.count == 2, "Overlay must be attached to the actual window")
         first.watchWindow(firstWindow)
-        require(content.subviews.count == originalSubviews + 1, "Repeated window reports must not duplicate overlays")
+        require(firstWindow.contentView === container && container.subviews.count == 2, "Repeated window reports must not duplicate overlays")
         first.finish(); first.finish()
         wait(3) { !first.blocksLibrary }
-        require(first.player == nil && content.subviews.count == originalSubviews, "Completion must release player and overlay")
+        require(first.player == nil && container.subviews.count == 1 && content.superview === container, "Completion must release player and overlay while retaining library")
         first.watchWindow(firstWindow); first.start()
-        require(!first.blocksLibrary && content.subviews.count == originalSubviews, "Reopening must not replay in the same process")
+        require(!first.blocksLibrary && container.subviews.count == 1, "Reopening must not replay in the same process")
         firstWindow.close()
 
         let closing = NativeBootPresentation(enabled: true, resource: resource, reduceMotion: false)

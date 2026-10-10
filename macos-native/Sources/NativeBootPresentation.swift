@@ -14,6 +14,7 @@ import SwiftUI
     private var windowNotification: NSObjectProtocol?
     private weak var watchedWindow: NSWindow?
     private var hostingView: NSHostingView<NativeBootView>?
+    private var escapeMonitor: Any?
     private var deadline: Task<Void, Never>?
     private var fadeCompletion: Task<Void, Never>?
     private var started = false
@@ -72,11 +73,32 @@ import SwiftUI
             // macOS; a sibling SwiftUI ZStack view is not reliably presented.
             // Attach above that hierarchy, in the same window, without changing
             // its content controller, frame, toolbar or stream routing.
-            let host = NSHostingView(rootView: NativeBootView(presentation: self))
-            host.frame = content.bounds
+            // The library's hosting view is disabled during playback. Keep
+            // the movie outside that hosting hierarchy so both its layer and
+            // its controls remain visible and interactive.
+            let container = NSView(frame: content.frame)
+            container.autoresizingMask = [.width, .height]
+            let wrapper = NSViewController()
+            wrapper.view = container
+            if let originalController = window.contentViewController {
+                wrapper.addChild(originalController)
+            }
+            window.contentViewController = wrapper
+            content.frame = container.bounds
+            content.autoresizingMask = [.width, .height]
+            container.addSubview(content)
+            let host = BootHostingView(rootView: NativeBootView(presentation: self))
+            host.frame = container.bounds
             host.autoresizingMask = [.width, .height]
-            content.addSubview(host, positioned: .above, relativeTo: nil)
+            container.addSubview(host, positioned: .above, relativeTo: nil)
             hostingView = host
+            escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak window] event in
+                guard event.window === window, event.keyCode == 53,
+                      event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
+                      self?.phase == .playing else { return event }
+                self?.finish()
+                return nil
+            }
         }
         guard window !== watchedWindow else { return }
         if let windowNotification { NotificationCenter.default.removeObserver(windowNotification) }
@@ -118,6 +140,8 @@ import SwiftUI
         motionNotification = nil
         if let windowNotification { NotificationCenter.default.removeObserver(windowNotification) }
         windowNotification = nil; watchedWindow = nil
+        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+        escapeMonitor = nil
     }
 
     deinit {
@@ -126,7 +150,12 @@ import SwiftUI
         notifications.forEach { NotificationCenter.default.removeObserver($0) }
         if let motionNotification { NSWorkspace.shared.notificationCenter.removeObserver(motionNotification) }
         if let windowNotification { NotificationCenter.default.removeObserver(windowNotification) }
+        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
     }
+}
+
+private final class BootHostingView: NSHostingView<NativeBootView> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 private struct NativeBootMovie: NSViewRepresentable {
