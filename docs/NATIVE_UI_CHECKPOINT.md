@@ -2,8 +2,8 @@
 
 Repository: `th3d3ck3r/moonlight-native-glass` · branch: `native-ui`.
 Latest work: Preview 20 integrates the approved 1440p/60 fps boot animation in
-the library window, then crossfades to the main app. Validation pending; see the
-Preview 20 entry at the end of this document.
+the library window, then crossfades to the main app. Both builds and the full
+validation suite passed; see the Preview 20 entry at the end of this document.
 `master` application code remains stock Qt v6.2.0: `de2467e433821664cdd2224aad8c89a625be1ad9`. Its README-only homepage commit is `e0c36c9`.
 The Enhanced repository is untouched.
 
@@ -461,7 +461,7 @@ offline during diagnosis; GitHub API/workflow access continues to work.
   unexplained. Animation stays a design preview. No public release/tag, master
   or public README change; Preview 19 remains an unreleased test build.
 
-### Preview 20 same-window boot animation (validation pending)
+### Preview 20 same-window boot animation (validated)
 
 - User authorized app-launch integration of the approved eight-second boot
   preview. The movie is bundled in the native frontend; streaming is untouched.
@@ -475,5 +475,20 @@ offline during diagnosis; GitHub API/workflow access continues to work.
   audit checks its exact bytes. UI version is 20; engine remains 6.2.0.
 - New UI tests exercise automatic completion in one unchanged window,
   Skip/Escape, close/reopen/fresh launch, Reduce Motion, and missing/corrupt assets.
-  Compilation, real playback, all existing regressions and both builds pending.
+  All eight UI cases passed, including opening/dismissing Add Computer after
+  the fade. Real playback and repeated window-callback regression tests passed.
+- Final app source: `289f190520d90dfc336e94dd63a88bf4e3a7de32`. CI run
+  `38082342799`: Intel job `114301668066`, Universal job `114301668000`,
+  UI job `114301667941` all succeeded. Native overlay/shortcut, fullscreen and
+  borderless Metal presentation, SDL hide/restore, ASan/UBSan, engine settings
+  and persistence, 100+100 immediate shutdown cycles and status icon/menu checks
+  passed. Both bundle audits verified all 105 Mach-O files and dependencies.
+- Startup presentation retains the library controller inside a native container.
+  Deferred attachment prevents reentrant view-move callbacks; movie and Skip
+  remain outside the disabled library hosting view. A window-scoped Escape
+  monitor is removed with the other observers.
+- Intel artifact `11680628373`; Universal artifact `11681047031`. Full validation,
+  package checksums and hardware/live-host limits: `NATIVE_APP_AUDIT_PREVIEW_20.md`.
+- Actual smoothness and live streaming/input/game exit/error 11 still require
+  testing on the Intel/OCLP Mac. Exact Xcode 26 motion matching is unverified.
 - No public release/tag, master/public README or streaming-engine changes.
