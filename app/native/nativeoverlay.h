@@ -18,4 +18,4 @@ bool nativeOverlayControlsEnabled();
 bool nativeOverlayConsumeKeyRelease(bool& consumed, Uint8 state);
 
 // Queue an existing action on SDL's main event loop; never call input from AppKit.
-void nativeOverlayPerformAction(int action);
+bool nativeOverlayPerformAction(int action, Uint32 requestID = 0);

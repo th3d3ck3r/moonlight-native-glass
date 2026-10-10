@@ -37,6 +37,7 @@ import ScreenCaptureKit
     private var activeMenu: NSMenu?
     private var hoverTask: Task<Void, Never>?
     private var closeTask: Task<Void, Never>?
+    private var restoreInputAfterMenu = true
     private var cachedThumbnail: NSImage?
     private var tracking: NSTrackingArea?
     private(set) var previewPanel: NSPanel?
@@ -225,14 +226,17 @@ import ScreenCaptureKit
         dismissPreview()
         if NSApp.currentEvent?.type == .rightMouseUp || NSApp.currentEvent?.modifierFlags.contains(.control) == true {
             guard let button = item.button else { return }
-            perform?(210)
+            restoreInputAfterMenu = true
+            perform?(213)
             let menu = makeMenu(); activeMenu = menu
             menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
             activeMenu = nil
+            perform?(restoreInputAfterMenu ? 214 : 215)
         } else { open?() }
     }
     @objc func menuAction(_ sender: NSMenuItem) {
         let tag = sender.tag
+        if tag < 0 { restoreInputAfterMenu = false }
         switch tag {
         case -1: library?()
         case -2: settings?()
@@ -250,10 +254,14 @@ import ScreenCaptureKit
         case 209:
             guard state.exists else { return }
             let token = state.token
+            perform?(213)
             let alert = NSAlert(); alert.messageText = "Disconnect and exit the host game?"
             alert.informativeText = "This closes the game on the host computer. Unsaved progress may be lost."
             alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Disconnect and Exit")
-            if alert.runModal() == .alertSecondButtonReturn && state.exists && state.token == token { perform?(209) }
+            let confirmed = alert.runModal() == .alertSecondButtonReturn
+            if state.exists && state.token == token {
+                perform?(confirmed ? 209 : 214)
+            }
         default: if state.exists { perform?(tag) }
         }
     }

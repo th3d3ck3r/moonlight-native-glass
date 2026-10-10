@@ -405,7 +405,7 @@ void NativeBridge::startStream(const QStringList& args) {
         connect(session, &Session::stageStarting, this, [this](QString stage) { send({{"event", "stage"}, {"message", "Starting " + stage + "…"}}); });
         connect(session, &Session::stageFailed, this, [this](QString stage, int code, QString ports) { error(QString("Starting %1 failed (error %2). %3").arg(stage).arg(code).arg(ports.isEmpty() ? QString() : "Check these ports: " + ports)); });
         connect(session, &Session::displayLaunchError, this, [this](QString message) { error(message); });
-        connect(session, &Session::connectionStarted, this, [this] { m_Streaming = true; send({{"event", "streaming"}}); });
+        connect(session, &Session::connectionStarted, this, [this] { m_Streaming = true; m_Input->setEnabled(false); send({{"event", "streaming"}}); });
         connect(session, &Session::sessionFinished, this, [this](int ports) { send({{"event", "finished"}, {"portTest", ports}}); });
         connect(session, &Session::readyForDeletion, this, [session] { delete session; QCoreApplication::quit(); });
         if (!session->initialize(m_Window.get())) {

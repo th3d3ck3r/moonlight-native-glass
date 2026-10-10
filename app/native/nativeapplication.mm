@@ -13,9 +13,35 @@ void configureNativeBackgroundApplication()
 #import <SDL_syswm.h>
 #include <cstdio>
 #include <string>
+#include <thread>
+#include <atomic>
+#include <poll.h>
+#include <unistd.h>
+#include <cerrno>
+#include <exception>
 #include "nativeoverlay.h"
 #include "nativetitlebar.h"
 #include "nativeapplication.h"
+
+// This reader never calls AppKit window APIs. It only validates framed commands
+// and queues SDL events; the live Session owns every action on its main thread.
+static std::thread menuReader;
+static std::atomic<bool> menuReaderStopping(true);
+static bool supportedMenuAction(int action) {
+    return action == 100 || action == 200 || action == 201 || action == 202 ||
+           action == 203 || action == 207 || action == 208 || action == 209 ||
+           action == 210 || action == 212 || action == 213 || action == 214 || action == 215;
+}
+void nativeAcknowledgeMenuAction(int action, Uint32 requestID) {
+    if (!requestID) return;
+    std::fprintf(stdout,"{\"event\":\"menuActionAcknowledged\",\"action\":%d,\"requestID\":%u}\n",action,requestID);
+    std::fflush(stdout);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"Native menu action %d accepted (request %u)",action,requestID);
+}
+void nativeStopStreamMenuCommands() {
+    menuReaderStopping = true;
+    if (menuReader.joinable()) menuReader.join();
+}
 
 static NSString* const MLRestoreStreamWindow = @"com.moonlight-stream.NativeGlass.restoreStreamWindow";
 static Uint32 restoreEventType;
@@ -135,6 +161,64 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 - (void)restoreWindow;
 @end
 
+static MLStreamWindowAccess* streamWindowAccess;
+
+bool nativeStreamMenuCommandsEnabled() { return streamWindowAccess != nil; }
+
+bool nativeStartStreamMenuCommands(int fd) {
+    // One reader per streaming helper; Qt's notifier is disabled before entry.
+    nativeStopStreamMenuCommands();
+    if (!streamWindowAccess.token) return true;
+    if (fd < 0) return false;
+    const std::string token = streamWindowAccess.token.UTF8String;
+    menuReaderStopping = false;
+    try { menuReader = std::thread([fd,token] {
+        std::string buffer;
+        while (!menuReaderStopping) {
+            pollfd descriptor = {fd,POLLIN,0};
+            const int ready = poll(&descriptor,1,100);
+            if (ready < 0 && errno == EINTR) continue;
+            if (ready < 0 || (ready && (descriptor.revents & (POLLERR|POLLNVAL)))) break;
+            if (!ready) continue;
+            char chunk[4096];
+            const ssize_t count = read(fd,chunk,sizeof(chunk));
+            if (count < 0 && (errno == EINTR || errno == EAGAIN)) continue;
+            if (count <= 0) {
+                // A vanished frontend disconnects without killing the host game.
+                if (!menuReaderStopping) nativeOverlayPerformAction(212);
+                break;
+            }
+            buffer.append(chunk,size_t(count));
+            if (buffer.size() > 65536) { SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Native menu command exceeds limit"); break; }
+            size_t newline;
+            while ((newline=buffer.find('\n')) != std::string::npos) {
+                const std::string line=buffer.substr(0,newline); buffer.erase(0,newline+1);
+                @autoreleasepool {
+                    NSData* data=[NSData dataWithBytes:line.data() length:line.size()];
+                    id request=[NSJSONSerialization JSONObjectWithData:data options:0 error:nullptr];
+                    if (![request isKindOfClass:NSDictionary.class] || ![request[@"command"] isEqual:@"menuAction"] ||
+                        ![request[@"token"] isEqual:[NSString stringWithUTF8String:token.c_str()]]) continue;
+                    id actionValue=request[@"action"], identifier=request[@"requestID"];
+                    if (![actionValue isKindOfClass:NSNumber.class] || ![identifier isKindOfClass:NSNumber.class] ||
+                        CFGetTypeID((CFTypeRef)actionValue)==CFBooleanGetTypeID() || CFGetTypeID((CFTypeRef)identifier)==CFBooleanGetTypeID()) continue;
+                    const double actionNumber=[actionValue doubleValue], idNumber=[identifier doubleValue];
+                    if (actionNumber < 0 || actionNumber > 215 || actionNumber != int(actionNumber) ||
+                        idNumber < 1 || idNumber > UINT32_MAX || idNumber != Uint32(idNumber)) continue;
+                    const int action=int(actionNumber);
+                    if (!supportedMenuAction(action)) continue;
+                    if (!nativeOverlayPerformAction(action,Uint32(idNumber)))
+                        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Could not queue native menu action %d",action);
+                }
+            }
+        }
+    }); } catch (const std::exception& error) {
+        menuReaderStopping = true;
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Native menu reader could not start: %s",error.what());
+        return false;
+    }
+    return true;
+}
+
 @implementation MLStreamWindowAccess
 - (void)windowBecameKey:(NSNotification*)notification
 {
@@ -210,7 +294,6 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 }
 @end
 
-static MLStreamWindowAccess* streamWindowAccess;
 void nativeRestoreStreamWindow(Uint32 windowID)
 {
     if (windowID && streamWindowAccess.windowDelegate.windowID == windowID)
@@ -253,6 +336,7 @@ void configureNativeStreamWindow(const char* token)
 }
 void stopNativeStreamWindow()
 {
+    nativeStopStreamMenuCommands();
     if (restoreEventType && restoreEventType != Uint32(-1)) SDL_FlushEvent(restoreEventType);
     nativeOverlayDetach();
     [streamWindowAccess release]; streamWindowAccess = nil;

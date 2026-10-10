@@ -92,7 +92,8 @@ import Combine
                 NSApp.stopModal(withCode: reply)
             }
             menu.menuAction(exitItem)
-            precondition(actions.count == before + (reply == .alertSecondButtonReturn && !replaceStream ? 1 : 0),"Only confirmed exit for the same stream may send the host-exit action")
+            let expected = replaceStream ? [213] : [213, reply == .alertSecondButtonReturn ? 209 : 214]
+            precondition(Array(actions.dropFirst(before)) == expected,"Confirmation must suspend input, restore on Cancel, and exit only the same stream")
         }
         menu.state.token = "first-stream"
         let thumbnail = NSImage(size: NSSize(width: 320, height: 180), flipped: false) { rect in

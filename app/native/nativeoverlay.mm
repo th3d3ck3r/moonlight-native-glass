@@ -30,7 +30,7 @@ static SDL_Rect previousMouseRect = {};
 static bool hadMouseRect = false;
 static NSArray* titles() { return @[@"Close Stream Window", @"Release / Capture Input", @"Full Screen", @"Statistics", @"Mouse Mode", @"Cursor Visibility", @"Minimize", @"Paste Clipboard", @"Pointer Region Lock", @"Disconnect and Exit", @"Keyboard Capture", @"Show / Hide Controls"]; }
 // Index 9 also quits the host game; action 12 disconnects without forcing that.
-static void pushAction(int code) { if (actionEvent == (Uint32)-1) return; SDL_Event e = {}; e.type = actionEvent; e.user.code = code; SDL_PushEvent(&e); }
+static bool pushAction(int code, Uint32 requestID = 0) { if (actionEvent == (Uint32)-1) return false; SDL_Event e = {}; e.type = actionEvent; e.user.code = code; e.user.data1 = reinterpret_cast<void*>(uintptr_t(requestID)); return SDL_PushEvent(&e) == 1; }
 
 // Keep keyboard focus and SDL cursor confinement on the stream. Native buttons
 // remain clickable, and all actions retain their configurable SDL shortcuts.
@@ -245,7 +245,7 @@ int nativeOverlayShortcut(const SDL_KeyboardEvent* event) {
     for (int i=0;i<13;i++) if (bindings[i].key==event->keysym.sym && bindings[i].modifiers==normalized) return i;
     return -1;
 }
-void nativeOverlayPerformAction(int action) { pushAction(action); }
+bool nativeOverlayPerformAction(int action, Uint32 requestID) { return pushAction(action, requestID); }
 bool nativeOverlayPresent(int type, bool enabled, const char* text) {
     if (!configured || type<0 || type>1) return false;
     if (type==0) nativeTitlebarSetStatistics(enabled);

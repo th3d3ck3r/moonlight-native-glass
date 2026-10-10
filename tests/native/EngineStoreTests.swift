@@ -70,8 +70,14 @@ func nativeArgument(_ name: String) -> String? { nil }
                 pathlib.Path('stream-started').write_text('started')
                 emit({'event': 'quitRequired', 'app': 'Previous game'})
                 for line in sys.stdin:
-                    if json.loads(line)['command'] == 'confirmQuit':
+                    request = json.loads(line)
+                    if request['command'] == 'confirmQuit':
                         emit({'event': 'streaming'})
+                        emit({'event': 'windowOpened'})
+                    elif request['command'] == 'menuAction':
+                        if '\(mode)' != 'menu-no-ack':
+                            emit({'event': 'menuActionAcknowledged', 'action': request['action'], 'requestID': request['requestID']})
+                        pathlib.Path('menu-actions').open('a').write(str(request['action']) + '\\n')
             else:
                 pauses = []
                 emit({'event': 'ready', 'protocol': 1})
@@ -93,6 +99,17 @@ func nativeArgument(_ name: String) -> String? { nil }
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
             return executable
         }
+        let missingAck = EngineStore(executable: try fixture("menu-no-ack"))
+        missingAck.start(); try await wait { missingAck.ready }
+        missingAck.startStream(computer, game: game)
+        try await wait { missingAck.values["fixtureStep"] as? String == "pause" }
+        missingAck.send("release", ["index": 0])
+        try await wait { missingAck.quitRequired != nil }
+        missingAck.confirmQuit()
+        try await wait { missingAck.streamWindowExists }
+        missingAck.menuAction(209)
+        try await wait { missingAck.message?.detail.contains("did not acknowledge") == true }
+        missingAck.shutdown()
         let brokenHelper = try fixture("broken-pipe")
         for operation in 0..<3 {
             let broken = EngineStore(executable: brokenHelper)
@@ -151,6 +168,12 @@ func nativeArgument(_ name: String) -> String? { nil }
             try await wait { (delayed.values["windowMode"] as? NSNumber)?.intValue == expected && delayed.values["fixtureStep"] as? String == "settings" }
             precondition(delayed.streamActive && delayed.streamStarted, "Selecting next window mode ended the active stream")
         }
+        try await wait { delayed.streamWindowExists }
+        for action in [213, 214, 212, 209] { delayed.menuAction(action) }
+        let actionFile = delayedHelper.deletingLastPathComponent().appendingPathComponent("menu-actions")
+        try await wait { (try? String(contentsOf: actionFile, encoding: .utf8))?.contains("209") == true }
+        try await Task.sleep(for: .seconds(4))
+        precondition(delayed.message == nil,"Acknowledged menu commands must not trigger a timeout")
         delayed.message = nil
         delayed.quitRequired = "Previous game"
         delayed.dismissQuitConfirmation()

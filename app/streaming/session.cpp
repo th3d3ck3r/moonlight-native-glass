@@ -1309,13 +1309,20 @@ private:
 
         // Perform a best-effort app quit
         if (shouldQuit) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Requesting host game exit after stream shutdown");
             NvHTTP http(m_Session->m_Computer);
 
             // Logging is already done inside NvHTTP
             try {
                 http.quitApp();
-            } catch (const GfeHttpResponseException&) {
-            } catch (const QtNetworkReplyException&) {
+            } catch (const GfeHttpResponseException& error) {
+#ifdef Q_OS_MACOS
+                if (nativeStreamMenuCommandsEnabled()) emit m_Session->displayLaunchError(error.toQString());
+#endif
+            } catch (const QtNetworkReplyException& error) {
+#ifdef Q_OS_MACOS
+                if (nativeStreamMenuCommandsEnabled()) emit m_Session->displayLaunchError(error.toQString());
+#endif
             }
 
             // Session is finished now
@@ -1998,6 +2005,8 @@ void Session::exec()
         nativePublishMenuState(m_Window, m_InputHandler->isCaptureActive(),
             m_OverlayManager.isOverlayEnabled(Overlay::OverlayDebug), nativeUserMuted);
     };
+    if (!nativeStartStreamMenuCommands())
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Native stream menu command channel could not start");
 #endif
     SDL_Event event;
     for (;;) {
@@ -2040,6 +2049,7 @@ void Session::exec()
         }
         if (event.type == nativeOverlayEventType() && nativeOverlayConfigured()) {
             const int action = event.user.code;
+            nativeAcknowledgeMenuAction(action, Uint32(reinterpret_cast<uintptr_t>(event.user.data1)));
             if (action == 200) nativeHideStreamWindow(m_Window);
             else if (action == 207) {
                 nativeUserMuted = !nativeUserMuted;
@@ -2048,6 +2058,7 @@ void Session::exec()
                 // End this session directly. Do not enqueue a second generic
                 // quit or request process exit before readyForDeletion: the
                 // adapter owns the helper's lifetime after deferred cleanup.
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Native disconnect accepted; quit host game: %s", action == 209 ? "yes" : "no");
                 m_Preferences->quitAppAfter = action == 209;
                 m_InputHandler->raiseAllKeys();
                 goto DispatchDeferredCleanup;
@@ -2383,6 +2394,9 @@ void Session::exec()
     }
 
 DispatchDeferredCleanup:
+#ifdef Q_OS_MACOS
+    nativeStopStreamMenuCommands();
+#endif
     // Switch back to synchronous logging mode
     StreamUtils::exitAsyncLoggingMode();
 

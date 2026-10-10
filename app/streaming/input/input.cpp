@@ -283,6 +283,7 @@ void SdlInputHandler::notifyFocusLost()
 #ifdef Q_OS_MACOS
     // Native controls may restore focus before an older SDL focus-loss event
     // drains. That stale event must not release newly restored capture.
+    if (m_NativeMenuInputSuspended) { raiseAllKeys(); return; }
     if (nativeOverlayConfigured() && SDL_GetKeyboardFocus() == m_Window) {
         raiseAllKeys();
         return;
@@ -318,7 +319,7 @@ void SdlInputHandler::notifyFocusGained()
 {
 #ifdef Q_OS_MACOS
     if (nativeOverlayConfigured() && SDL_GetKeyboardFocus() == m_Window &&
-        m_NativeCaptureBeforeFocusLoss && !m_NativeControlsVisible) {
+        m_NativeCaptureBeforeFocusLoss && !m_NativeControlsVisible && !m_NativeMenuInputSuspended) {
         // Returning from the frontend's menu must restore both mouse focus and
         // the prior capture intent. Keyboard focus alone does not repair SDL's
         // relative mouse routing after a status-item click.
@@ -394,7 +395,7 @@ void SdlInputHandler::setCaptureActive(bool active)
 {
 #ifdef Q_OS_MACOS
     // Window/decoder events must not hide or recapture the local control cursor.
-    if (active && m_NativeControlsVisible) return;
+    if (active && (m_NativeControlsVisible || m_NativeMenuInputSuspended)) return;
     m_NativeCaptureBeforeFocusLoss = false;
 #endif
     if (active) {

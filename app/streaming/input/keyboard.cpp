@@ -190,6 +190,33 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
 #ifdef Q_OS_MACOS
 void SdlInputHandler::handleNativeOverlayAction(int action)
 {
+    if (action == 213) {
+        if (m_NativeMenuInputSuspended) return;
+        m_NativeCaptureBeforeMenu = isCaptureActive() || m_NativeCaptureBeforeFocusLoss;
+        m_NativeMenuInputSuspended = true;
+        nativeOverlayEndControlsInput();
+        for (int button : {BUTTON_LEFT, BUTTON_MIDDLE, BUTTON_RIGHT, BUTTON_X1, BUTTON_X2})
+            LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, button);
+        setCaptureActive(false); raiseAllKeys();
+        return;
+    }
+    if (action == 214 || action == 215) {
+        if (!m_NativeMenuInputSuspended) return;
+        m_NativeMenuInputSuspended = false;
+        if (action == 215 || (SDL_GetWindowFlags(m_Window) & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) {
+            m_NativeCaptureBeforeFocusLoss = m_NativeCaptureBeforeMenu;
+        } else if (m_NativeControlsVisible) nativeOverlayBeginControlsInput(m_Window);
+        else if (m_NativeCaptureBeforeMenu) {
+            setCaptureActive(false);
+            nativeOverlayRestoreStreamFocus(m_Window);
+            setCaptureActive(true);
+        }
+        m_NativeCaptureBeforeMenu = false;
+        return;
+    }
+
+    if (m_NativeMenuInputSuspended && action != 209 && action != 212 && action != 210)
+        handleNativeOverlayAction(214);
     if (action == 100 || action == 102) {
         // Keyboard, title bar and menu requests are all explicit entry points.
         // The optional presentation setting must not disable these actions.

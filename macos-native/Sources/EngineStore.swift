@@ -108,6 +108,9 @@ struct PairingRequest: Identifiable {
     @Published var menuState = NativeMenuState()
     @Published var streamWindowExists = false
     private var streamWindowToken: String?
+    private var menuRequestID: UInt32 = 0
+    private var menuDeadlines: [UInt32: Task<Void, Never>] = [:]
+    private var menuActions: [UInt32: Int] = [:]
     @Published var streamActive = false
     @Published var streamStarted = false
     @Published var quitRequired: String?
@@ -315,7 +318,17 @@ struct PairingRequest: Identifiable {
                 self.menuState.exists = true
                 self.menuAction(210)
             case "windowHidden": self.menuState.visible = false
-            case "windowClosed": self.streamWindowExists = false; self.menuState = NativeMenuState()
+            case "windowClosed":
+                self.clearMenuRequests()
+                self.streamWindowExists = false; self.menuState = NativeMenuState()
+            case "menuActionAcknowledged":
+                if let number = event["requestID"] as? NSNumber, let action = event["action"] as? Int {
+                    let id = number.uint32Value
+                    if self.menuActions[id] == action {
+                        self.menuDeadlines.removeValue(forKey: id)?.cancel()
+                        self.menuActions.removeValue(forKey: id)
+                    }
+                }
             case "menuState":
                 self.menuState.windowNumber = (event["windowNumber"] as? NSNumber)?.uint32Value ?? 0
                 self.menuState.visible = event["visible"] as? Bool ?? false
@@ -333,6 +346,7 @@ struct PairingRequest: Identifiable {
         }
         helper.onExit = { [weak self, weak helper] code in
             guard let self, let helper, self.stream === helper else { return }
+            self.clearMenuRequests()
             self.streamWindowExists = false; self.streamWindowToken = nil; self.menuState = NativeMenuState()
             self.stream = nil; self.streamActive = false; self.streamStarted = false; self.quitRequired = nil
             self.status = "Stream ended"
@@ -345,6 +359,10 @@ struct PairingRequest: Identifiable {
             send("resume"); fail(error.localizedDescription)
         }
     }
+    private func clearMenuRequests() {
+        for task in menuDeadlines.values { task.cancel() }
+        menuDeadlines.removeAll(); menuActions.removeAll()
+    }
     func menuAction(_ action: Int) {
         if (204...206).contains(action) {
             guard streamWindowExists else { return }
@@ -355,9 +373,21 @@ struct PairingRequest: Identifiable {
             set("windowMode", [2, 0, 1][action - 204])
             return
         }
-        guard streamWindowExists, let token = streamWindowToken else { return }
-        DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.moonlight-stream.NativeGlass.menuAction.\(action)"),
-            object: token, userInfo: nil, deliverImmediately: true)
+        guard streamWindowExists, let token = streamWindowToken, let stream else { return }
+        guard [100, 200, 201, 202, 203, 207, 208, 209, 210, 212, 213, 214, 215].contains(action) else { return }
+        menuRequestID = menuRequestID == .max ? 1 : menuRequestID + 1
+        let id = menuRequestID
+        do {
+            try stream.send(["command": "menuAction", "token": token, "action": action, "requestID": id])
+            menuActions[id] = action
+            menuDeadlines[id] = Task { [weak self, weak stream] in
+                try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled, let self, self.stream === stream, self.streamWindowToken == token,
+                      self.menuActions.removeValue(forKey: id) != nil else { return }
+                self.menuDeadlines.removeValue(forKey: id)
+                self.fail("The streaming engine did not acknowledge menu action \(action). Open Engine Logs to inspect the stream log.")
+            }
+        } catch { fail("Could not send the stream menu command. \(error.localizedDescription)") }
     }
     func restoreStreamWindow() {
         guard streamWindowExists, let token = streamWindowToken else { return }
@@ -389,6 +419,7 @@ struct PairingRequest: Identifiable {
     }
     func fail(_ detail: String) { message = NativeMessage(title: "Moonlight Native Glass", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true) }
     func shutdown() {
+        clearMenuRequests()
         shuttingDown = true; hostDeadline?.cancel(); launchDeadline?.cancel(); pendingStream = nil
         channel?.stop(); stream?.stop()
     }

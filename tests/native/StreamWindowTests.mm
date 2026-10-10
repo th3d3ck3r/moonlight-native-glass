@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <unistd.h>
+#include <cstring>
 #include "nativeapplication.h"
 #include "nativeoverlay.h"
 
@@ -62,6 +64,8 @@ public:
     SDL_Window* m_Window;
     bool m_AbsoluteMouseMode = false;
     bool m_NativeCaptureBeforeFocusLoss = false;
+    bool m_NativeMenuInputSuspended = false;
+    bool m_NativeCaptureBeforeMenu = false;
     bool m_NativeControlsVisible = false;
     bool m_NativeCaptureBeforeControls = false;
 #include "NativeKeyCombos.inc"
@@ -157,7 +161,63 @@ int main(int argc, char** argv) {
                 if (count) check(menuEvent.user.code==action,"Cross-process menu action changed its meaning");
             }
         }
+        int commands[2]; check(pipe(commands)==0,"Create live command pipe");
+        check(nativeStartStreamMenuCommands(commands[0]),"Start streaming command reader");
+        for (int action : {100,200,201,202,203,207,208,209,210,212,213,214,215,999}) {
+            for (bool validToken : {false,true}) {
+                SDL_FlushEvent(nativeOverlayEventType());
+                const Uint32 id=Uint32(1000+action);
+                NSString* line=[NSString stringWithFormat:@"{\"command\":\"menuAction\",\"token\":\"%s\",\"action\":%d,\"requestID\":%u}\n",validToken ? token : "wrong-token",action,id];
+                const char* bytes=line.UTF8String;
+                // Split a framed command across writes to exercise partial reads.
+                check(write(commands[1],bytes,5)==5,"Write command prefix");
+                SDL_Delay(2);
+                check(write(commands[1],bytes+5,strlen(bytes)-5)==ssize_t(strlen(bytes)-5),"Write command suffix");
+                const Uint32 deadline=SDL_GetTicks()+150;
+                bool received=false;
+                do {
+                    SDL_Event event;
+                    if (SDL_WaitEventTimeout(&event,10) && event.type==nativeOverlayEventType()) {
+                        check(event.user.code==action,"Live command changed action");
+                        check(Uint32(reinterpret_cast<uintptr_t>(event.user.data1))==id,"Live command lost acknowledgement ID");
+                        received=true; break;
+                    }
+                } while (SDL_GetTicks()<deadline);
+                check(received==(validToken && action!=999),"SDL-only live loop must accept exactly supported current-token commands");
+            }
+        }
+        SDL_FlushEvent(nativeOverlayEventType());
+        close(commands[1]);
+        bool eofDisconnect=false;
+        const Uint32 eofDeadline=SDL_GetTicks()+300;
+        while (SDL_GetTicks()<eofDeadline) {
+            SDL_Event event;
+            if (SDL_WaitEventTimeout(&event,10) && event.type==nativeOverlayEventType()) {
+                check(event.user.code==212 && event.user.data1==nullptr,"Frontend EOF must disconnect without quitting the host game");
+                eofDisconnect=true; break;
+            }
+        }
+        check(eofDisconnect,"Frontend EOF must not strand a streaming helper");
+        nativeStopStreamMenuCommands();
+        close(commands[0]);
+        std::puts("Live pipe commands passed under SDL_WaitEventTimeout without explicit NSRunLoop pumping");
         SdlInputHandler routing(window);
+        routing.setCaptureActive(true);
+        routing.handleNativeOverlayAction(213);
+        check(!routing.isCaptureActive() && routing.m_NativeMenuInputSuspended,"Menu must release relative capture");
+        routing.handleNativeOverlayAction(213);
+        routing.notifyFocusLost(); routing.notifyFocusGained();
+        check(!routing.isCaptureActive(),"Menu focus changes must not recapture input");
+        routing.handleNativeOverlayAction(214);
+        check(routing.isCaptureActive() && !routing.m_NativeMenuInputSuspended,"Cancel/close must restore earlier capture");
+        routing.handleNativeOverlayAction(214);
+        routing.handleNativeOverlayAction(213); routing.handleNativeOverlayAction(215);
+        check(!routing.isCaptureActive() && routing.m_NativeCaptureBeforeFocusLoss,"Library actions must keep local input released");
+        routing.notifyFocusGained();
+        check(routing.isCaptureActive(),"Returning to stream must restore saved menu capture");
+        routing.setCaptureActive(false);
+        routing.handleNativeOverlayAction(213); routing.handleNativeOverlayAction(214);
+        check(!routing.isCaptureActive(),"Menu must respect explicitly released input");
         for (int action : {int(SdlInputHandler::KeyComboQuitAndExit),12,209,212}) {
             SDL_FlushEvent(nativeOverlayEventType());
             routing.handleNativeOverlayAction(action);
@@ -247,6 +307,14 @@ int main(int argc, char** argv) {
                 check(SDL_SetWindowDisplayMode(window,&desktop)==0,"Exclusive fixture display mode selection failed");
             }
             check(SDL_SetWindowFullscreen(window,mode)==0,"Fullscreen title-bar transition"); pump(1.0);
+            SdlInputHandler menuInput(window);
+            menuInput.setCaptureActive(true);
+            menuInput.handleNativeOverlayAction(213);
+            menuInput.notifyFocusLost(); menuInput.notifyFocusGained();
+            check(!menuInput.isCaptureActive(),"Confirmation must release capture in every window mode");
+            menuInput.handleNativeOverlayAction(214); pump();
+            check(menuInput.isCaptureActive(),"Cancel must restore capture in every window mode");
+            menuInput.setCaptureActive(false);
             check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
             nativeOverlayRestoreStreamFocus(window);
             check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Fresh relative capture must work before controls");
