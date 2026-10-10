@@ -13,7 +13,8 @@ uses a separate helper with the original Session/SDL video window. Controller
 handlers detach before streaming. Preferences and pairing use a separate Qt
 application name. Updates are manual; no updater object is instantiated.
 
-No changes to `app/streaming`, `app/backend`, `app/settings`, common-c or mDNS.
+Streaming changes are limited to reviewed native presentation/action hooks;
+upstream backend, settings, common-c and mDNS remain protected.
 Native-only CLI app-ID selection and a hidden display-selection QQuickWindow
 connect the frontend to stock streaming. No Enhanced extensions are imported.
 
@@ -430,3 +431,29 @@ offline during diagnosis; GitHub API/workflow access continues to work.
   XCTest cases passed. Full builds were skipped because application source was
   unchanged from the fully validated run `37894048789`. Build 18 is ready for
   user testing with the audit's live-host/hardware limitations disclosed.
+
+
+### Preview 19 menu repair, hover removal and completed validation
+
+- Application source `f3e3e18798a87b196854b047514ac6c60e68d5e1`; run
+  `38065418163`: Intel `114252004822`, Universal `114252004653`,
+  native UI `114252004783` all SUCCESS. UI build 19; engine 6.2.0.
+- Stream menu commands use the existing helper pipe with token/request IDs,
+  acknowledgements and visible timeout errors. The reader queues SDL events
+  during the live SDL loop, starts after event registration, and joins before
+  teardown. Menu/dialog input handoff preserves capture intent and menu labels.
+- Disconnect/host exit reaches deferred cleanup and the same NvHTTP::quitApp
+  operation as library Quit App; native host errors are reported. Hover preview,
+  tracking/capture tasks and native Screen Recording permission UI are removed.
+  Rounded icons, primary click restore and right-click controls remain.
+- Full builds, both 105-Mach-O audits, live SDL pipe/input/window fixtures,
+  ASan/UBSan fixtures, frontend process tests, five native UI XCTest cases,
+  settings/persistence/recovery and 100 diagnostic plus 100 ordinary shutdown
+  cycles passed. Intel artifact `11675296898`, Universal `11674873692`.
+- Verified Intel inner ZIP SHA-256:
+  `a3ed53b298611f3ee9689cc07ef15593cd3cd81760ff80a6ab92c33b99faa47c`.
+  Audit and explicit limitations: docs/NATIVE_APP_AUDIT_PREVIEW_19.md.
+- Live host quit, exact error 11, physical Intel/OCLP behavior and streaming
+  performance still require user testing. Earlier intermittent SIGILL remains
+  unexplained. Animation stays a design preview. No public release/tag, master
+  or public README change; Preview 19 remains an unreleased test build.
