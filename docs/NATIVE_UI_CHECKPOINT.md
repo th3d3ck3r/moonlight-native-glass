@@ -1,6 +1,9 @@
 # Native UI checkpoint
 
 Repository: `th3d3ck3r/moonlight-native-glass` · branch: `native-ui`.
+Latest work: Preview 20 integrates the approved 1440p/60 fps boot animation in
+the library window, then crossfades to the main app. Validation pending; see the
+Preview 20 entry at the end of this document.
 `master` application code remains stock Qt v6.2.0: `de2467e433821664cdd2224aad8c89a625be1ad9`. Its README-only homepage commit is `e0c36c9`.
 The Enhanced repository is untouched.
 
@@ -457,3 +460,20 @@ offline during diagnosis; GitHub API/workflow access continues to work.
   performance still require user testing. Earlier intermittent SIGILL remains
   unexplained. Animation stays a design preview. No public release/tag, master
   or public README change; Preview 19 remains an unreleased test build.
+
+### Preview 20 same-window boot animation (validation pending)
+
+- User authorized app-launch integration of the approved eight-second boot
+  preview. The movie is bundled in the native frontend; streaming is untouched.
+- The App-owned presentation plays once per process in the existing library
+  window. The helper starts concurrently; library mouse, keyboard and controller
+  actions are held until the 0.65-second fade completes. Skip/Escape is available.
+- Reduce Motion and a missing asset bypass playback. AVPlayer failures and a
+  bounded watchdog reveal the library. Window close stops playback and clears
+  observers/player resources; reopening does not replay, fresh launch does.
+- Production packaging and the UI test bundle both include the MP4. Bundle
+  audit checks its exact bytes. UI version is 20; engine remains 6.2.0.
+- New UI tests exercise automatic completion in one unchanged window,
+  Skip/Escape, close/reopen/fresh launch, Reduce Motion, and missing/corrupt assets.
+  Compilation, real playback, all existing regressions and both builds pending.
+- No public release/tag, master/public README or streaming-engine changes.

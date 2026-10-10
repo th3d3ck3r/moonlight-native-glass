@@ -1,6 +1,81 @@
 import XCTest
 
 @MainActor final class NativeUIScreensTests: XCTestCase {
+    func testBootCompletesInLibraryWindow() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--design-preview", "--boot-preview", "--dark"]
+        app.launch()
+        let window = app.windows["native-library"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        let skip = window.buttons["native-boot-skip"]
+        XCTAssertTrue(skip.waitForExistence(timeout: 5), "Boot playback must appear in the library window")
+        let frame = window.frame
+        XCTAssertEqual(app.windows.count, 1, "Boot must not create a second window")
+        let boot = XCTAttachment(screenshot: window.screenshot())
+        boot.name = "boot-in-library-window"; boot.lifetime = .keepAlways; add(boot)
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: skip)
+        waitForExpectations(timeout: 15)
+        XCTAssertTrue(window.exists)
+        XCTAssertEqual(window.frame, frame, "Crossfade must retain the same window and size")
+        XCTAssertTrue(window.buttons["Add Computer"].isHittable, "Library controls must become available after boot")
+        let library = XCTAttachment(screenshot: window.screenshot())
+        library.name = "library-after-boot"; library.lifetime = .keepAlways; add(library)
+        app.terminate()
+    }
+
+    func testBootSkipReopenAndFreshLaunch() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--design-preview", "--boot-preview", "--dark"]
+        app.launch()
+        let window = app.windows["native-library"]
+        let skip = window.buttons["native-boot-skip"]
+        XCTAssertTrue(skip.waitForExistence(timeout: 10))
+        skip.click()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: skip)
+        waitForExpectations(timeout: 5)
+        window.buttons[XCUIIdentifierCloseWindow].click()
+        let item = app.descendants(matching: .any)["native-status-item"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+        XCTAssertFalse(skip.exists, "Reopening must not replay the animation")
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(skip.waitForExistence(timeout: 10), "A fresh process should play the animation again")
+        app.typeKey(.escape, modifierFlags: [])
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: skip)
+        waitForExpectations(timeout: 5)
+        app.terminate()
+    }
+
+    func testBootFallbacksAndCloseDuringPlayback() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        for flag in ["--boot-missing-resource", "--boot-invalid-resource", "--boot-reduce-motion"] {
+            app.launchArguments = ["--design-preview", "--boot-preview", flag, "--dark"]
+            app.launch()
+            let window = app.windows["native-library"]
+            XCTAssertTrue(window.waitForExistence(timeout: 10))
+            expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: window.buttons["native-boot-skip"])
+            waitForExpectations(timeout: 8)
+            XCTAssertTrue(window.buttons["Add Computer"].isHittable)
+            app.terminate()
+        }
+        app.launchArguments = ["--design-preview", "--boot-preview", "--dark"]
+        app.launch()
+        let window = app.windows["native-library"]
+        XCTAssertTrue(window.buttons["native-boot-skip"].waitForExistence(timeout: 10))
+        window.buttons[XCUIIdentifierCloseWindow].click()
+        let item = app.descendants(matching: .any)["native-status-item"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+        XCTAssertFalse(window.buttons["native-boot-skip"].exists, "Closing during boot must stop playback and restore directly to the library")
+        app.terminate()
+    }
+
     func testOverlaySettings() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -40,6 +40,7 @@ else
 fi
 cp macos-native/Resources/moonlight.icns "$app/Contents/Resources/moonlight.icns"
 cp macos-native/Resources/full-moon.png "$app/Contents/Resources/full-moon.png"
+cp macos-native/Resources/boot-animation.mp4 "$app/Contents/Resources/boot-animation.mp4"
 cp macos-native/Info.plist "$app/Contents/Info.plist"
 ditto "$engine_app" "$app/Contents/Helpers/MoonlightEngine.app"
 # The active streaming process has its own Dock icon. Update the nested bundle

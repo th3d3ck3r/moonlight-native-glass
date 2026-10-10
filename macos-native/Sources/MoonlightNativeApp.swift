@@ -47,12 +47,33 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
 @main struct MoonlightNativeApp: App {
     @NSApplicationDelegateAdaptor(NativeAppDelegate.self) private var delegate
     @StateObject private var store = EngineStore(preview: CommandLine.arguments.contains("--design-preview"))
+    @StateObject private var boot = NativeBootPresentation(
+        enabled: !CommandLine.arguments.contains("--design-preview") || CommandLine.arguments.contains("--boot-preview"),
+        resource: CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-missing-resource")
+            ? nil : CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-invalid-resource")
+                ? Bundle.main.url(forResource: "full-moon", withExtension: "png")
+                : Bundle.main.url(forResource: "boot-animation", withExtension: "mp4"),
+        reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ||
+            (CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-reduce-motion")))
     var body: some Scene {
         Window("Moonlight Native Glass", id: "library") {
-            LibraryView(store: store)
+            ZStack {
+                LibraryView(store: store, interactive: !boot.blocksLibrary)
+                    .disabled(boot.blocksLibrary)
+                    .allowsHitTesting(!boot.blocksLibrary)
+                    .accessibilityHidden(boot.blocksLibrary)
+                if boot.blocksLibrary {
+                    NativeBootView(presentation: boot)
+                        .opacity(boot.phase == .fading ? 0 : 1)
+                        .zIndex(1)
+                }
+            }
                 .frame(minWidth: 680, minHeight: 460)
+                .toolbar(boot.blocksLibrary ? .hidden : .automatic, for: .windowToolbar)
                 .background(NativeStatusActions(store: store, delegate: delegate))
+                .background(NativeWindowAccessor { boot.watchWindow($0) }.frame(width: 0, height: 0))
                 .onAppear { delegate.store = store; store.start() }
+                .onDisappear { boot.finishImmediately() }
         }
         .defaultSize(width: 1080, height: 720)
         .commands {
@@ -64,6 +85,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             CommandGroup(after: .newItem) {
                 Button("Add Computer…") { NotificationCenter.default.post(name: .nativeAddComputer, object: nil) }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
+                    .disabled(boot.blocksLibrary)
                 Button("Refresh Computers") { store.refresh() }.keyboardShortcut("r")
             }
             CommandGroup(after: .appSettings) {
@@ -122,7 +144,7 @@ private struct NativeStatusActions: View {
 // Keep these credits fixed across builds. AppKit reads the build number from
 // CFBundleVersion for the preview number; release notes belong on GitHub.
 func showNativeAboutPanel() {
-    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "18"
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "20"
     let engineBundle = Bundle(url: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app"))
     let engineVersion = engineBundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "6.2.0"

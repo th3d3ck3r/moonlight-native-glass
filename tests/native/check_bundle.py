@@ -18,6 +18,7 @@ for bundle, identity in [(app, "com.moonlight-stream.NativeGlass"),
     icon = bundle / "Contents/Resources" / (icon_name if icon_name.endswith(".icns") else icon_name + ".icns")
     assert icon.read_bytes() == (app / "Contents/Resources/moonlight.icns").read_bytes(), f"{bundle}: mismatched Dock icon"
 
+assert (app / "Contents/Resources/boot-animation.mp4").read_bytes() == pathlib.Path("macos-native/Resources/boot-animation.mp4").read_bytes(), "Boot animation resource differs"
 assert (app / "Contents/Resources/full-moon.png").read_bytes() == pathlib.Path("macos-native/Resources/full-moon.png").read_bytes(), "Menu bar full moon resource differs"
 
 checked = 0

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct LibraryView: View {
     @ObservedObject var store: EngineStore
+    var interactive = true
     @Environment(\.openSettings) private var openSettings
     @State private var previewConfigured = false
     @State private var search = ""
@@ -94,6 +95,7 @@ struct LibraryView: View {
             else if screen == "pair", let computer = store.selected { store.pairing = PairingRequest(computer: computer, pin: "1234") }
         }
         .onDisappear { controller.stop() }
+        .onChange(of: interactive) { _, enabled in if enabled { configureController() } else { controller.stop() } }
         .onChange(of: store.streamActive) { _, active in if active { controller.stop() } else { configureController() } }
         .onChange(of: store.selectedID) { _, _ in focusedGame = nil; search = "" }
     }
@@ -227,6 +229,7 @@ struct LibraryView: View {
         focusedGame = games[min(max(0, index + delta), games.count - 1)].id
     }
     private func configureController() {
+        guard interactive else { controller.stop(); return }
         guard !store.streamActive else { return }
         controller.start(move: { direction in if store.libraryWindow?.isKeyWindow == true { moveGames(direction) } }, select: {
             guard controlsEnabled, store.libraryWindow?.isKeyWindow == true, let computer = store.selected else { return }
