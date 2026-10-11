@@ -32,6 +32,9 @@ jobs:
           lipo build/AWDLTest.app/Contents/Library/Helpers/MoonlightAWDLHelper -verify_arch arm64 x86_64
           codesign --verify --strict --verbose=2 build/AWDLTest.app/Contents/Library/Helpers/MoonlightAWDLHelper
           plutil -lint build/AWDLTest.app/Contents/Library/LaunchDaemons/*.plist
+          # Non-root invocations must fail before installation or network work.
+          if build/AWDLTest.app/Contents/Library/Helpers/MoonlightAWDLHelper --install; then exit 1; fi
+          if build/AWDLTest.app/Contents/Library/Helpers/MoonlightAWDLHelper --remove; then exit 1; fi
       - name: Compile the actual native frontend for Intel and Apple Silicon
         run: |
           sdk=$(xcrun --sdk macosx --show-sdk-path)

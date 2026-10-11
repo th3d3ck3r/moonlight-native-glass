@@ -28,8 +28,15 @@ interval. Failed restoration retries until the interface becomes available.
 
 Settings → Network contains installation, approval settings, refresh, removal,
 and **Suppress AWDL while streaming**. Install/approval requires an explicit user
-action. Registration uses `SMAppService.daemon`; administrator approval is in
-macOS Login Items & Extensions. Copying the app to Applications before approval
+action. Apple-issued, consistently signed builds use `SMAppService.daemon`;
+administrator approval is in macOS Login Items & Extensions. Ad-hoc private
+builds use an explicit administrator-authorized installer implemented inside the
+verified helper executable. It copies the helper to `/Library/PrivilegedHelperTools`,
+writes its fixed launchd configuration, and stores the approved frontend signing
+requirement in a root-owned file. There is no automatically generated root shell
+script and no general-purpose installer RPC. Reinstall the helper after updating
+an ad-hoc build so its approved frontend signature is refreshed. Remove Helper
+uses the matching installation path and administrator authorization when needed. Copying the app to Applications before approval
 is recommended. The helper is bundled under `Contents/Library/Helpers`; its
 launchd plist is under `Contents/Library/LaunchDaemons`.
 
@@ -53,8 +60,10 @@ journals restoration before disabling an initially up interface, recovers after
 daemon restart, and checks once per second for macOS re-enabling AWDL. Idle
 checks do not query or modify any interfaces.
 
-Mutual XPC code requirements derive from the bundled executables' actual valid
-signatures. Ad-hoc builds use designated cdhash requirements; Developer ID
+Mutual XPC code requirements derive from the executables' actual valid
+signatures. The administrator-installed variant reads its approved frontend
+requirement from a root-owned, mode 0600 file; it never trusts a user-writable
+bundle identifier or user preferences. Ad-hoc builds use designated cdhash requirements; Developer ID
 builds retain their designated signing requirements. A bundle ID alone is never
 accepted as proof of authorization. The fixed recovery file is root-owned,
 mode 0600, created exclusively without following symlinks. Unexpected files at

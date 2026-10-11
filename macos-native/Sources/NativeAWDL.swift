@@ -24,6 +24,7 @@ import SwiftUI
     @Published private(set) var approvalRequired = false
     @Published private(set) var busy = false
     @Published private(set) var streamInProgress = false
+    @Published private(set) var manualInstallation = false
     private let preview: Bool
     private var sessions = Set<String>()
     private var connection: NSXPCConnection?
@@ -33,7 +34,9 @@ import SwiftUI
     private var removalConnection: NSXPCConnection?
     private var removalDeadline: Task<Void, Never>?
     private var service: SMAppService { .daemon(plistName: Self.serviceName + ".plist") }
-    private var helperURL: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Library/Helpers/MoonlightAWDLHelper") }
+    private var bundledHelperURL: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Library/Helpers/MoonlightAWDLHelper") }
+    private var installedHelperURL: URL { URL(fileURLWithPath: "/Library/PrivilegedHelperTools/" + Self.serviceName) }
+    private var helperURL: URL { manualInstallation ? installedHelperURL : bundledHelperURL }
 
     init(preview: Bool = false) {
         self.preview = preview
@@ -42,8 +45,9 @@ import SwiftUI
     }
     func refresh() {
         guard !preview else { return }
-        installed = service.status == .enabled
-        approvalRequired = service.status == .requiresApproval
+        manualInstallation = Self.rootOwnedFile(installedHelperURL.path)
+        installed = manualInstallation || service.status == .enabled
+        approvalRequired = !manualInstallation && service.status == .requiresApproval
         if approvalRequired { status = "Approve the helper in Login Items & Extensions" }
         else if !installed { status = "Helper not installed or approved" }
         else if !enabled { status = "Off" }
@@ -51,6 +55,10 @@ import SwiftUI
     }
     func install() {
         guard !preview, !busy, !streamInProgress else { return }
+        if manualInstallation || !supportsServiceSigning() {
+            runInstaller(removing: false)
+            return
+        }
         busy = true
         defer { busy = false }
         do {
@@ -69,7 +77,7 @@ import SwiftUI
         busy = true
         // A pending approval has never run the daemon, so there is no state to
         // restore. An approved daemon must acknowledge recovery before removal.
-        guard service.status == .enabled else { unregister(); return }
+        guard installed else { unregister(); return }
         guard let requirement = helperRequirement() else {
             busy = false; status = "Cannot verify the helper. Restore AWDL before removing it."; return
         }
@@ -97,6 +105,7 @@ import SwiftUI
         if success { unregister() } else { busy = false; status = message }
     }
     private func unregister() {
+        if manualInstallation { runInstaller(removing: true); return }
         service.unregister { [weak self] error in
             Task { @MainActor in
                 guard let self else { return }
@@ -138,7 +147,7 @@ import SwiftUI
     }
     private func renew() {
         guard enabled, !sessions.isEmpty, !awaitingReply else { return }
-        guard service.status == .enabled else {
+        guard manualInstallation || service.status == .enabled else {
             disconnect(); refresh(); return
         }
         if connection == nil {
@@ -188,17 +197,69 @@ import SwiftUI
         // 15-second heartbeat timeout if the process vanishes unexpectedly.
         old?.invalidate()
     }
-    private func helperRequirement() -> String? {
+    private func helperRequirement() -> String? { Self.designatedRequirement(helperURL) }
+    nonisolated private static func designatedRequirement(_ url: URL) -> String? {
         var code: SecStaticCode?
         var requirement: SecRequirement?
         var text: CFString?
-        guard SecStaticCodeCreateWithPath(helperURL as CFURL, [], &code) == errSecSuccess,
+        guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess,
               let code,
               SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSStrictValidate), nil) == errSecSuccess,
               SecCodeCopyDesignatedRequirement(code, [], &requirement) == errSecSuccess,
               let requirement,
               SecRequirementCopyString(requirement, [], &text) == errSecSuccess else { return nil }
         return text as String?
+    }
+    private func supportsServiceSigning() -> Bool {
+        func team(_ url: URL) -> String? {
+            var code: SecStaticCode?
+            var info: CFDictionary?
+            guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess, let code,
+                  SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
+                  let info else { return nil }
+            return (info as NSDictionary)[kSecCodeInfoTeamIdentifier] as? String
+        }
+        guard let appTeam = team(Bundle.main.bundleURL), !appTeam.isEmpty else { return false }
+        return team(bundledHelperURL) == appTeam
+    }
+    nonisolated private static func rootOwnedFile(_ path: String) -> Bool {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.ownerAccountID] as? NSNumber)?.intValue == 0,
+              let mode = (attributes[.posixPermissions] as? NSNumber)?.intValue else { return false }
+        return mode & 0o022 == 0
+    }
+    private func runInstaller(removing: Bool) {
+        let tool = removing ? installedHelperURL : bundledHelperURL
+        guard Self.designatedRequirement(tool) != nil else {
+            busy = false; status = "Installer signature is invalid"; return
+        }
+        busy = true
+        status = removing ? "Waiting for administrator approval to remove the helper…" : "Waiting for administrator approval to install the helper…"
+        Task { [weak self] in
+            let result = await Task.detached { Self.administratorCommand(tool, removing: removing) }.value
+            guard let self else { return }
+            self.busy = false; self.refresh()
+            if let result { self.status = result }
+            else if !removing && self.enabled { self.reconcile() }
+        }
+    }
+    nonisolated private static func administratorCommand(_ tool: URL, removing: Bool) -> String? {
+        // The root executable implements fixed --install/--remove operations.
+        // No generated shell scripts or caller-supplied destinations are used.
+        let quotedTool = "'" + tool.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        let command = quotedTool + (removing ? " --remove" : " --install")
+        let escaped = command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        let process = Process(), output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", "do shell script \"\(escaped)\" with administrator privileges"]
+        process.standardOutput = output; process.standardError = output
+        do { try process.run() } catch { return "Administrator authorization failed: \(error.localizedDescription)" }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus != 0 else { return nil }
+        let message = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return message.isEmpty ? "Helper installation or removal failed" : message
     }
 }
 
@@ -218,6 +279,9 @@ struct NativeAWDLSettings: View {
                 }
                 if awdl.approvalRequired {
                     Button("Open Approval Settings…") { awdl.openApprovalSettings() }
+                }
+                if awdl.manualInstallation {
+                    Button("Reinstall Helper…") { awdl.install() }
                 }
                 Button("Refresh Helper Status") { awdl.refresh() }
                 if awdl.installed || awdl.approvalRequired { Button("Remove Helper") { awdl.remove() } }
