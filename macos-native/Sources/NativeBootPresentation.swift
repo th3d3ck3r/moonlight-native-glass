@@ -22,6 +22,7 @@ import SwiftUI
         let transparent: Bool
         let fullSize: Bool
         let separator: NSTitlebarSeparatorStyle
+        let background: NSColor
         let movable: Bool
         let toolbar: NSToolbar?
         let toolbarVisible: Bool
@@ -57,9 +58,10 @@ import SwiftUI
         watchedWindow = window
         chrome = Chrome(title: window.titleVisibility, transparent: window.titlebarAppearsTransparent,
                         fullSize: window.styleMask.contains(.fullSizeContentView),
-                        separator: window.titlebarSeparatorStyle, movable: window.isMovableByWindowBackground,
+                        separator: window.titlebarSeparatorStyle, background: window.backgroundColor, movable: window.isMovableByWindowBackground,
                         toolbar: window.toolbar, toolbarVisible: window.toolbar?.isVisible ?? false)
         let frame = window.frame
+        window.backgroundColor = NSColor(red: 7 / 255, green: 12 / 255, blue: 25 / 255, alpha: 1)
         window.styleMask.insert(.fullSizeContentView)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -67,6 +69,15 @@ import SwiftUI
         window.toolbar?.isVisible = false
         window.isMovableByWindowBackground = true
         window.setFrame(frame, display: false)
+        // SwiftUI can finish applying its scene chrome after view attachment.
+        // Reassert the transparent title region once that pass has completed.
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, self.blocksLibrary, let window, self.watchedWindow === window else { return }
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.titlebarSeparatorStyle = .none
+            window.toolbar?.isVisible = false
+        }
         escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak window] event in
             guard event.window === window, event.keyCode == 53,
                   event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
@@ -100,6 +111,7 @@ import SwiftUI
             window.titleVisibility = chrome.title
             window.titlebarAppearsTransparent = chrome.transparent
             window.titlebarSeparatorStyle = chrome.separator
+            window.backgroundColor = chrome.background
             window.isMovableByWindowBackground = chrome.movable
             chrome.toolbar?.isVisible = chrome.toolbarVisible
             window.setFrame(frame, display: false)
@@ -127,6 +139,7 @@ import SwiftUI
 // contraction and the unchanged bundled Moonlight logo.
 struct NativeBootView: View {
     @ObservedObject var presentation: NativeBootPresentation
+    var previewTime: Double? = nil
     static let background = Color(red: 7 / 255, green: 12 / 255, blue: 25 / 255)
 
     private func ease(_ time: Double, _ start: Double, _ duration: Double) -> Double {
@@ -135,8 +148,8 @@ struct NativeBootView: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 60, paused: presentation.phase != .playing)) { timeline in
-            let t = max(0, timeline.date.timeIntervalSince(presentation.startedAt ?? timeline.date))
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: previewTime != nil || presentation.phase != .playing)) { timeline in
+            let t = previewTime ?? max(0, timeline.date.timeIntervalSince(presentation.startedAt ?? timeline.date))
             GeometryReader { geometry in
                 let size = geometry.size
                 let diameter = min(96.0, min(size.width, size.height) * 0.16)
@@ -208,6 +221,6 @@ struct NativeBootView: View {
         .accessibilityLabel("Moonlight startup animation. Press Escape to skip.")
         .accessibilityIdentifier("native-boot-animation")
         .accessibilityAction(named: Text("Skip startup animation")) { presentation.finish() }
-        .onAppear { presentation.start() }
+        .onAppear { if previewTime == nil { presentation.start() } }
     }
 }

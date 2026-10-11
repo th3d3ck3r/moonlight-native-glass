@@ -56,3 +56,19 @@ import SwiftUI
 #Preview("Native Glass · Library · Light") {
     NativeGlassLibraryPreview().preferredColorScheme(.light)
 }
+
+@MainActor private struct NativeGlassArtworkPreview: View {
+    @StateObject private var boot = NativeBootPresentation(enabled: true, reduceMotion: false)
+    let time: Double
+    var body: some View {
+        NativeBootView(presentation: boot, previewTime: time).frame(width: 960, height: 640)
+    }
+}
+
+#Preview("Native Glass · Construction rings") {
+    NativeGlassArtworkPreview(time: 1.85)
+}
+
+#Preview("Native Glass · Existing logo") {
+    NativeGlassArtworkPreview(time: 3.55)
+}

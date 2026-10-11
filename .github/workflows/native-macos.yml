@@ -159,7 +159,7 @@ jobs:
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
           build/engine-store-tests
       - name: Test native startup animation and window chrome recovery
-        # The media fixture also runs in UI-only probes, before screenshots.
+        # Startup lifetime checks also run in UI-only probes, before screenshots.
         # Compile the same production coordinator used by the actual app.
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests

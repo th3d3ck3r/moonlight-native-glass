@@ -1,6 +1,23 @@
 import XCTest
 
 @MainActor final class NativeUIScreensTests: XCTestCase {
+    func testNativeStartupArtworkStages() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        for (name, time) in [("seed", 0.12), ("expansion", 0.65), ("construction-rings", 1.85), ("existing-logo", 3.55)] {
+            app.launchArguments = ["--design-preview", "--boot-preview", "--boot-frame=\(time)", "--dark"]
+            app.launch()
+            let window = app.windows["native-library"]
+            XCTAssertTrue(window.waitForExistence(timeout: 10))
+            XCTAssertTrue(window.descendants(matching: .any)["native-boot-animation"].firstMatch.waitForExistence(timeout: 5))
+            XCTAssertFalse(window.searchFields.firstMatch.exists)
+            XCTAssertFalse(window.buttons["Add Computer"].exists)
+            let shot = XCTAttachment(screenshot: window.screenshot())
+            shot.name = "native-startup-" + name; shot.lifetime = .keepAlways; add(shot)
+            app.terminate()
+        }
+    }
+
     func testBootCompletesInLibraryWindow() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

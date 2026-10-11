@@ -63,9 +63,10 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     var body: some Scene {
         Window("Moonlight Native Glass", id: "library") {
             ZStack {
-                NativeBootView.background
+                NativeBootView.background.ignoresSafeArea()
                 if boot.blocksLibrary {
-                    NativeBootView(presentation: boot)
+                    NativeBootView(presentation: boot, previewTime: store.preview ? Double(nativeArgument("--boot-frame") ?? "") : nil)
+                        .toolbarBackground(.hidden, for: .windowToolbar)
                         .background(NativeWindowAccessor { window in
                             store.libraryWindow = window
                             window?.identifier = NSUserInterfaceItemIdentifier("native-library")
@@ -77,6 +78,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                         .transition(.opacity)
                 }
             }
+            .containerBackground(boot.blocksLibrary ? NativeBootView.background : Color(nsColor: .windowBackgroundColor), for: .window)
             .frame(minWidth: 680, minHeight: 460)
             .animation(.easeInOut(duration: 0.4), value: boot.phase)
             .background(NativeStatusActions(store: store, delegate: delegate))
