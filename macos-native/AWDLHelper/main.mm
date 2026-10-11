@@ -130,7 +130,7 @@ static NSString* FrontendRequirement() {
     CFStringRef text = NULL;
     if (SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:app], kSecCSDefaultFlags, &code) != errSecSuccess) return nil;
     if (SecStaticCodeCheckValidity(code, kSecCSStrictValidate, NULL) == errSecSuccess &&
-        SecCodeCopyDesignatedRequirement((SecCodeRef)code, kSecCSDefaultFlags, &requirement) == errSecSuccess)
+        SecCodeCopyDesignatedRequirement(code, kSecCSDefaultFlags, &requirement) == errSecSuccess)
         SecRequirementCopyString(requirement, kSecCSDefaultFlags, &text);
     if (requirement) CFRelease(requirement);
     CFRelease(code);

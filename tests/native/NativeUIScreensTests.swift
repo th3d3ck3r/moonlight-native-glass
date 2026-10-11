@@ -1,6 +1,21 @@
 import XCTest
 
 @MainActor final class NativeUIScreensTests: XCTestCase {
+    func testAWDLControlsCannotInstallOrActivateInPreview() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--design-preview", "--preview-screen=settings-network", "--settings-fixture", Bundle(for: Self.self).url(forResource: "preview-settings", withExtension: "json")!.path]
+        app.launch()
+        let toggle = app.descendants(matching: .any)["native-awdl-toggle"].firstMatch
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        XCTAssertFalse(toggle.isEnabled, "Design previews must never change AWDL")
+        let install = app.buttons["native-awdl-install"]
+        XCTAssertTrue(install.exists)
+        XCTAssertFalse(install.isEnabled, "Design previews must never install a privileged helper")
+        let status = app.staticTexts["native-awdl-status"]
+        XCTAssertTrue(status.label.contains("Design preview"))
+        app.terminate()
+    }
     func testBootCompletesInLibraryWindow() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

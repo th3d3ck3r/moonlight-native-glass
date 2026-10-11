@@ -193,7 +193,7 @@ import SwiftUI
         guard SecStaticCodeCreateWithPath(helperURL as CFURL, [], &code) == errSecSuccess,
               let code,
               SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSStrictValidate), nil) == errSecSuccess,
-              SecCodeCopyDesignatedRequirement(unsafeBitCast(code, to: SecCode.self), [], &requirement) == errSecSuccess,
+              SecCodeCopyDesignatedRequirement(code, [], &requirement) == errSecSuccess,
               let requirement,
               SecRequirementCopyString(requirement, [], &text) == errSecSuccess else { return nil }
         return text as String?

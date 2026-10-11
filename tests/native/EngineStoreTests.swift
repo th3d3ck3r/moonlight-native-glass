@@ -14,6 +14,14 @@ func nativeArgument(_ name: String) -> String? { nil }
     }
     @MainActor static func main() async throws {
         _ = NSApplication.shared
+        // Preview and injected-engine tests cannot register or activate a
+        // privileged service, even if a user's persisted setting is enabled.
+        let previewStore = EngineStore(preview: true)
+        precondition(!previewStore.awdl.enabled)
+        previewStore.awdl.install()
+        previewStore.awdl.beginSession("preview")
+        precondition(!previewStore.awdl.installed && !previewStore.awdl.streamInProgress)
+        previewStore.awdl.shutdown()
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
