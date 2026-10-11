@@ -127,13 +127,16 @@ jobs:
           if-no-files-found: error
       - name: Package preview artifact
         run: |
-          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-20-${{ matrix.architecture }}.zip'
-          shasum -a 256 'build/Moonlight-Native-Glass-Preview-20-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
+          preview_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' macos-native/Info.plist)
+          echo "NATIVE_PREVIEW_BUILD=$preview_build" >> "$GITHUB_ENV"
+          preview_zip="build/Moonlight-Native-Glass-Preview-$preview_build-${{ matrix.architecture }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' "$preview_zip"
+          shasum -a 256 "$preview_zip" > 'build/SHA256-${{ matrix.architecture }}.txt'
       - uses: actions/upload-artifact@v6
         with:
-          name: Native-Glass-Preview-20-${{ matrix.architecture }}
+          name: Native-Glass-Preview-${{ env.NATIVE_PREVIEW_BUILD }}-${{ matrix.architecture }}
           path: |
-            build/Moonlight-Native-Glass-Preview-20-${{ matrix.architecture }}.zip
+            build/Moonlight-Native-Glass-Preview-*-${{ matrix.architecture }}.zip
             build/SHA256-${{ matrix.architecture }}.txt
           if-no-files-found: error
 

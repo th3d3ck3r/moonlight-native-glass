@@ -1,7 +1,13 @@
 # Native UI checkpoint
 
 Repository: `th3d3ck3r/moonlight-native-glass` · branch: `native-ui`.
-Latest work: Preview 20 integrates the approved 1440p/60 fps boot animation in
+Experimental development: **Preview 21 AWDL helper** is isolated on
+`feature/awdl-helper`; see [AWDL_HELPER.md](AWDL_HELPER.md). It is optional,
+off by default, and requires explicit macOS approval. The validated pre-feature
+checkpoint is `checkpoint/pre-awdl-2026-10-11` at
+`9532df823f7785f75dc6db4bfa93fc4d2ef26683`. `native-ui` remains at that checkpoint.
+
+Baseline work: Preview 20 integrates the approved 1440p/60 fps boot animation in
 the library window, then crossfades to the main app. Both builds and the full
 validation suite passed; see the Preview 20 entry below. A root Xcode project is now available; see
 `docs/XCODE_SETUP.md` for full-app and UI-preview schemes.

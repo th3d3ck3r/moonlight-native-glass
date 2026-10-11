@@ -13,7 +13,10 @@ import XCTest
         XCTAssertTrue(install.exists)
         XCTAssertFalse(install.isEnabled, "Design previews must never install a privileged helper")
         let status = app.staticTexts["native-awdl-status"]
-        XCTAssertTrue(status.label.contains("Design preview"))
+        // AppKit exposes static text through AXValue; SwiftUI may also provide
+        // AXLabel. Check the visible text without depending on one AX mapping.
+        let text = status.label + " " + (status.value as? String ?? "")
+        XCTAssertTrue(text.contains("Design preview"), "Unexpected helper status: \(text)")
         app.terminate()
     }
     func testBootCompletesInLibraryWindow() throws {
