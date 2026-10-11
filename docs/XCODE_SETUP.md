@@ -50,3 +50,26 @@ and notarized release still needs the separate release signing process.
 
 This setup does not connect a remote chat session to your Mac or grant screen
 control. It prepares the local checkout for Xcode editing, running and debugging.
+
+## Validation
+
+Validated at source `dcf3a66a20e05e0d819f30e3078d434498d7eb6e` in
+[Native Xcode Project Validation run 38098996413](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38098996413),
+job `114350802360`:
+
+- Fresh-checkout full Universal build and deep signature verification passed.
+- All 107 bundled Mach-O files passed dependency and Intel/ARM architecture checks.
+- Incremental rebuild reused the deployed engine and succeeded.
+- The embedded real engine passed settings/type/choice, atomic validation,
+  persistence, stale-host recovery and correlated pause/resume checks.
+- A git-free source export automatically recovered all three pinned submodules.
+- The UI Preview build skipped engine setup; all eight UI tests passed using
+  the root project, including boot, Skip/Escape, close/reopen, Dock/menu routing,
+  sheets, About and Settings.
+- Existing native UI validation also passed at the same source in run
+  `38098996384`, job `114350802318`.
+
+CI runs on ARM macOS 26 and cross-compiles the Intel slice. Physical Intel/OCLP
+behavior and live-host streaming still require testing on your Mac. The setup
+changes build/project configuration and audits; the app UI and streaming core
+remain at the verified Preview 20 source.

@@ -3,7 +3,8 @@
 Repository: `th3d3ck3r/moonlight-native-glass` · branch: `native-ui`.
 Latest work: Preview 20 integrates the approved 1440p/60 fps boot animation in
 the library window, then crossfades to the main app. Both builds and the full
-validation suite passed; see the Preview 20 entry at the end of this document.
+validation suite passed; see the Preview 20 entry below. A root Xcode project is now available; see
+`docs/XCODE_SETUP.md` for full-app and UI-preview schemes.
 `master` application code remains stock Qt v6.2.0: `de2467e433821664cdd2224aad8c89a625be1ad9`. Its README-only homepage commit is `e0c36c9`.
 The Enhanced repository is untouched.
 
@@ -492,3 +493,35 @@ offline during diagnosis; GitHub API/workflow access continues to work.
 - Actual smoothness and live streaming/input/game exit/error 11 still require
   testing on the Intel/OCLP Mac. Exact Xcode 26 motion matching is unverified.
 - No public release/tag, master/public README or streaming-engine changes.
+
+### Xcode development project setup (validated)
+
+- User authorized preparing Moonlight Native Glass on GitHub for local Xcode.
+  Root project: `MoonlightNativeGlass.xcodeproj`, branch `native-ui`.
+- Shared schemes: **Moonlight Native Glass** builds/runs the real app; **Moonlight
+  UI Preview** uses sample hosts/games and skips engine/dependency setup.
+  Command-U uses the Preview configuration and existing native UI tests.
+- Xcode 26 is required by the existing Liquid Glass SDK references. Deployment
+  remains macOS 15+. Local development uses ad-hoc signing without a team.
+- `scripts/build-xcode-engine.py` bootstraps project-private, verified Python,
+  the pinned aqt installer, Qt 6.11.2, Moonlight v19 dependencies and original
+  submodules. qmake remains the engine build; the helper is deployed, renamed,
+  signed and embedded in the frontend. Incremental builds reuse the helper when
+  its source/recipe fingerprint matches. Tools and build outputs are ignored.
+- Source ZIP support recovers gitlinks from `scripts/xcode-submodules.json`;
+  when updating submodule pins, update this manifest too. Private Python release
+  URLs and SHA-256 values live in `scripts/xcode-python.json`.
+- Add new frontend files to both the root Xcode project and the existing
+  `tests/native/NativeUITests.xcodeproj` when changing source membership.
+- Bundle auditing recognizes dylib install identities and Xcode's declared
+  executable-directory runpath, allowing standard debug/preview dylibs while
+  continuing to check actual library dependencies and architecture slices.
+- Validated source: `dcf3a66a20e05e0d819f30e3078d434498d7eb6e`.
+  Xcode CI run `38098996413`, job `114350802360`, passed fresh full Universal
+  build, deep signing, all 107 Mach-O files, incremental rebuild, real helper
+  bridge/persistence, source ZIP recovery and all eight root-project UI tests.
+  Existing UI run `38098996384`, job `114350802318`, also passed.
+- No application feature/version or streaming-core changes. Preview 20 package
+  links/checksums remain valid. No release/tag/master/public README updates.
+- Local Mac screen/control access is not established by this repository setup.
+  Physical Intel/OCLP and live-host limits remain as recorded for Preview 20.
