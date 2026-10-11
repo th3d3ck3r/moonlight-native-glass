@@ -19,7 +19,15 @@ For live Canvas previews, open
 `macos-native/Previews/NativeGlassLivePreview.swift`, choose **Moonlight UI
 Preview**, and enable **Editor > Canvas** and live mode. Use **Replay Startup**
 to repeat the animation. Dark/light libraries and fixed construction-ring/logo
-stages are included. No additional source files need to be added manually: the
+stages are included. For the five new motion alternatives, open
+`macos-native/Previews/NativeGlassAnimationAlternatives.swift`: **Orbit Reveal**,
+**Aurora Bloom**, **Starlight Weave**, **Lunar Eclipse**, and **Prism Sweep**.
+Each Canvas preview has its own Replay button, uses the same small original
+Moonlight logo and three window dots, and fades into the sample library. The
+alternatives do not replace the app's selected animation. The logo's baked navy
+square is masked away in memory for animation use; Dock/status assets are unchanged.
+
+No additional source files need to be added manually: the
 project already includes all preview code and resources.
 
 The preview schemes support **Command-U** for native UI tests. Cases supply their

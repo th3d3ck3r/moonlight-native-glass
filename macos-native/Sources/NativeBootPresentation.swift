@@ -1,6 +1,30 @@
 import AppKit
 import SwiftUI
 
+// The original icon has an opaque navy tile. Mask only those dark background
+// pixels for animation use; preserve the existing crescent/star artwork and RGB
+// values. Dock/status resources stay byte-for-byte unchanged.
+@MainActor enum NativeBootLogo {
+    static func image(_ url: URL) -> NSImage? {
+        guard let source = NSImage(contentsOf: url),
+              let cg = source.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let bitmap = CGContext(data: nil, width: cg.width, height: cg.height,
+                                     bitsPerComponent: 8, bytesPerRow: cg.width * 4,
+                                     space: CGColorSpaceCreateDeviceRGB(),
+                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let data = bitmap.data else { return nil }
+        bitmap.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: cg.width * cg.height * 4)
+        for index in stride(from: 0, to: cg.width * cg.height * 4, by: 4) {
+            let peak = max(pixels[index], max(pixels[index + 1], pixels[index + 2]))
+            let coverage = min(1.0, max(0.0, (Double(peak) - 48) / 32))
+            for channel in 0..<4 { pixels[index + channel] = UInt8(Double(pixels[index + channel]) * coverage) }
+        }
+        guard let cutout = bitmap.makeImage() else { return nil }
+        return NSImage(cgImage: cutout, size: source.size)
+    }
+}
+
 // One finite, native animation per process. No media decoder, window replacement,
 // network work, or streaming changes are involved in startup presentation.
 @MainActor final class NativeBootPresentation: ObservableObject {
@@ -31,7 +55,7 @@ import SwiftUI
 
     init(enabled: Bool, resource: URL? = Bundle.main.url(forResource: "moonlight", withExtension: "icns"),
          reduceMotion: Bool = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) {
-        logo = resource.flatMap { NSImage(contentsOf: $0) }
+        logo = resource.flatMap(NativeBootLogo.image)
         phase = enabled && !reduceMotion && logo != nil ? .playing : .finished
     }
 

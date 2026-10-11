@@ -83,3 +83,21 @@ scheme, workflow and documentation revisions):
 - Universal: artifact `11710140462`, run `38159249193`.
 
 No public release was created and no helper was installed or activated.
+
+## Five Xcode motion alternatives
+
+`macos-native/Previews/NativeGlassAnimationAlternatives.swift` adds five live
+Canvas choices: Orbit Reveal (converging comet arcs), Aurora Bloom (soft flowing
+light curtains), Starlight Weave (gathering star trails), Lunar Eclipse (a gradual
+light reveal), and Prism Sweep (passing refraction streaks). All finish on the
+same small logo before the existing fade to the sample library. They are
+preview-only alternatives; no selection is applied to the app.
+
+The square noticed in the previous animation was the opaque background baked
+into `moonlight.icns`. `NativeBootLogo` now masks only dark background pixels in
+memory and retains the original bright crescent and small-star artwork. The
+Dock/menu-bar resources remain byte-for-byte unchanged. The mask is also used
+by the current production startup, but the previously packaged Build 22 does
+not include this later source change. A new app package has not been delivered
+for the alternatives. A native test checks transparent corners and opaque moon
+artwork in the actual resource.
