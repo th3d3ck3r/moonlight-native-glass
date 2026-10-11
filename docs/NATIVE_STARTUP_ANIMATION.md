@@ -66,3 +66,20 @@ while natural completion continues to exercise the real finite timeline.
 The subsequent final push changes only tests, shared preview schemes, workflow
 validation and documentation; the packaged production sources remain identical
 to `661631e3a04332e05b3064f308d7b57cd83971e5`.
+
+Final Xcode/scheme/test revision `8039226cfb3d5bead2f2c696f466c35f5c6d6f28`
+passed both complete nine-test UI suites (zero failures): native run
+`38160139878`, job `114531133654`, and root-project run `38160139957`, job
+`114531133727`. The latter also built **Moonlight Startup Preview** and verified
+that its app contains no streaming engine. The close-during-startup case passed
+in both suites after holding the preview frame. Canvas preview source compiled
+through the root Xcode target. The interactive Xcode Canvas itself and physical
+Intel/OCLP frame pacing still require local inspection.
+
+Preview 22 artifacts (production source above, unchanged by the later test,
+scheme, workflow and documentation revisions):
+
+- Intel: artifact `11709489448`, run `38159249193`.
+- Universal: artifact `11710140462`, run `38159249193`.
+
+No public release was created and no helper was installed or activated.

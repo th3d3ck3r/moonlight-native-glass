@@ -77,5 +77,7 @@ composited artwork-stage captures. Both full Intel/Universal packages passed in 
 UI suite also passed. The root project's fresh/incremental Universal builds,
 real-engine bridge and source-ZIP dependency recovery passed in run
 `38159249190`. A close-during-startup UI test was made deterministic after that
-run, without changing the app's production source. Final scheme/UI validation
-is recorded in `docs/NATIVE_STARTUP_ANIMATION.md`.
+run, without changing the app's production source. Final revision `8039226cfb3d5bead2f2c696f466c35f5c6d6f28` passed both nine-test
+UI suites in runs `38160139878` and `38160139957`. The startup scheme built
+without the engine, and all Canvas preview code compiled. See
+`docs/NATIVE_STARTUP_ANIMATION.md` for evidence and physical-test limits.

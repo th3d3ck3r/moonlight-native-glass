@@ -8,7 +8,10 @@ and the original bundled logo, hides startup title/toolbar/library chrome, and
 keeps only the genuine window buttons visible. Live Canvas code is in
 `macos-native/Previews/NativeGlassLivePreview.swift`; shared UI/startup preview
 schemes and setup instructions are in `docs/XCODE_SETUP.md`.
-See `docs/NATIVE_STARTUP_ANIMATION.md` for behavior and validation evidence.
+Both complete architecture builds and both final nine-test UI suites passed.
+The root Xcode full/incremental builds, real bridge, source-ZIP setup and new
+startup preview scheme also passed. See `docs/NATIVE_STARTUP_ANIMATION.md` for
+source revisions, evidence and physical-test limits.
 The stable `native-ui` branch retains Preview 20 until this branch is adopted.
 `master` application code remains stock Qt v6.2.0: `de2467e433821664cdd2224aad8c89a625be1ad9`. Its README-only homepage commit is `e0c36c9`.
 The Enhanced repository is untouched.
