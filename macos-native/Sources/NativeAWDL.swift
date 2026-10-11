@@ -23,6 +23,7 @@ import SwiftUI
     @Published private(set) var installed = false
     @Published private(set) var approvalRequired = false
     @Published private(set) var busy = false
+    @Published private(set) var streamInProgress = false
     private let preview: Bool
     private var sessions = Set<String>()
     private var connection: NSXPCConnection?
@@ -33,7 +34,6 @@ import SwiftUI
     private var removalDeadline: Task<Void, Never>?
     private var service: SMAppService { .daemon(plistName: Self.serviceName + ".plist") }
     private var helperURL: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Library/Helpers/MoonlightAWDLHelper") }
-    var streamInProgress: Bool { !sessions.isEmpty }
 
     init(preview: Bool = false) {
         self.preview = preview
@@ -108,14 +108,16 @@ import SwiftUI
     func beginSession(_ token: String) {
         guard !preview else { return }
         sessions.insert(token)
+        streamInProgress = true
         reconcile()
     }
     func endSession(_ token: String) {
         sessions.remove(token)
+        streamInProgress = !sessions.isEmpty
         if sessions.isEmpty { disconnect(); if !preview { refresh() } }
     }
     func shutdown() {
-        sessions.removeAll(); disconnect()
+        sessions.removeAll(); streamInProgress = false; disconnect()
         removalDeadline?.cancel(); removalDeadline = nil
         removalConnection?.invalidate(); removalConnection = nil
     }
