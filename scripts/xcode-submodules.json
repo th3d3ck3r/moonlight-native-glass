@@ -1,0 +1,17 @@
+[
+  {
+    "path": "moonlight-common-c/moonlight-common-c",
+    "url": "https://github.com/moonlight-stream/moonlight-common-c.git",
+    "commit": "f900dd4767759c7b9d0e93bcea666b55c69ea62f"
+  },
+  {
+    "path": "qmdnsengine/qmdnsengine",
+    "url": "https://github.com/cgutman/qmdnsengine.git",
+    "commit": "920c097ffa742e2968290f15d4dde6693aec02e5"
+  },
+  {
+    "path": "app/SDL_GameControllerDB",
+    "url": "https://github.com/gabomdq/SDL_GameControllerDB.git",
+    "commit": "8d9fefd7b810f2541f78cc7a8ccbd185bc84c7a5"
+  }
+]

@@ -1,0 +1,71 @@
+name: Native Xcode Project Validation
+on:
+  push:
+    branches: [native-ui]
+    paths:
+      - 'MoonlightNativeGlass.xcodeproj/**'
+      - 'scripts/build-xcode-engine.py'
+      - 'scripts/xcode-python.json'
+      - 'scripts/xcode-submodules.json'
+      - '.github/workflows/native-xcode.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-xcode-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  xcode:
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+        # Deliberately leave submodules uninitialized: the Xcode build owns setup.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - name: Validate shared project and schemes
+        run: |
+          plutil -lint MoonlightNativeGlass.xcodeproj/project.pbxproj
+          xcodebuild -list -project MoonlightNativeGlass.xcodeproj
+      - name: Build the full app from a fresh checkout
+        run: |
+          xcodebuild -project MoonlightNativeGlass.xcodeproj -scheme 'Moonlight Native Glass' -configuration Debug -destination 'platform=macOS' -derivedDataPath build/xcode-main ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
+          codesign --verify --deep --strict --verbose=2 build/xcode-main/Build/Products/Debug/MoonlightNative.app
+          python3 tests/native/check_bundle.py build/xcode-main/Build/Products/Debug/MoonlightNative.app universal
+      - name: Verify incremental full-app build
+        run: |
+          xcodebuild -project MoonlightNativeGlass.xcodeproj -scheme 'Moonlight Native Glass' -configuration Debug -destination 'platform=macOS' -derivedDataPath build/xcode-main ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
+      - name: Test the embedded real engine
+        run: |
+          python3 tests/native/bridge_smoke.py build/xcode-main/Build/Products/Debug/MoonlightNative.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight
+      - name: Verify source ZIP dependency setup
+        run: |
+          mkdir -p build/source-zip
+          git archive HEAD | tar -x -C build/source-zip
+          /usr/bin/python3 - <<'PY'
+          import importlib.util, json, pathlib, subprocess
+          root = pathlib.Path('build/source-zip').resolve()
+          spec = importlib.util.spec_from_file_location('zip_setup', root / 'scripts/build-xcode-engine.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.prepare_sources()
+          for entry in json.loads((root / 'scripts/xcode-submodules.json').read_text()):
+              actual = subprocess.check_output(['git', '-C', str(root / entry['path']), 'rev-parse', 'HEAD'], text=True).strip()
+              assert actual == entry['commit'], entry['path']
+          print('Source ZIP recovered every pinned submodule without manual setup')
+          PY
+      - name: Test the root project's UI preview scheme
+        run: |
+          xcodebuild -project MoonlightNativeGlass.xcodeproj -scheme 'Moonlight UI Preview' -destination 'platform=macOS' -derivedDataPath build/xcode-preview -resultBundlePath build/xcode-preview.xcresult test
+      - name: Export UI captures
+        if: always()
+        run: |
+          mkdir -p build/xcode-captures
+          if [ -d build/xcode-preview.xcresult ]; then xcrun xcresulttool export attachments --path build/xcode-preview.xcresult --output-path build/xcode-captures; fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: Xcode-Project-UI-Captures
+          path: build/xcode-captures/*
+          if-no-files-found: warn
