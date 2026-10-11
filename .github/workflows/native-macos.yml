@@ -1,7 +1,7 @@
 name: Native macOS Validation
 on:
   push:
-    branches: [native-ui]
+    branches: [native-ui, feature/awdl-helper]
     paths-ignore: [README.md, "docs/**", "readme-assets/**", .github/workflows/publish-native-preview.yml]
   workflow_dispatch:
 permissions:
@@ -46,7 +46,7 @@ jobs:
       - name: Test frontend engine failure recovery
         if: matrix.architecture == 'universal'
         run: |
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift macos-native/Sources/NativeAWDL.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
           build/engine-store-tests
       - name: Test real boot playback and native window lifetime
         if: matrix.architecture == 'universal'
@@ -156,7 +156,7 @@ jobs:
       - name: Test frontend lifecycle during UI probes
         if: contains(github.event.head_commit.message, '[ui probe]')
         run: |
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift macos-native/Sources/NativeAWDL.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
           build/engine-store-tests
       - name: Test real boot playback and native window lifetime
         # The media fixture also runs in UI-only probes, before screenshots.

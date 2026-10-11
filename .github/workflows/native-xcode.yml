@@ -1,9 +1,12 @@
 name: Native Xcode Project Validation
 on:
   push:
-    branches: [native-ui]
+    branches: [native-ui, feature/awdl-helper]
     paths:
       - 'MoonlightNativeGlass.xcodeproj/**'
+      - 'macos-native/AWDLHelper/**'
+      - 'macos-native/Sources/NativeAWDL.swift'
+      - 'scripts/build-awdl-helper.sh'
       - 'scripts/build-xcode-engine.py'
       - 'scripts/xcode-python.json'
       - 'scripts/xcode-submodules.json'

@@ -119,6 +119,7 @@ struct PairingRequest: Identifiable {
     weak var settingsWindow: NSWindow?
     weak var libraryWindow: NSWindow?
     let preview: Bool
+    let awdl: NativeAWDL
     private var channel: EngineChannel?
     private var stream: EngineChannel?
     private var shuttingDown = false
@@ -134,6 +135,7 @@ struct PairingRequest: Identifiable {
 
     init(preview: Bool = false, executable: URL? = nil) {
         self.preview = preview
+        awdl = NativeAWDL(preview: preview || executable != nil)
         executableOverride = executable
         if preview {
             computers = [Computer(id: "preview-computer", name: "Gaming PC", online: true, unknown: false,
@@ -337,7 +339,10 @@ struct PairingRequest: Identifiable {
                 self.menuState.controls = event["controls"] as? Bool ?? false
                 self.menuState.muted = event["muted"] as? Bool ?? false
                 self.menuState.mode = event["mode"] as? Int ?? 0
-            case "streaming": self.streamStarted = true; self.status = "Streaming \(game.name)"
+            case "streaming":
+                self.streamStarted = true; self.status = "Streaming \(game.name)"
+                self.awdl.beginSession(token)
+            case "finished": self.awdl.endSession(token)
             case "warning": self.warnings.append(event["message"] as? String ?? "")
             case "quitRequired": self.quitRequired = event["app"] as? String
             case "error": self.fail(event["message"] as? String ?? "Streaming failed.")
@@ -346,6 +351,7 @@ struct PairingRequest: Identifiable {
         }
         helper.onExit = { [weak self, weak helper] code in
             guard let self, let helper, self.stream === helper else { return }
+            self.awdl.endSession(token)
             self.clearMenuRequests()
             self.streamWindowExists = false; self.streamWindowToken = nil; self.menuState = NativeMenuState()
             self.stream = nil; self.streamActive = false; self.streamStarted = false; self.quitRequired = nil
@@ -419,6 +425,7 @@ struct PairingRequest: Identifiable {
     }
     func fail(_ detail: String) { message = NativeMessage(title: "Moonlight Native Glass", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true) }
     func shutdown() {
+        awdl.shutdown()
         clearMenuRequests()
         shuttingDown = true; hostDeadline?.cancel(); launchDeadline?.cancel(); pendingStream = nil
         channel?.stop(); stream?.stop()

@@ -1,0 +1,44 @@
+name: Native AWDL Helper Validation
+on:
+  push:
+    branches: [native-ui, feature/awdl-helper]
+    paths:
+      - 'macos-native/**'
+      - 'scripts/build-awdl-helper.sh'
+      - 'tests/native/AWDL*'
+      - '.github/workflows/native-awdl.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  helper:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - name: Test lease lifetime and crash recovery without changing Wi-Fi
+        run: |
+          mkdir -p build
+          xcrun clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/native/AWDLLeaseTests.cpp -o build/awdl-lease-tests
+          build/awdl-lease-tests
+      - name: Compile and verify the universal privileged helper
+        run: |
+          mkdir -p build/AWDLTest.app/Contents
+          cp macos-native/Info.plist build/AWDLTest.app/Contents/Info.plist
+          bash scripts/build-awdl-helper.sh "$PWD/build/AWDLTest.app" arm64 x86_64
+          lipo build/AWDLTest.app/Contents/Library/Helpers/MoonlightAWDLHelper -verify_arch arm64 x86_64
+          codesign --verify --strict --verbose=2 build/AWDLTest.app/Contents/Library/Helpers/MoonlightAWDLHelper
+          plutil -lint build/AWDLTest.app/Contents/Library/LaunchDaemons/*.plist
+      - name: Compile the actual native frontend for Intel and Apple Silicon
+        run: |
+          sdk=$(xcrun --sdk macosx --show-sdk-path)
+          for cpu in arm64 x86_64; do
+            xcrun swiftc -swift-version 5 -parse-as-library -O -sdk "$sdk" -target "$cpu-apple-macos15.0" macos-native/Sources/*.swift -o "build/frontend-$cpu"
+          done
+      - name: Test frontend lifecycle and optional-feature defaults
+        run: |
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift macos-native/Sources/NativeAWDL.swift tests/native/EngineStoreTests.swift -o build/engine-store-tests
+          build/engine-store-tests

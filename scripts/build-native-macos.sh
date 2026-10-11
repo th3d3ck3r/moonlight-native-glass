@@ -55,6 +55,7 @@ cp macos-native/Resources/moonlight.icns "$app/Contents/Helpers/MoonlightEngine.
 # Ad-hoc signatures make all nested code verifiable and retain one bundle
 # identity. This is not Developer ID signing or notarization. Verify all code;
 # do not strip signatures or alter entitlements to bypass privacy controls.
+bash scripts/build-awdl-helper.sh "$app" "${native_archs[@]}"
 codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 python3 tests/native/check_bundle.py "$app" "$arch_set"

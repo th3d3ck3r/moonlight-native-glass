@@ -30,7 +30,7 @@ struct NativeSettingsView: View {
             if store.preview { Label("Design preview · Sample settings", systemImage: "photo").font(.caption).foregroundStyle(.secondary).padding(.top, 10) }
             Picker("Settings", selection: $pane) { ForEach(SettingsPane.allCases) { Label($0.rawValue, systemImage: $0.symbol).tag($0) } }
                 .pickerStyle(.segmented).padding(20)
-            if store.fields.isEmpty && pane != .overlay && pane != .shortcuts {
+            if store.fields.isEmpty && pane != .overlay && pane != .shortcuts && pane != .network {
                 ContentUnavailableView("Settings Unavailable", systemImage: "gearshape", description: Text("Open the main window and connect to the streaming engine first."))
             } else {
                 Form {
@@ -52,6 +52,7 @@ struct NativeSettingsView: View {
                         Section { Text("Hide the stream window with Close Stream Window (Control–Option–Shift–Q by default). End the stream with Disconnect or Start + Select + L1 + R1. Disconnect and Exit also quits the host game. In the library, use the D-pad to select games, A to launch, and shoulder buttons to switch computers.").foregroundStyle(.secondary) }
                     }
                     if pane == .network {
+                        NativeAWDLSettings(awdl: store.awdl, preview: store.preview)
                         Section {
                             Button(store.testingConnection ? "Testing Internet Streaming Ports…" : "Test Internet Streaming Ports") { store.testConnection() }
                                 .disabled(store.testingConnection)

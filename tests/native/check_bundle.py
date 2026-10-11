@@ -22,6 +22,14 @@ for bundle, identity in [(app, "com.moonlight-stream.NativeGlass"),
 assert (app / "Contents/Resources/boot-animation.mp4").read_bytes() == pathlib.Path("macos-native/Resources/boot-animation.mp4").read_bytes(), "Boot animation resource differs"
 assert (app / "Contents/Resources/full-moon.png").read_bytes() == pathlib.Path("macos-native/Resources/full-moon.png").read_bytes(), "Menu bar full moon resource differs"
 
+helper = app / "Contents/Library/Helpers/MoonlightAWDLHelper"
+assert helper.is_file(), "AWDL helper was not bundled"
+daemon = plistlib.loads((app / "Contents/Library/LaunchDaemons/com.moonlight-stream.NativeGlass.AWDLHelper.plist").read_bytes())
+assert daemon["BundleProgram"] == "Contents/Library/Helpers/MoonlightAWDLHelper"
+assert daemon["Label"] == "com.moonlight-stream.NativeGlass.AWDLHelper"
+assert daemon["MachServices"] == {daemon["Label"]: True}
+assert "ProgramArguments" not in daemon, "Use the bundled SMAppService helper, never a shell command"
+
 checked = 0
 for file in app.rglob("*"):
     if not file.is_file() or file.is_symlink():
