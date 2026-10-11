@@ -21,7 +21,7 @@ import SwiftUI
         let title: NSWindow.TitleVisibility
         let transparent: Bool
         let fullSize: Bool
-        let separator: NSWindow.TitlebarSeparatorStyle
+        let separator: NSTitlebarSeparatorStyle
         let movable: Bool
         let toolbar: NSToolbar?
         let toolbarVisible: Bool
