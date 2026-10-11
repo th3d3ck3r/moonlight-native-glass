@@ -91,7 +91,10 @@ import XCTest
             XCTAssertTrue(window.buttons["Add Computer"].isHittable)
             app.terminate()
         }
-        app.launchArguments = ["--design-preview", "--boot-preview", "--dark"]
+        // Hold a genuine startup frame so accessibility/launch timing cannot
+        // turn this into a close-after-completion test. Natural completion is
+        // exercised separately in testBootCompletesInLibraryWindow.
+        app.launchArguments = ["--design-preview", "--boot-preview", "--boot-frame=1.85", "--dark"]
         app.launch()
         let window = app.windows["native-library"]
         XCTAssertTrue(window.descendants(matching: .any)["native-boot-animation"].firstMatch.waitForExistence(timeout: 10))

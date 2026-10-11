@@ -63,6 +63,10 @@ jobs:
               assert actual == entry['commit'], entry['path']
           print('Source ZIP recovered every pinned submodule without manual setup')
           PY
+      - name: Build the startup preview scheme without the engine
+        run: |
+          xcodebuild -project MoonlightNativeGlass.xcodeproj -scheme 'Moonlight Startup Preview' -configuration Preview -destination 'platform=macOS' -derivedDataPath build/xcode-preview build
+          test ! -d build/xcode-preview/Build/Products/Preview/MoonlightNative.app/Contents/Helpers
       - name: Test the root project's UI preview scheme
         run: |
           xcodebuild -project MoonlightNativeGlass.xcodeproj -scheme 'Moonlight UI Preview' -destination 'platform=macOS' -derivedDataPath build/xcode-preview -resultBundlePath build/xcode-preview.xcresult test

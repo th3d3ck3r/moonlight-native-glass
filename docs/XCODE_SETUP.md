@@ -1,40 +1,35 @@
 # Open Moonlight Native Glass in Xcode
 
-Clone `th3d3ck3r/moonlight-native-glass` and select the `native-ui` branch.
-Open **MoonlightNativeGlass.xcodeproj** at the repository root. A GitHub source
-ZIP of the `native-ui` branch also works; its missing submodule sources are
-fetched automatically by the full build.
-Use Xcode 26: the existing frontend references the macOS 26 Liquid Glass SDK.
-The built app still supports macOS 15 or later through its runtime fallbacks.
+For the native startup animation and Canvas previews, use branch
+`feature/native-boot-animation`. It starts from the validated Preview 20
+checkpoint and includes **no AWDL helper changes**. The stable `native-ui`
+branch remains at that checkpoint.
 
-## Run the full app
+Open **MoonlightNativeGlass.xcodeproj** at the repository root with **Xcode 26**.
+Choose:
 
-Select **Moonlight Native Glass**, choose **My Mac**, and press **Command-R**.
-The first build automatically fetches the pinned submodules, Moonlight v19
-dependencies, Qt 6.11.2 and private build tools. Internet access is needed for
-that first build, which takes longer than subsequent incremental builds.
-No Homebrew, separate Qt installation, terminal setup or Apple Developer team
-is required for local development. The app uses an ad-hoc signature.
+- **Moonlight Native Glass**: build and run the real app with its existing
+  streaming engine. Dependency setup stays automatic.
+- **Moonlight UI Preview**: run the sample library immediately, skipping both
+  engine setup and startup animation.
+- **Moonlight Startup Preview**: run the native startup animation in the actual
+  macOS window, then show the sample library; no streaming engine is built.
 
-The project builds and embeds the real streaming helper from this checkout.
-It does not download an older release or depend on expiring Actions artifacts.
-The original qmake build remains the engine's source of truth.
+For live Canvas previews, open
+`macos-native/Previews/NativeGlassLivePreview.swift`, choose **Moonlight UI
+Preview**, and enable **Editor > Canvas** and live mode. Use **Replay Startup**
+to repeat the animation. Dark/light libraries and fixed construction-ring/logo
+stages are included. No additional source files need to be added manually: the
+project already includes all preview code and resources.
 
-## Work on the UI quickly
-
-Select **Moonlight UI Preview** and press **Command-R**. This scheme uses sample
-hosts/games, shows the startup animation, and skips the engine and dependency
-downloads. It does not connect to a streaming host.
-
-Both schemes support **Command-U** for the native UI tests. Tests use the Preview
-configuration, with each case supplying its own launch arguments.
-The Preview configuration enables SwiftUI preview support. Run the UI Preview
-scheme to preview the app window with sample content.
+The preview schemes support **Command-U** for native UI tests. Cases supply their
+own launch arguments. Production deployment remains macOS 15 and newer, with
+Intel and Apple Silicon build support.
 
 ## Project layout
 
 - **Native Sources**: the existing SwiftUI/AppKit frontend files, edited in place.
-- **Resources**: the Dock/menu icon and boot movie used by the app.
+- **Resources**: the unchanged Dock/menu icons; the older boot movie is retained as a fixture.
 - **Tests**: native UI tests and their settings fixture.
 - **Moonlight engine sources**: the existing Qt sources; the helper build uses
   qmake instead of duplicating its compiler settings inside Xcode.
@@ -48,10 +43,9 @@ app, use the full scheme with `ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO` in
 Release/archive builds use the same frontend and engine; a distributable signed
 and notarized release still needs the separate release signing process.
 
-This setup does not connect a remote chat session to your Mac or grant screen
-control. It prepares the local checkout for Xcode editing, running and debugging.
+The Canvas previews use sample data and do not launch the streaming engine.
 
-## Validation
+## Previous baseline validation
 
 Validated at source `dcf3a66a20e05e0d819f30e3078d434498d7eb6e` in
 [Native Xcode Project Validation run 38098996413](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38098996413),
@@ -73,3 +67,15 @@ CI runs on ARM macOS 26 and cross-compiles the Intel slice. Physical Intel/OCLP
 behavior and live-host streaming still require testing on your Mac. The setup
 changes build/project configuration and audits; the app UI and streaming core
 remain at the verified Preview 20 source.
+
+## Native startup validation
+
+The first native startup revision passed all eight root-project UI tests at
+`80cff78ddcd80acd4da47b34dfdd1787de98a995`, run `38158772255`.
+A later revision removes the remaining title-region background and adds four
+composited artwork-stage captures. Both full Intel/Universal packages passed in run `38159249193`; its nine-test
+UI suite also passed. The root project's fresh/incremental Universal builds,
+real-engine bridge and source-ZIP dependency recovery passed in run
+`38159249190`. A close-during-startup UI test was made deterministic after that
+run, without changing the app's production source. Final scheme/UI validation
+is recorded in `docs/NATIVE_STARTUP_ANIMATION.md`.

@@ -1,10 +1,15 @@
 # Native UI checkpoint
 
-Repository: `th3d3ck3r/moonlight-native-glass` · branch: `native-ui`.
-Latest work: Preview 20 integrates the approved 1440p/60 fps boot animation in
-the library window, then crossfades to the main app. Both builds and the full
-validation suite passed; see the Preview 20 entry below. A root Xcode project is now available; see
-`docs/XCODE_SETUP.md` for full-app and UI-preview schemes.
+Repository: `th3d3ck3r/moonlight-native-glass`.
+Animation/Xcode work: `feature/native-boot-animation`, Preview 22, based directly
+on stable Preview 20 commit `9532df823f7785f75dc6db4bfa93fc4d2ef26683`.
+No AWDL helper changes are included. The animation now uses native vector motion
+and the original bundled logo, hides startup title/toolbar/library chrome, and
+keeps only the genuine window buttons visible. Live Canvas code is in
+`macos-native/Previews/NativeGlassLivePreview.swift`; shared UI/startup preview
+schemes and setup instructions are in `docs/XCODE_SETUP.md`.
+See `docs/NATIVE_STARTUP_ANIMATION.md` for behavior and validation evidence.
+The stable `native-ui` branch retains Preview 20 until this branch is adopted.
 `master` application code remains stock Qt v6.2.0: `de2467e433821664cdd2224aad8c89a625be1ad9`. Its README-only homepage commit is `e0c36c9`.
 The Enhanced repository is untouched.
 

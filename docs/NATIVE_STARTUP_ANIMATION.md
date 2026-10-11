@@ -25,7 +25,9 @@ the window in the same process doesn't replay; a fresh app launch does.
 Open `MoonlightNativeGlass.xcodeproj`, select **Moonlight UI Preview**, and open
 `macos-native/Previews/NativeGlassLivePreview.swift`. Enable **Editor > Canvas**
 and its live mode. Choose **Native Glass · Live startup** and use **Replay
-Startup** to repeat. Dark and light sample-library previews are also included.
+Startup** to repeat. Dark and light sample-library previews and fixed artwork stages are also included.
+Use **Moonlight Startup Preview** with Command-R to inspect the actual window
+chrome; use **Moonlight UI Preview** to go straight to the sample library.
 The Canvas represents the three window buttons visually; the running app uses
 actual AppKit controls. Sample previews do not launch the streaming engine.
 
@@ -41,3 +43,26 @@ and the existing streaming/input/engine checks remain required before delivery.
 
 Exact perceived smoothness and matching on the user's Intel/OCLP Mac require
 local testing; 60 Hz scheduling is a target, not a hardware frame-rate guarantee.
+
+## Verified artwork and validation evidence
+
+Production source `661631e3a04332e05b3064f308d7b57cd83971e5` passed the
+nine-test native UI suite in run `38159249193`, job `114528519269`.
+Composited captures of the seed, expansion, construction rings and unchanged
+logo were inspected: the artwork reaches the top edge behind the actual window
+buttons, with no title-bar strip or library underneath. The window frame stays
+unchanged through reveal. The Intel package passed in job `114528519102`.
+The native coordinator's lifecycle tests and existing menu/restore/hover checks
+also passed in that run. The Universal package passed in job `114528519243`, including overlay,
+fullscreen/borderless, input/window lifetime and sanitizer checks, and the real
+engine bridge/persistence tests. Both packages passed architecture, dependency,
+identity, permissions and deep-signature audits for all 105 bundled Mach-O files.
+
+The complete root Xcode project fresh/incremental builds passed in run
+`38159249190`, as did real-engine and source-ZIP dependency checks. That run's
+UI suite passed eight of nine cases; its close-during-startup case missed the
+short animation. The final test revision holds a preview frame for that case,
+while natural completion continues to exercise the real finite timeline.
+The subsequent final push changes only tests, shared preview schemes, workflow
+validation and documentation; the packaged production sources remain identical
+to `661631e3a04332e05b3064f308d7b57cd83971e5`.
