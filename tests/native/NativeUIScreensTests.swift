@@ -8,10 +8,13 @@ import XCTest
         app.launch()
         let window = app.windows["native-library"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        let skip = window.buttons["native-boot-skip"]
+        let skip = window.descendants(matching: .any)["native-boot-animation"].firstMatch
         XCTAssertTrue(skip.waitForExistence(timeout: 5), "Boot playback must appear in the library window")
-        // Capture visible artwork after the movie's initial fade-in.
-        Thread.sleep(forTimeInterval: 1)
+        // Capture the native expansion and verify startup-only chrome.
+        XCTAssertFalse(window.buttons["Add Computer"].exists, "Library must not exist behind startup")
+        XCTAssertFalse(window.searchFields.firstMatch.exists, "Startup must have no search toolbar")
+        XCTAssertTrue(window.buttons[XCUIIdentifierCloseWindow].exists, "Keep the real window buttons")
+        Thread.sleep(forTimeInterval: 0.6)
         let frame = window.frame
         XCTAssertEqual(app.windows.count, 1, "Boot must not create a second window")
         let boot = XCTAttachment(screenshot: window.screenshot())
@@ -38,9 +41,9 @@ import XCTest
         app.launchArguments = ["--design-preview", "--boot-preview", "--dark"]
         app.launch()
         let window = app.windows["native-library"]
-        let skip = window.buttons["native-boot-skip"]
+        let skip = window.descendants(matching: .any)["native-boot-animation"].firstMatch
         XCTAssertTrue(skip.waitForExistence(timeout: 10))
-        skip.click()
+        app.typeKey(.escape, modifierFlags: [])
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: skip)
         waitForExpectations(timeout: 5)
         window.buttons[XCUIIdentifierCloseWindow].click()
@@ -66,7 +69,7 @@ import XCTest
             app.launch()
             let window = app.windows["native-library"]
             XCTAssertTrue(window.waitForExistence(timeout: 10))
-            expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: window.buttons["native-boot-skip"])
+            expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: window.descendants(matching: .any)["native-boot-animation"].firstMatch)
             waitForExpectations(timeout: 8)
             XCTAssertTrue(window.buttons["Add Computer"].isHittable)
             app.terminate()
@@ -74,13 +77,13 @@ import XCTest
         app.launchArguments = ["--design-preview", "--boot-preview", "--dark"]
         app.launch()
         let window = app.windows["native-library"]
-        XCTAssertTrue(window.buttons["native-boot-skip"].waitForExistence(timeout: 10))
+        XCTAssertTrue(window.descendants(matching: .any)["native-boot-animation"].firstMatch.waitForExistence(timeout: 10))
         window.buttons[XCUIIdentifierCloseWindow].click()
         let item = app.descendants(matching: .any)["native-status-item"]
         XCTAssertTrue(item.waitForExistence(timeout: 5))
         item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
-        XCTAssertFalse(window.buttons["native-boot-skip"].exists, "Closing during boot must stop playback and restore directly to the library")
+        XCTAssertFalse(window.descendants(matching: .any)["native-boot-animation"].firstMatch.exists, "Closing during boot must stop playback and restore directly to the library")
         app.terminate()
     }
 

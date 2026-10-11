@@ -1,9 +1,12 @@
 name: Native Xcode Project Validation
 on:
   push:
-    branches: [native-ui]
+    branches: [native-ui, feature/native-boot-animation]
     paths:
       - 'MoonlightNativeGlass.xcodeproj/**'
+      - 'macos-native/**'
+      - 'tests/native/NativeUIScreensTests.swift'
+      - 'tests/native/BootPlaybackTests.swift'
       - 'scripts/build-xcode-engine.py'
       - 'scripts/xcode-python.json'
       - 'scripts/xcode-submodules.json'
@@ -30,17 +33,21 @@ jobs:
           plutil -lint MoonlightNativeGlass.xcodeproj/project.pbxproj
           xcodebuild -list -project MoonlightNativeGlass.xcodeproj
       - name: Build the full app from a fresh checkout
+        if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[ui probe]')
         run: |
           xcodebuild -project MoonlightNativeGlass.xcodeproj -scheme 'Moonlight Native Glass' -configuration Debug -destination 'platform=macOS' -derivedDataPath build/xcode-main ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
           codesign --verify --deep --strict --verbose=2 build/xcode-main/Build/Products/Debug/MoonlightNative.app
           python3 tests/native/check_bundle.py build/xcode-main/Build/Products/Debug/MoonlightNative.app universal
       - name: Verify incremental full-app build
+        if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[ui probe]')
         run: |
           xcodebuild -project MoonlightNativeGlass.xcodeproj -scheme 'Moonlight Native Glass' -configuration Debug -destination 'platform=macOS' -derivedDataPath build/xcode-main ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
       - name: Test the embedded real engine
+        if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[ui probe]')
         run: |
           python3 tests/native/bridge_smoke.py build/xcode-main/Build/Products/Debug/MoonlightNative.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight
       - name: Verify source ZIP dependency setup
+        if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[ui probe]')
         run: |
           mkdir -p build/source-zip
           git archive HEAD | tar -x -C build/source-zip

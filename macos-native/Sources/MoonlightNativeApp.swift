@@ -53,8 +53,8 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         enabled: !CommandLine.arguments.contains("--design-preview") || CommandLine.arguments.contains("--boot-preview"),
         resource: CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-missing-resource")
             ? nil : CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-invalid-resource")
-                ? Bundle.main.url(forResource: "full-moon", withExtension: "png")
-                : Bundle.main.url(forResource: "boot-animation", withExtension: "mp4"),
+                ? Bundle.main.url(forResource: "boot-animation", withExtension: "mp4")
+                : Bundle.main.url(forResource: "moonlight", withExtension: "icns"),
         // An explicit design playback probe must work even on CI machines
         // configured to reduce system animation. Normal launches respect it.
         reduceMotion: CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-preview")
@@ -62,13 +62,25 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             : NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
     var body: some Scene {
         Window("Moonlight Native Glass", id: "library") {
-            LibraryView(store: store, interactive: !boot.blocksLibrary, reportWindow: { boot.watchWindow($0) })
-                    .disabled(boot.blocksLibrary)
-                    .allowsHitTesting(!boot.blocksLibrary)
-                    .accessibilityHidden(boot.blocksLibrary)
-                .frame(minWidth: 680, minHeight: 460)
-                .background(NativeStatusActions(store: store, delegate: delegate))
-                .onAppear { delegate.store = store; delegate.boot = boot; store.start() }
+            ZStack {
+                NativeBootView.background
+                if boot.blocksLibrary {
+                    NativeBootView(presentation: boot)
+                        .background(NativeWindowAccessor { window in
+                            store.libraryWindow = window
+                            window?.identifier = NSUserInterfaceItemIdentifier("native-library")
+                            window?.setAccessibilityIdentifier("native-library")
+                            boot.watchWindow(window)
+                        }.frame(width: 0, height: 0))
+                } else {
+                    LibraryView(store: store, sizesPreviewWindow: boot.startedAt == nil)
+                        .transition(.opacity)
+                }
+            }
+            .frame(minWidth: 680, minHeight: 460)
+            .animation(.easeInOut(duration: 0.4), value: boot.phase)
+            .background(NativeStatusActions(store: store, delegate: delegate))
+            .onAppear { delegate.store = store; delegate.boot = boot; store.start() }
         }
         .defaultSize(width: 1080, height: 720)
         .commands {
@@ -139,7 +151,7 @@ private struct NativeStatusActions: View {
 // Keep these credits fixed across builds. AppKit reads the build number from
 // CFBundleVersion for the preview number; release notes belong on GitHub.
 func showNativeAboutPanel() {
-    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "20"
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "22"
     let engineBundle = Bundle(url: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app"))
     let engineVersion = engineBundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "6.2.0"

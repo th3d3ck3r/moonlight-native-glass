@@ -1,58 +1,42 @@
 import AppKit
-import AVFoundation
 import SwiftUI
 
-// Owned by App, rather than the window's view state: play once per process.
+// One finite, native animation per process. No media decoder, window replacement,
+// network work, or streaming changes are involved in startup presentation.
 @MainActor final class NativeBootPresentation: ObservableObject {
     enum Phase { case playing, fading, finished }
     @Published private(set) var phase: Phase
-    private(set) var player: AVPlayer?
-    private var item: AVPlayerItem?
-    private var statusObservation: NSKeyValueObservation?
-    private var notifications: [NSObjectProtocol] = []
+    @Published private(set) var startedAt: Date?
+    let logo: NSImage?
+    static let duration = 4.1
+    private var completion: Task<Void, Never>?
+    private var fadeCompletion: Task<Void, Never>?
     private var motionNotification: NSObjectProtocol?
     private var windowNotification: NSObjectProtocol?
-    private weak var watchedWindow: NSWindow?
-    private var hostingView: NSHostingView<NativeBootView>?
     private var escapeMonitor: Any?
-    private var attachmentScheduled = false
-    private var deadline: Task<Void, Never>?
-    private var fadeCompletion: Task<Void, Never>?
-    private var started = false
+    private weak var watchedWindow: NSWindow?
+    private var chrome: Chrome?
 
+    private struct Chrome {
+        let title: NSWindow.TitleVisibility
+        let transparent: Bool
+        let fullSize: Bool
+        let separator: NSWindow.TitlebarSeparatorStyle
+        let movable: Bool
+        let toolbar: NSToolbar?
+        let toolbarVisible: Bool
+    }
     var blocksLibrary: Bool { phase != .finished }
 
-    init(enabled: Bool, resource: URL? = Bundle.main.url(forResource: "boot-animation", withExtension: "mp4"),
+    init(enabled: Bool, resource: URL? = Bundle.main.url(forResource: "moonlight", withExtension: "icns"),
          reduceMotion: Bool = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) {
-        guard enabled, !reduceMotion, let resource, FileManager.default.fileExists(atPath: resource.path) else {
-            phase = .finished
-            return
-        }
-        phase = .playing
-        let item = AVPlayerItem(url: resource)
-        self.item = item
-        let player = AVPlayer(playerItem: item)
-        player.isMuted = true
-        player.actionAtItemEnd = .pause
-        self.player = player
+        logo = resource.flatMap { NSImage(contentsOf: $0) }
+        phase = enabled && !reduceMotion && logo != nil ? .playing : .finished
     }
 
     func start() {
-        guard !started, phase == .playing, let item else { return }
-        started = true
-        let center = NotificationCenter.default
-        for name in [AVPlayerItem.didPlayToEndTimeNotification, AVPlayerItem.failedToPlayToEndTimeNotification] {
-            notifications.append(center.addObserver(forName: name, object: item, queue: .main) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.finish() }
-            })
-        }
-        statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
-            Task { @MainActor [weak self] in
-                guard let self, self.item === item, self.phase == .playing else { return }
-                if item.status == .readyToPlay { self.player?.play() }
-                else if item.status == .failed { self.finish() }
-            }
-        }
+        guard startedAt == nil, phase == .playing else { return }
+        startedAt = Date()
         motionNotification = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -60,63 +44,36 @@ import SwiftUI
                 if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { self?.finishImmediately() }
             }
         }
-        // A corrupt/unavailable media asset must never hold the library hostage.
-        deadline = Task { @MainActor [weak self] in
-            do { try await Task.sleep(nanoseconds: 12_000_000_000) } catch { return }
+        completion = Task { @MainActor [weak self] in
+            do { try await Task.sleep(nanoseconds: UInt64(Self.duration * 1_000_000_000)) } catch { return }
             self?.finish()
         }
     }
 
     func watchWindow(_ window: NSWindow?) {
-        guard phase == .playing, let window, hostingView == nil, !attachmentScheduled else { return }
-        // Window accessors run during AppKit/SwiftUI hierarchy enumeration.
-        // Reparent only after that pass; moving the library reports its window
-        // again, so retain the guard until the entire attachment has completed.
-        attachmentScheduled = true
-        DispatchQueue.main.async { [weak self, weak window] in
-            guard let self else { return }
-            defer { self.attachmentScheduled = false }
-            self.attachWindow(window)
-        }
-    }
-
-    private func attachWindow(_ window: NSWindow?) {
-        guard phase == .playing, let window, let content = window.contentView else { return }
-        if hostingView == nil {
-            // NavigationSplitView owns the native window content hierarchy on
-            // macOS; a sibling SwiftUI ZStack view is not reliably presented.
-            // Retain that hierarchy inside a container in the same window,
-            // preserving the frame, toolbar and stream routing.
-            // The library's hosting view is disabled during playback. Keep
-            // the movie outside that hosting hierarchy so both its layer and
-            // its controls remain visible and interactive.
-            let container = NSView(frame: content.frame)
-            container.autoresizingMask = [.width, .height]
-            let wrapper = NSViewController()
-            wrapper.view = container
-            if let originalController = window.contentViewController {
-                wrapper.addChild(originalController)
-            }
-            window.contentViewController = wrapper
-            content.frame = container.bounds
-            content.autoresizingMask = [.width, .height]
-            container.addSubview(content)
-            let host = BootHostingView(rootView: NativeBootView(presentation: self))
-            host.frame = container.bounds
-            host.autoresizingMask = [.width, .height]
-            container.addSubview(host, positioned: .above, relativeTo: nil)
-            hostingView = host
-            escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak window] event in
-                guard event.window === window, event.keyCode == 53,
-                      event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
-                      self?.phase == .playing else { return event }
-                self?.finish()
-                return nil
-            }
-        }
-        guard window !== watchedWindow else { return }
-        if let windowNotification { NotificationCenter.default.removeObserver(windowNotification) }
+        guard phase == .playing, let window, watchedWindow == nil else { return }
+        // Apply synchronously, before the first window paint. The library is
+        // not constructed until startup finishes, so it cannot flash through.
         watchedWindow = window
+        chrome = Chrome(title: window.titleVisibility, transparent: window.titlebarAppearsTransparent,
+                        fullSize: window.styleMask.contains(.fullSizeContentView),
+                        separator: window.titlebarSeparatorStyle, movable: window.isMovableByWindowBackground,
+                        toolbar: window.toolbar, toolbarVisible: window.toolbar?.isVisible ?? false)
+        let frame = window.frame
+        window.styleMask.insert(.fullSizeContentView)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.toolbar?.isVisible = false
+        window.isMovableByWindowBackground = true
+        window.setFrame(frame, display: false)
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak window] event in
+            guard event.window === window, event.keyCode == 53,
+                  event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
+                  self?.blocksLibrary == true else { return event }
+            self?.finish()
+            return nil
+        }
         windowNotification = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: window, queue: .main
         ) { [weak self] _ in
@@ -126,98 +83,131 @@ import SwiftUI
 
     func finish() {
         guard phase == .playing else { return }
-        stopObservers()
-        player?.pause() // Keep the final frame through the crossfade.
-        withAnimation(.easeInOut(duration: 0.65)) { phase = .fading }
+        completion?.cancel(); completion = nil
+        withAnimation(.easeInOut(duration: 0.35)) { phase = .fading }
         fadeCompletion = Task { @MainActor [weak self] in
-            do { try await Task.sleep(nanoseconds: 650_000_000) } catch { return }
+            do { try await Task.sleep(nanoseconds: 350_000_000) } catch { return }
             self?.finishImmediately()
         }
     }
 
     func finishImmediately() {
-        stopObservers()
+        completion?.cancel(); completion = nil
         fadeCompletion?.cancel(); fadeCompletion = nil
-        player?.pause()
-        player?.replaceCurrentItem(with: nil)
-        player = nil; item = nil
-        hostingView?.removeFromSuperview(); hostingView = nil
-        phase = .finished
-    }
-
-    private func stopObservers() {
-        deadline?.cancel(); deadline = nil
-        statusObservation?.invalidate(); statusObservation = nil
-        notifications.forEach { NotificationCenter.default.removeObserver($0) }
-        notifications.removeAll()
+        if let window = watchedWindow, let chrome {
+            let frame = window.frame // Preserve the user's latest size/position.
+            if !chrome.fullSize { window.styleMask.remove(.fullSizeContentView) }
+            window.titleVisibility = chrome.title
+            window.titlebarAppearsTransparent = chrome.transparent
+            window.titlebarSeparatorStyle = chrome.separator
+            window.isMovableByWindowBackground = chrome.movable
+            chrome.toolbar?.isVisible = chrome.toolbarVisible
+            window.setFrame(frame, display: false)
+        }
+        chrome = nil; watchedWindow = nil
         if let motionNotification { NSWorkspace.shared.notificationCenter.removeObserver(motionNotification) }
         motionNotification = nil
         if let windowNotification { NotificationCenter.default.removeObserver(windowNotification) }
-        windowNotification = nil; watchedWindow = nil
+        windowNotification = nil
         if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
         escapeMonitor = nil
+        phase = .finished
     }
 
     deinit {
-        deadline?.cancel(); fadeCompletion?.cancel()
-        statusObservation?.invalidate()
-        notifications.forEach { NotificationCenter.default.removeObserver($0) }
+        completion?.cancel(); fadeCompletion?.cancel()
         if let motionNotification { NSWorkspace.shared.notificationCenter.removeObserver(motionNotification) }
         if let windowNotification { NotificationCenter.default.removeObserver(windowNotification) }
         if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
     }
 }
 
-private final class BootHostingView: NSHostingView<NativeBootView> {
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-}
-
-private struct NativeBootMovie: NSViewRepresentable {
-    let player: AVPlayer?
-    final class MovieView: NSView {
-        let movieLayer = AVPlayerLayer()
-        override init(frame: NSRect) {
-            super.init(frame: frame)
-            wantsLayer = true
-            layer?.backgroundColor = NSColor.black.cgColor
-            movieLayer.videoGravity = .resizeAspectFill
-            layer?.addSublayer(movieLayer)
-            setAccessibilityElement(false)
-        }
-        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-        override func layout() {
-            super.layout()
-            CATransaction.begin(); CATransaction.setDisableActions(true)
-            movieLayer.frame = bounds
-            CATransaction.commit()
-        }
-    }
-    func makeNSView(context: Context) -> MovieView {
-        let view = MovieView(); view.movieLayer.player = player; return view
-    }
-    func updateNSView(_ view: MovieView, context: Context) { view.movieLayer.player = player }
-    static func dismantleNSView(_ view: MovieView, coordinator: ()) { view.movieLayer.player = nil }
-}
-
+// Time-driven vector drawing scales to the window's actual backing resolution.
+// All elements share one timeline: expansion, particles, construction rings,
+// contraction and the unchanged bundled Moonlight logo.
 struct NativeBootView: View {
     @ObservedObject var presentation: NativeBootPresentation
+    static let background = Color(red: 7 / 255, green: 12 / 255, blue: 25 / 255)
+
+    private func ease(_ time: Double, _ start: Double, _ duration: Double) -> Double {
+        let p = min(1, max(0, (time - start) / duration))
+        return p * p * p * (10 + p * (-15 + 6 * p))
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Color.black
-            NativeBootMovie(player: presentation.player)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityHidden(true)
-            Button("Skip") { presentation.finish() }
-                .keyboardShortcut(.escape, modifiers: [])
-                .buttonStyle(.bordered)
-                .tint(.white.opacity(0.15))
-                .foregroundStyle(.white.opacity(0.85))
-                .accessibilityLabel("Skip startup animation")
-                .accessibilityIdentifier("native-boot-skip")
-                .padding(20)
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: presentation.phase != .playing)) { timeline in
+            let t = max(0, timeline.date.timeIntervalSince(presentation.startedAt ?? timeline.date))
+            GeometryReader { geometry in
+                let size = geometry.size
+                let diameter = min(96.0, min(size.width, size.height) * 0.16)
+                let fullRadius = hypot(size.width, size.height) * 0.55
+                let expand = ease(t, 0.12, 0.7)
+                let collapse = ease(t, 2.55, 0.8)
+                let radius = (7 + (fullRadius - 7) * expand) * (1 - collapse) + diameter * 0.5 * collapse
+                ZStack {
+                    Self.background
+                    Canvas { context, canvasSize in
+                        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+                        let disk = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+                        var backdrop = context
+                        backdrop.opacity = 1 - ease(t, 3.05, 0.38)
+                        backdrop.fill(Path(ellipseIn: disk), with: .linearGradient(
+                            Gradient(colors: [Color(red: 0.29, green: 0.81, blue: 0.96), Color(red: 0.25, green: 0.39, blue: 0.91)]),
+                            startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: canvasSize.width, y: canvasSize.height)))
+
+                        // Four bright dots separate from the initial seed and
+                        // dissolve while the fine construction lines emerge.
+                        let scatter = ease(t, 0.85, 0.55)
+                        let dotOpacity = ease(t, 0.55, 0.2) * (1 - ease(t, 1.45, 0.4))
+                        let distance = (12 + 74 * scatter) * min(canvasSize.width / 680, 1.5)
+                        let dotRadius = 6 * (1 - scatter) + 1.4
+                        var particles = context; particles.opacity = dotOpacity
+                        for i in 0..<4 {
+                            let angle = Double(i) * .pi / 2 - .pi / 2
+                            let point = CGPoint(x: center.x + cos(angle) * distance, y: center.y + sin(angle) * distance)
+                            particles.fill(Path(ellipseIn: CGRect(x: point.x - dotRadius, y: point.y - dotRadius,
+                                                                 width: dotRadius * 2, height: dotRadius * 2)), with: .color(.white))
+                        }
+
+                        let lines = ease(t, 1.3, 0.7) * (1 - ease(t, 2.55, 0.5))
+                        let spread = ease(t, 1.15, 1.3)
+                        var rings = context; rings.opacity = lines * 0.52
+                        for i in 0..<3 {
+                            let r = (diameter * 0.5 + Double(i) * 32 + 105 * spread) * (1 - collapse)
+                            var arc = Path()
+                            let rotation = t * 27 + Double(i) * 85
+                            arc.addArc(center: center, radius: r, startAngle: .degrees(rotation),
+                                       endAngle: .degrees(rotation + 285), clockwise: false)
+                            rings.stroke(arc, with: .color(.white), style: StrokeStyle(lineWidth: 0.8, lineCap: .round))
+                        }
+                        var grid = context; grid.opacity = lines * ease(t, 1.9, 0.5) * 0.13
+                        let gridSize = diameter * 2.5
+                        for i in -2...2 {
+                            let offset = Double(i) * gridSize / 4
+                            var path = Path()
+                            path.move(to: CGPoint(x: center.x + offset, y: center.y - gridSize / 2))
+                            path.addLine(to: CGPoint(x: center.x + offset, y: center.y + gridSize / 2))
+                            path.move(to: CGPoint(x: center.x - gridSize / 2, y: center.y + offset))
+                            path.addLine(to: CGPoint(x: center.x + gridSize / 2, y: center.y + offset))
+                            grid.stroke(path, with: .color(.white), lineWidth: 0.65)
+                        }
+                    }
+                    if let logo = presentation.logo {
+                        Image(nsImage: logo).resizable().aspectRatio(contentMode: .fit)
+                            .frame(width: diameter, height: diameter)
+                            .clipShape(RoundedRectangle(cornerRadius: diameter * 0.22, style: .continuous))
+                            .scaleEffect(0.86 + 0.14 * ease(t, 2.95, 0.5))
+                            .opacity(ease(t, 2.95, 0.38))
+                    }
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
         .opacity(presentation.phase == .fading ? 0 : 1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Moonlight startup animation. Press Escape to skip.")
+        .accessibilityIdentifier("native-boot-animation")
+        .accessibilityAction(named: Text("Skip startup animation")) { presentation.finish() }
         .onAppear { presentation.start() }
     }
 }
