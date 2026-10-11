@@ -7,6 +7,7 @@ on:
       - 'scripts/build-xcode-engine.py'
       - 'scripts/xcode-python.json'
       - 'scripts/xcode-submodules.json'
+      - 'tests/native/check_bundle.py'
       - '.github/workflows/native-xcode.yml'
   workflow_dispatch:
 permissions:

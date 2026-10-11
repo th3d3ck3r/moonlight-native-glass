@@ -1,6 +1,7 @@
 """Validate the delivered bundle, including every nested Mach-O slice."""
 import pathlib
 import plistlib
+import re
 import subprocess
 import sys
 
@@ -31,18 +32,32 @@ for file in app.rglob("*"):
     slices = set(subprocess.check_output(["lipo", "-archs", str(file)], text=True).split())
     assert required <= slices, f"{file}: missing {required - slices}"
     dependencies = subprocess.check_output(["otool", "-L", str(file)], text=True)
+    # otool -L also lists a dylib's own LC_ID_DYLIB. It is an identity,
+    # not an edge that must resolve through this image's runpath list.
+    install_names = set(line.strip() for line in
+                        subprocess.check_output(["otool", "-D", str(file)], text=True).splitlines()
+                        if line.strip().startswith(("@rpath/", "@loader_path/", "@executable_path/")))
     nearest_app = next(parent for parent in file.parents if parent.suffix == ".app")
     frameworks = nearest_app / "Contents/Frameworks"
     for line in dependencies.splitlines():
         if not line.startswith("\t"):
             continue
         dependency = line.strip().split(" (", 1)[0]
+        if dependency in install_names:
+            continue
         if dependency.startswith(("/System/Library/", "/usr/lib/", "/Library/Apple/System/Library/")):
             continue  # Apple libraries may live only in the dyld shared cache.
         if dependency.startswith("@rpath/libswift"):
             continue  # Swift runtime is supplied by supported macOS versions.
         if dependency.startswith("@rpath/"):
             candidate = frameworks / dependency[len("@rpath/"):]
+            if not candidate.exists():
+                # Xcode's preview/debug executor declares @executable_path as
+                # an LC_RPATH and loads its debug dylib beside the executable.
+                # Require that actual runpath before accepting this location.
+                load_commands = subprocess.check_output(["otool", "-l", str(file)], text=True)
+                if re.search(r"cmd LC_RPATH\s+cmdsize \d+\s+path @executable_path \(offset \d+\)", load_commands):
+                    candidate = nearest_app / "Contents/MacOS" / dependency[len("@rpath/"):]
             assert candidate.exists(), f"{file}: unresolved bundled dependency {dependency}"
         elif dependency.startswith("@loader_path/"):
             candidate = file.parent / dependency[len("@loader_path/"):]

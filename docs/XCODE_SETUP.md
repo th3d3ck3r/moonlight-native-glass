@@ -4,7 +4,8 @@ Clone `th3d3ck3r/moonlight-native-glass` and select the `native-ui` branch.
 Open **MoonlightNativeGlass.xcodeproj** at the repository root. A GitHub source
 ZIP of the `native-ui` branch also works; its missing submodule sources are
 fetched automatically by the full build.
-Use Xcode 16 or later and a Mac running macOS 15 or later. CI validates Xcode 26.
+Use Xcode 26: the existing frontend references the macOS 26 Liquid Glass SDK.
+The built app still supports macOS 15 or later through its runtime fallbacks.
 
 ## Run the full app
 
@@ -27,8 +28,8 @@ downloads. It does not connect to a streaming host.
 
 Both schemes support **Command-U** for the native UI tests. Tests use the Preview
 configuration, with each case supplying its own launch arguments.
-The shared project enables SwiftUI previews for native views; running the UI
-Preview scheme is the complete-app preview workflow.
+The Preview configuration enables SwiftUI preview support. Run the UI Preview
+scheme to preview the app window with sample content.
 
 ## Project layout
 
