@@ -222,7 +222,11 @@ static int InstallHelper() {
         @"AssociatedBundleIdentifiers": @[@"com.moonlight-stream.NativeGlass"]};
     NSError* error = nil;
     NSData* plistData = [NSPropertyListSerialization dataWithPropertyList:plist format:NSPropertyListXMLFormat_v1_0 options:0 error:&error];
-    Launchctl(@[@"bootout", @"system", InstalledPlist]);
+    NSString* job = [@"system/" stringByAppendingString:Service];
+    if (Launchctl(@[@"print", job]) == 0 && Launchctl(@[@"bootout", job]) != 0) {
+        [files removeItemAtPath:staging error:NULL];
+        fprintf(stderr, "Could not stop the previous helper; installation cancelled.\n"); return 1;
+    }
     BOOL ok = rename(staging.fileSystemRepresentation, InstalledHelper.fileSystemRepresentation) == 0 &&
         [requirement writeToFile:TrustFile atomically:YES encoding:NSUTF8StringEncoding error:&error] &&
         chown(TrustFile.fileSystemRepresentation, 0, 0) == 0 &&
@@ -239,7 +243,10 @@ static int InstallHelper() {
 static int RemoveHelper() {
     struct stat marker = {};
     if (lstat(JournalPath, &marker) == 0) { fprintf(stderr, "AWDL restoration is pending; removal cancelled.\n"); return 1; }
-    Launchctl(@[@"bootout", @"system", InstalledPlist]);
+    NSString* job = [@"system/" stringByAppendingString:Service];
+    if (Launchctl(@[@"print", job]) == 0 && Launchctl(@[@"bootout", job]) != 0) {
+        fprintf(stderr, "Could not stop the helper; removal cancelled.\n"); return 1;
+    }
     NSFileManager* files = NSFileManager.defaultManager;
     for (NSString* path in @[InstalledHelper, InstalledPlist, TrustFile]) {
         if ([files fileExistsAtPath:path] && ![files removeItemAtPath:path error:NULL]) {
