@@ -211,7 +211,7 @@ private enum MoonlightMotion: String, CaseIterable {
         let arrival = ease(t, 1.8, 0.85)
         for i in 0..<150 {
             let angle = Double(i) * 2.399963
-            let lane = 20 + Double((i * 47) % 210)
+            let lane = 45 + Double((i * 47) % 210)
             let depth = Double((i * 73) % 151) / 151 - travel
             let z = 0.15 + (depth - floor(depth)) * 0.85
             let radius = lane * scale / z
