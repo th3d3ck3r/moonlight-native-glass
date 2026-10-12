@@ -71,7 +71,12 @@ static void applyPanelTheme(NSPanel* panel) {
     if ([root isKindOfClass:NSVisualEffectView.class]) {
         ((NSVisualEffectView*)root).state = reduce ? NSVisualEffectStateInactive : NSVisualEffectStateActive;
     }
-    panel.backgroundColor = reduce ? (crimson ? [NSColor colorWithSRGBRed:0.045 green:0.025 blue:0.035 alpha:1] : NSColor.windowBackgroundColor) : NSColor.clearColor;
+    // The NSPanel background is rectangular. Keep it transparent and place
+    // the accessibility fallback inside the same rounded material boundary.
+    panel.backgroundColor = NSColor.clearColor;
+    root.wantsLayer = YES;
+    root.layer.cornerRadius = 12; root.layer.masksToBounds = YES;
+    root.layer.backgroundColor = reduce ? (crimson ? [NSColor colorWithSRGBRed:0.045 green:0.025 blue:0.035 alpha:1] : NSColor.windowBackgroundColor).CGColor : nullptr;
     MLOverlayTintView* wash = nil;
     for (NSView* child in content.subviews) if ([child isKindOfClass:MLOverlayTintView.class]) { wash = (MLOverlayTintView*)child; break; }
     if (!wash) {

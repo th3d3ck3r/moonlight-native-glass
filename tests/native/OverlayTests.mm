@@ -26,6 +26,7 @@ static void checkCrimson(NSWindow* panel, bool enabled) {
     NSView* tint=tintView(panel.contentView);
     check(tint!=nil && tint.hidden==!enabled,"Every overlay must follow Crimson Glass, including existing passive panels");
     check(tint.layer.cornerRadius==12 && tint.layer.borderWidth==1,"Crimson overlay edges must be rounded and outlined");
+    check(panel.backgroundColor.alphaComponent==0 && panel.contentView.layer.masksToBounds && panel.contentView.layer.cornerRadius==12,"Opaque accessibility fallback must stay inside rounded panel edges, without square corners");
     check([tint hitTest:NSMakePoint(10,10)]==nil,"Tint must never intercept mouse input");
     if (enabled) {
         NSColor* color=[[NSColor colorWithCGColor:tint.layer.backgroundColor] colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
