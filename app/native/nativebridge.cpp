@@ -132,6 +132,8 @@ void NativeBridge::send(QJsonObject event) {
     if (m_Stopping) return;
     if (m_AwaitContinue && event["event"].toString() == "stage")
         nativeUpdateConnectionWindow(event["message"].toString().toUtf8().constData(),0);
+    if (m_AwaitContinue && event["event"].toString() == "warning")
+        nativeUpdateConnectionWindow(event["message"].toString().toUtf8().constData(),5);
     const QByteArray data = QJsonDocument(event).toJson(QJsonDocument::Compact) + '\n';
     // Pipe writes are serialized on the main thread. Ignore SIGPIPE in main;
     // a vanished frontend ends this helper instead of retaining discovery.
@@ -422,9 +424,10 @@ void NativeBridge::startStream(const QStringList& args) {
     }
     if (m_AwaitContinue) {
         nativeSetConnectionCommand([this](int action) {
-            if (m_Stopping) return;
+            if (m_Stopping || m_ConnectionCancelled) return;
             if (action == 1) command({{"command","continueStream"}});
             else if (action == 2) { send({{"event","connectionCancelled"}}); command({{"command","cancelStream"}}); }
+            else if (action == 4) command({{"command","confirmQuit"}});
             else if (action == 3 && !Session::get()) { send({{"event","connectionRetry"}}); QCoreApplication::quit(); }
         });
         const QString host = args.size() == 11 ? args[9] : args[3];
@@ -442,7 +445,10 @@ void NativeBridge::startStream(const QStringList& args) {
     });
     connect(m_Launcher, &CliStartStream::Launcher::searchingComputer, this, [this] { send({{"event", "stage"}, {"message", "Connecting to computer…"}}); });
     connect(m_Launcher, &CliStartStream::Launcher::searchingApp, this, [this] { send({{"event", "stage"}, {"message", "Loading game…"}}); });
-    connect(m_Launcher, &CliStartStream::Launcher::appQuitRequired, this, [this](QString app) { send({{"event", "quitRequired"}, {"app", app}}); });
+    connect(m_Launcher, &CliStartStream::Launcher::appQuitRequired, this, [this](QString app) {
+        if (m_AwaitContinue && nativeConnectionWindow()) nativeConfirmConnectionQuit(app.toUtf8().constData());
+        else send({{"event", "quitRequired"}, {"app", app}});
+    });
     connect(m_Launcher, &CliStartStream::Launcher::sessionCreated, this, [this](QString, Session* session) {
         session->setProperty("nativeAwaitContinue", m_AwaitContinue);
         connect(session, &Session::stageStarting, this, [this](QString stage) { send({{"event", "stage"}, {"message", "Starting " + stage + "…"}}); });

@@ -10,6 +10,10 @@ void configureNativeStreamWindow(const char*);
 static void check(bool okay,const char* message) { if (!okay) { fprintf(stderr,"FAIL: %s\n",message); exit(1); } }
 static NSWindow* cocoa(SDL_Window* window) { SDL_SysWMinfo i; SDL_VERSION(&i.version); check(SDL_GetWindowWMInfo(window,&i),"SDL Cocoa window"); return i.info.cocoa.window; }
 static void drain(double seconds) { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:seconds]; while(end.timeIntervalSinceNow>0) { SDL_PumpEvents(); [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; } }
+static NSButton* button(NSView* view, NSString* title) {
+    if ([view isKindOfClass:NSButton.class] && [((NSButton*)view).title isEqualToString:title]) return (NSButton*)view;
+    for(NSView* child in view.subviews) { NSButton* found=button(child,title); if(found) return found; } return nil;
+}
 static NSView* host(NSView* view) { if ([view.identifier isEqualToString:@"stream-connection-host"]) return view; for(NSView* child in view.subviews) { NSView* found=host(child); if(found) return found; } return nil; }
 int main(int argc,char** argv) { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching]; SDL_SetMainReady();
@@ -25,6 +29,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(original.visible && host(content)!=nil,"Apollo hosted inside the SDL content view");
     check(!nativeOverlayConfigured(),"Stream controls/input presentation must wait for Continue");
     nativeUpdateConnectionWindow("Starting video stream…",0); drain(.1);
+    nativeUpdateConnectionWindow("Connection warning fixture",5); drain(.1);
     nativeUpdateConnectionWindow("",1); drain(2.2);
     check(nativeConnectionWindow()==window && cocoa(window)==original && original.contentView==content,"Connected orbit must retain window/content identity");
     check(host(content)!=nil && nativeConnectionWaiting(),"Orbit must remain until explicit Continue");
@@ -36,6 +41,10 @@ int main(int argc,char** argv) { @autoreleasepool {
     }
     SDL_MinimizeWindow(window); drain(.2); nativeRestoreConnectionWindow(); drain(.2);
     check(original.visible && !(SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED),"Restore must bring back the connecting stream window");
+    nativeConfirmConnectionQuit("Previous host game"); drain(.2);
+    check(original.attachedSheet!=nil,"Host-game confirmation must be a sheet on the stream window");
+    NSButton* confirm=button(original.attachedSheet.contentView,@"Quit and Start"); check(confirm!=nil,"Confirmation button");
+    [confirm performClick:nil]; drain(.2); check(action==4 && original.attachedSheet==nil,"Confirmation must route through the owner without closing the stream window");
     // The red button cancels the connection instead of destroying the SDL view.
     [original performClose:nil]; check(action==2 && original.visible,"Close must route to Cancel while connecting/orbiting");
     nativeSetConnectionWaiting(false); nativeDetachConnectionWindowView();

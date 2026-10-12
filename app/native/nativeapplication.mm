@@ -69,6 +69,7 @@ static void (*attachConnection)(void*,const char*,const char*,void(*)(int));
 static void (*updateConnection)(const char*,int);
 static void (*detachConnection)();
 static std::function<void(int)> connectionCommand;
+static NSAlert* connectionQuitAlert;
 void nativeSetConnectionCommand(std::function<void(int)> command) { connectionCommand = std::move(command); }
 static void connectionAction(int action) { if (connectionCommand) connectionCommand(action); }
 SDL_Window* nativeConnectionWindow() { return connectionWindowID ? SDL_GetWindowFromID(connectionWindowID) : nullptr; }
@@ -109,7 +110,25 @@ void nativeRestoreConnectionWindow() {
     SDL_ShowWindow(window); SDL_RaiseWindow(window);
     [nativeSDLWindow(window) makeKeyAndOrderFront:nil];
 }
+void nativeConfirmConnectionQuit(const char* app) {
+    NSWindow* parent = nativeSDLWindow(nativeConnectionWindow());
+    if (!parent || connectionQuitAlert) return;
+    NSAlert* alert = [[NSAlert alloc] init];
+    connectionQuitAlert = alert;
+    alert.messageText = [NSString stringWithFormat:@"Quit %@ and start the selected game?",[NSString stringWithUTF8String:app]];
+    alert.informativeText = @"Unsaved progress in the running host game may be lost.";
+    [alert addButtonWithTitle:@"Cancel"]; [alert addButtonWithTitle:@"Quit and Start"];
+    alert.window.appearance = parent.effectiveAppearance;
+    [alert beginSheetModalForWindow:parent completionHandler:^(NSModalResponse response) {
+        if (connectionQuitAlert != alert) return;
+        connectionQuitAlert = nil;
+        connectionAction(response == NSAlertSecondButtonReturn ? 4 : 2);
+        [alert release];
+    }];
+}
 void nativeEndConnectionWindow() {
+    NSAlert* alert = connectionQuitAlert; connectionQuitAlert = nil;
+    if (alert) { if (alert.window.sheetParent) [NSApp endSheet:alert.window returnCode:NSModalResponseAbort]; [alert release]; }
     nativeDetachConnectionWindowView();
     SDL_Window* window = nativeConnectionWindow();
     connectionWindowID = 0;

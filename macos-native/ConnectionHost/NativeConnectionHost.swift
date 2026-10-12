@@ -5,6 +5,7 @@ private typealias ConnectionAction = @convention(c) (Int32) -> Void
 @MainActor private final class ConnectionHostModel: ObservableObject {
     @Published var journey: ConnectionJourney
     @Published var canRetry = false
+    @Published var warnings: [String] = []
     let action: ConnectionAction
     init(host: String, game: String, action: @escaping ConnectionAction) {
         self.action = action
@@ -16,7 +17,7 @@ private typealias ConnectionAction = @convention(c) (Int32) -> Void
 @MainActor private struct ConnectionHostRoot: View {
     @ObservedObject var model: ConnectionHostModel
     var body: some View {
-        NativeConnectionView(journey: model.journey, canRetry: model.canRetry,
+        NativeConnectionView(journey: model.journey, warnings: model.warnings, canRetry: model.canRetry,
             cancel: { model.action(2) }, proceed: {
                 guard model.journey.phase == .connected else { return }
                 model.journey.phase = .entering; model.journey.detail = "Opening stream…"
@@ -68,6 +69,7 @@ public func connectionUpdate(_ message: UnsafePointer<CChar>, _ phase: Int32) {
         model.journey.phase = .failed; model.journey.error = text; model.journey.detail = "Connection failed"
         model.canRetry = false
     } else if phase == 3 { model.canRetry = true }
+    else if phase == 5 { if !text.isEmpty && !model.warnings.contains(text) { model.warnings.append(text) } }
     else if model.journey.phase == .connecting { model.journey.detail = text }
 }
 @MainActor @_cdecl("MLConnectionDetach")
