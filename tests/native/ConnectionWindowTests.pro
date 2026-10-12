@@ -1,0 +1,9 @@
+QT += core gui
+CONFIG += console c++17
+CONFIG -= app_bundle
+TARGET = connection-window-tests
+INCLUDEPATH += ../../libs/mac/include/SDL2 ../../app/native
+OBJECTIVE_SOURCES += ../../app/native/nativeapplication.mm ../../app/native/nativeoverlay.mm ../../app/native/nativetitlebar.mm ConnectionWindowTests.mm
+QMAKE_OBJECTIVE_CXXFLAGS += -fno-objc-arc
+LIBS += -L$$PWD/../../libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore
+QMAKE_RPATHDIR += $$PWD/../../libs/mac/lib

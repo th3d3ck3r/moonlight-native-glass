@@ -63,11 +63,9 @@ jobs:
         run: |
           python3 setup-deps.py
           python3 scripts/build-connection-view.py build/libMoonlightLGConnection.dylib arm64
-          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
-            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/ConnectionWindowTests.mm \
-            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
-            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/connection-window-tests
-          MOONLIGHT_NATIVE_CONNECTION_LIBRARY="$PWD/build/libMoonlightLGConnection.dylib" build/connection-window-tests build/connection-window-previews
+          mkdir -p build/connection-window-qt
+          (cd build/connection-window-qt && qmake ../../tests/native/ConnectionWindowTests.pro QMAKE_APPLE_DEVICE_ARCHS=arm64 && make -j4)
+          MOONLIGHT_NATIVE_CONNECTION_LIBRARY="$PWD/build/libMoonlightLGConnection.dylib" build/connection-window-qt/connection-window-tests build/connection-window-previews
       - name: Test native overlays and capture composited previews
         if: matrix.architecture == 'universal'
         run: |

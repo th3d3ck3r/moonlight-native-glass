@@ -1,6 +1,8 @@
 #import <AppKit/AppKit.h>
 #include <SDL.h>
 #include <SDL_syswm.h>
+#include <QGuiApplication>
+#include <QCoreApplication>
 #include <cstdio>
 #include <cstdlib>
 #include "nativeapplication.h"
@@ -9,13 +11,33 @@
 void configureNativeStreamWindow(const char*);
 static void check(bool okay,const char* message) { if (!okay) { fprintf(stderr,"FAIL: %s\n",message); exit(1); } }
 static NSWindow* cocoa(SDL_Window* window) { SDL_SysWMinfo i; SDL_VERSION(&i.version); check(SDL_GetWindowWMInfo(window,&i),"SDL Cocoa window"); return i.info.cocoa.window; }
-static void drain(double seconds) { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:seconds]; while(end.timeIntervalSinceNow>0) { SDL_PumpEvents(); [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; } }
+static void drain(double seconds) { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:seconds]; while(end.timeIntervalSinceNow>0) { QCoreApplication::processEvents(); SDL_PumpEvents(); [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; } }
 static NSButton* button(NSView* view, NSString* title) {
     if ([view isKindOfClass:NSButton.class] && [((NSButton*)view).title isEqualToString:title]) return (NSButton*)view;
     for(NSView* child in view.subviews) { NSButton* found=button(child,title); if(found) return found; } return nil;
 }
 static NSView* host(NSView* view) { if ([view.identifier isEqualToString:@"stream-connection-host"]) return view; for(NSView* child in view.subviews) { NSView* found=host(child); if(found) return found; } return nil; }
-int main(int argc,char** argv) { @autoreleasepool {
+static id accessibleButton(id element, NSString* identifier) {
+    if ([element respondsToSelector:@selector(accessibilityIdentifier)] &&
+        [[element accessibilityIdentifier] isEqualToString:identifier]) return element;
+    if ([element respondsToSelector:@selector(accessibilityChildren)]) {
+        for (id child in [element accessibilityChildren]) {
+            id found=accessibleButton(child,identifier); if(found) return found;
+        }
+    }
+    return nil;
+}
+static void click(NSWindow* window, id element) {
+    NSRect frame=[element accessibilityFrame];
+    NSPoint location=[window convertPointFromScreen:NSMakePoint(NSMidX(frame),NSMidY(frame))];
+    for (NSNumber* type in @[@(NSEventTypeLeftMouseDown),@(NSEventTypeLeftMouseUp)]) {
+        NSEvent* event=[NSEvent mouseEventWithType:(NSEventType)type.integerValue location:location modifierFlags:0
+            timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil eventNumber:1 clickCount:1 pressure:1];
+        [NSApp postEvent:event atStart:NO];
+    }
+    drain(.3);
+}
+int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching]; SDL_SetMainReady();
     NSUserDefaults* defaults=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
     id previousCrimson=[[defaults objectForKey:@"crimsonGlass"] retain];
@@ -47,6 +69,11 @@ int main(int argc,char** argv) { @autoreleasepool {
     [confirm performClick:nil]; drain(.2); check(action==4 && original.attachedSheet==nil,"Confirmation must route through the owner without closing the stream window");
     // The red button cancels the connection instead of destroying the SDL view.
     [original performClose:nil]; check(action==2 && original.visible,"Close must route to Cancel while connecting/orbiting");
+    action=0;
+    id proceed=accessibleButton(host(content),@"connection-continue");
+    check(proceed!=nil,"Continue must be exposed in the real SDL hosting view");
+    click(original,proceed);
+    check(action==1,"Mouse click on real Continue must invoke the bridge callback");
     nativeSetConnectionWaiting(false); nativeDetachConnectionWindowView();
     check(host(content)==nil && original.contentView==content && SDL_GetWindowID(window)==id,"Continue removes only the temporary hosting subview");
     nativeAttachStreamWindow(window); drain(.2);
