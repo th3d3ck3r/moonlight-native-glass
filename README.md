@@ -137,8 +137,9 @@ startup, About and title-bar captures are linked from the [current audit](https:
 
 **Current MoonlightLG 1.1.02U:** The actual stream window opens before connecting,
 with Apollo flight, bottom details and full-moon orbit until Continue. Native Continue/Cancel
-mouse dispatch is under macOS validation; the prior 1.1.01U passed complete builds
-and both 12-test UI suites, but its fixture simulated Continue. See the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.02U.md).
+mouse events passed in the real Qt/SDL window. Both complete builds and both 12-test UI
+suites passed, including same-window handoff, confirmation ownership, restore and
+sanitizers. Live-host handoff still needs owner acceptance. See the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.02U.md).
 U app download links are shared only directly with the owner.
 
 **Archived Experimental 24 validation:** [Native validation run 38219537762](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537762) and [Xcode validation run 38219537999](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537999) passed at application/test source **`4d8ee8a4`**.

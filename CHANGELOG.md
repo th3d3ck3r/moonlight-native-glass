@@ -8,6 +8,10 @@
   animation running together, including Metal and same-window handoff.
 - Internal build 31. U download links remain owner-only.
 
+Both complete packages, both 12-test UI suites, actual Qt/SDL mouse-event routing,
+window ownership, fullscreen/Metal, sanitizers and 200 shutdown cycles passed.
+See [audit](docs/MOONLIGHTLG_1.1.02U.md). Live-host handoff remains an owner acceptance test.
+
 ## 1.1.01U — unreleased — 2026-10-12
 
 - Correct placement: open the actual SDL stream window before starting host/game
