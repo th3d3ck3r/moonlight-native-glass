@@ -5,6 +5,11 @@ on:
     paths:
       - 'MoonlightNativeGlass.xcodeproj/**'
       - 'macos-native/**'
+      - 'app/native/**'
+      - 'app/streaming/input/**'
+      - 'tests/native/OverlayTests.mm'
+      - 'tests/native/StreamWindowTests.mm'
+      - 'tests/native/extract_native_focus_methods.py'
       - 'tests/native/NativeUIScreensTests.swift'
       - 'tests/native/BootPlaybackTests.swift'
       - 'scripts/build-xcode-engine.py'
