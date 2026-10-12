@@ -6,6 +6,10 @@
   sideways travel instead of radial motion and the same star styling.
 - Internal build 32. U download links remain owner-only.
 
+Both complete packages, both 12-test UI suites, production connection-window
+controls, fullscreen/Metal, sanitizers and 200 shutdown cycles passed. Flight and
+orbit captures were visually checked. See [audit](docs/MOONLIGHTLG_1.1.03U.md).
+
 ## 1.1.02U — unreleased — 2026-10-12
 
 - Use native AppKit connection buttons with direct target/action callbacks and

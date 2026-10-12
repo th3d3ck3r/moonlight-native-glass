@@ -136,10 +136,10 @@ startup, About and title-bar captures are linked from the [current audit](https:
 ## 🧪 Testing and known limitations
 
 **Current MoonlightLG 1.1.03U:** The Apollo scene uses the boot animation's star layout,
-with sideways travel instead of the old diagonal arrangement. macOS/Xcode
-validation is in progress.
-The prior 1.1.02U passed native Continue/Cancel mouse events, both complete builds and
-both 12-test UI suites. Live-host handoff still needs owner acceptance. See the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.03U.md).
+with sideways travel instead of the old diagonal arrangement. Both complete builds
+and both 12-test UI suites passed, including native Continue/Cancel mouse events,
+window ownership and sanitizers. The startup animation remains unchanged.
+Live-host handoff still needs owner acceptance. See the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.03U.md).
 U app download links are shared only directly with the owner.
 
 **Archived Experimental 24 validation:** [Native validation run 38219537762](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537762) and [Xcode validation run 38219537999](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537999) passed at application/test source **`4d8ee8a4`**.
