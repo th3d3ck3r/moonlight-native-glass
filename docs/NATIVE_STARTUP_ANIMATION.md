@@ -3,7 +3,7 @@
 This change starts at the validated Preview 20 source checkpoint
 `9532df823f7785f75dc6db4bfa93fc4d2ef26683`, on
 `feature/native-boot-animation`. It contains no AWDL helper source, settings,
-installation scripts, services, or helper build changes. Preview build: 22.
+installation scripts, services, or helper build changes. Preview build: 23.
 
 The current production startup is the user's edited Warp Arrival: perspective stars accelerate and then brake, the small crimson moon approaches, and two satellites orbit it before the library fades in. Its star lane starts at 45, preserving the user's change. Startup lasts 4.1 seconds plus a 0.35-second fade. Rendering uses native SwiftUI Canvas with a requested 60 Hz cadence and stops on completion; no video decoder is involved. The previous movie remains an unused resource.
 
@@ -131,3 +131,9 @@ Root Xcode run `38193808826`, job `114632077285`, passed fresh and incremental U
 Final revision `5ae657e99c8e4aac8b2e227d5cc06d73a0252050` corrects the accessibility-value assertion and preserves explicit `--dark` / `--light` design-preview appearance when switching themes. Normal production launch behavior and engine sources are unchanged from the fully packaged revision. Both final ten-test UI suites passed with zero failures: native run `38194648101`, job `114634535554`, and root Xcode run `38194648134`, job `114634551133`. The root scheme compiled all Canvas alternatives and the shared production warp renderer without embedding the engine.
 
 Inspected captures verify the small crimson moon, two satellites, star field, startup-only traffic lights, crimson sidebar, matching main title bar and readable Settings layout. Appearance switching restores the original palette, preserves window frame and persists across launches; both original/crimson settings captures were inspected. Hardware streaming performance and perceived animation smoothness on the user's physical Intel/OCLP Mac remain local checks. No AWDL helper changes are included.
+
+## Build 23: overlay coverage and Dock rounding repair
+
+The Dock image now contains its own rounded silhouette and transparent corners; it does not rely on an operating-system mask. The boot and menu assets retain their existing transparency. The built-in image editor masked the existing dark-backed crimson artwork to a generously rounded tile without redesigning the crescent and dots; the PNG was converted to ICNS.
+
+Statistics, connection/status and control panels all receive the Crimson Glass material and a consistent crimson fill/outline. Already-open statistics/status panels update when the appearance changes. Native glass is used on supported systems; the reduced-transparency/material fallback is retained. The decorative tint view rejects hit testing, keeping native buttons and stream pointer handling intact. Geometry, action handlers, shortcuts and streaming paths are unchanged.

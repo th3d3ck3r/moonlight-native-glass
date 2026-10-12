@@ -155,7 +155,7 @@ private struct NativeStatusActions: View {
 // CFBundleVersion for the preview number; release notes belong on GitHub.
 @MainActor func showNativeAboutPanel() {
     NativeCrimsonTheme.apply(NativeCrimsonTheme.enabled)
-    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "22"
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "23"
     let engineBundle = Bundle(url: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app"))
     let engineVersion = engineBundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "6.2.0"

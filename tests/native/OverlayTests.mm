@@ -1,4 +1,5 @@
 #import <AppKit/AppKit.h>
+#import <QuartzCore/QuartzCore.h>
 #import <SDL.h>
 #import <SDL_syswm.h>
 #include "nativeoverlay.h"
@@ -15,6 +16,21 @@ static bool hasLabel(NSView* view, NSString* text) {
     if ([view isKindOfClass:NSTextField.class] && [((NSTextField*)view).stringValue containsString:text]) return true;
     for (NSView* child in view.subviews) if (hasLabel(child,text)) return true;
     return false;
+}
+static NSView* tintView(NSView* view) {
+    if ([view.identifier isEqual:@"native-crimson-overlay-tint"]) return view;
+    for (NSView* child in view.subviews) if (NSView* found=tintView(child)) return found;
+    return nil;
+}
+static void checkCrimson(NSWindow* panel, bool enabled) {
+    NSView* tint=tintView(panel.contentView);
+    check(tint!=nil && tint.hidden==!enabled,"Every overlay must follow Crimson Glass, including existing passive panels");
+    check(tint.layer.cornerRadius==12 && tint.layer.borderWidth==1,"Crimson overlay edges must be rounded and outlined");
+    check([tint hitTest:NSMakePoint(10,10)]==nil,"Tint must never intercept mouse input");
+    if (enabled) {
+        NSColor* color=[[NSColor colorWithCGColor:tint.layer.backgroundColor] colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
+        check(color.redComponent>color.greenComponent+0.1,"Overlay fill must visibly carry the crimson palette");
+    }
 }
 static bool takeAction(int code) {
     SDL_Event event; bool found=false;
@@ -95,6 +111,15 @@ int main(int argc,char** argv) { @autoreleasepool {
         check(!panel.canBecomeKeyWindow && !panel.canBecomeMainWindow,"Passive panels must reject keyboard/main focus");
     }
     check(NSApp.keyWindow==window,"Passive overlay must not steal focus");
+    NSArray* passive=[window.childWindows copy];
+    for (NSWindow* panel in passive) checkCrimson(panel,true);
+    [defaults setBool:NO forKey:@"crimsonGlass"]; [defaults synchronize];
+    [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
+    for (NSWindow* panel in passive) { check([window.childWindows containsObject:panel],"Appearance switching must retain passive panel identities"); checkCrimson(panel,false); }
+    [defaults setBool:YES forKey:@"crimsonGlass"]; [defaults synchronize];
+    [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
+    for (NSWindow* panel in passive) checkCrimson(panel,true);
+    [passive release];
     SDL_KeyboardEvent key={}; key.state=SDL_PRESSED; key.keysym.sym=SDLK_o; key.keysym.mod=KMOD_LCTRL|KMOD_LALT|KMOD_LSHIFT;
     [defaults setBool:NO forKey:@"controlsEnabled"]; [defaults synchronize];
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
@@ -130,6 +155,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(restored && restored->x==20 && restored->y==20 && restored->w==400 && restored->h==300,"Dismissal must restore the previous pointer region");
     SDL_SetWindowMouseRect(stream,nullptr); SDL_ShowCursor(SDL_ENABLE);
     for (NSWindow* panel in window.childWindows) check(panel.visible && (panel.occlusionState & NSWindowOcclusionStateVisible),"Showing controls must keep all overlays unobscured");
+    for (NSWindow* panel in window.childWindows) checkCrimson(panel,true);
     capture([out stringByAppendingPathComponent:@"overlay-controls-dark.png"]);
     [batteryButton performClick:nil]; pump(); capture([out stringByAppendingPathComponent:@"titlebar-controller-details.png"]);
     [batteryButton performClick:nil]; pump();

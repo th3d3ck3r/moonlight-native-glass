@@ -46,6 +46,47 @@ static bool pushAction(int code, Uint32 requestID = 0) { if (actionEvent == (Uin
 - (BOOL)canBecomeMainWindow { return NO; }
 @end
 
+// Tint decoration never participates in hit testing; native controls and the
+// stream retain their existing input paths.
+@interface MLOverlayTintView : NSView
+@end
+@implementation MLOverlayTintView
+- (NSView*)hitTest:(NSPoint)point { return nil; }
+@end
+
+static void applyPanelTheme(NSPanel* panel) {
+    if (!panel) return;
+    BOOL crimson = crimsonEnabled();
+    BOOL reduce = [NSWorkspace sharedWorkspace].accessibilityDisplayShouldReduceTransparency;
+    panel.appearance = crimson ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
+    NSView* root = panel.contentView;
+    NSView* content = root;
+    if (@available(macOS 26.0, *)) {
+        if ([root isKindOfClass:NSGlassEffectView.class]) {
+            NSGlassEffectView* glass = (NSGlassEffectView*)root;
+            glass.tintColor = crimson ? [crimsonAccent() colorWithAlphaComponent:0.32] : nil;
+            content = glass.contentView;
+        }
+    }
+    if ([root isKindOfClass:NSVisualEffectView.class]) {
+        ((NSVisualEffectView*)root).state = reduce ? NSVisualEffectStateInactive : NSVisualEffectStateActive;
+    }
+    panel.backgroundColor = reduce ? (crimson ? [NSColor colorWithSRGBRed:0.045 green:0.025 blue:0.035 alpha:1] : NSColor.windowBackgroundColor) : NSColor.clearColor;
+    MLOverlayTintView* wash = nil;
+    for (NSView* child in content.subviews) if ([child isKindOfClass:MLOverlayTintView.class]) { wash = (MLOverlayTintView*)child; break; }
+    if (!wash) {
+        wash = [[[MLOverlayTintView alloc] initWithFrame:content.bounds] autorelease];
+        wash.identifier = @"native-crimson-overlay-tint";
+        wash.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        wash.wantsLayer = YES; wash.layer.cornerRadius = 12; wash.layer.masksToBounds = YES;
+        [content addSubview:wash positioned:NSWindowBelow relativeTo:nil];
+    }
+    wash.frame = content.bounds; wash.hidden = !crimson;
+    wash.layer.backgroundColor = (reduce ? [NSColor colorWithSRGBRed:0.045 green:0.025 blue:0.035 alpha:1] : [NSColor colorWithSRGBRed:0.20 green:0.025 blue:0.065 alpha:0.24]).CGColor;
+    wash.layer.borderColor = [crimsonAccent() colorWithAlphaComponent:0.5].CGColor;
+    wash.layer.borderWidth = 1;
+}
+
 @interface MLOverlayController : NSObject
 @property(nonatomic, assign) NSWindow* parent;
 @property(nonatomic, retain) NSPanel* stats;
@@ -93,7 +134,7 @@ static MLOverlayController* controller;
     panel.contentView = material;
     NSView* container = material;
     if (@available(macOS 26.0, *)) {
-        if (!field && ![NSWorkspace sharedWorkspace].accessibilityDisplayShouldReduceTransparency) {
+        if (![NSWorkspace sharedWorkspace].accessibilityDisplayShouldReduceTransparency) {
             NSGlassEffectView* glass = [[[NSGlassEffectView alloc] initWithFrame:material.frame] autorelease];
             glass.cornerRadius = 12;
             glass.tintColor = crimsonEnabled() ? [crimsonAccent() colorWithAlphaComponent:0.16] : nil;
@@ -102,6 +143,7 @@ static MLOverlayController* controller;
             panel.contentView = glass; container = glass.contentView;
         }
     }
+    applyPanelTheme(panel);
     if (field) {
         NSTextField* label = [NSTextField wrappingLabelWithString:@""];
         label.textColor = NSColor.labelColor; label.selectable = NO;
@@ -122,8 +164,7 @@ static MLOverlayController* controller;
 - (void)dismiss:(id)sender { pushAction(101); }
 - (void)refresh {
     [self.defaults synchronize];
-    NSAppearance* appearance = crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
-    self.stats.appearance = appearance; self.status.appearance = appearance;
+    applyPanelTheme(self.stats); applyPanelTheme(self.status);
     NSDictionary* custom = [self.defaults dictionaryForKey:@"shortcuts"];
     { std::lock_guard<std::mutex> lock(bindingMutex);
       for (int i=0;i<13;i++) {
@@ -216,12 +257,9 @@ static MLOverlayController* controller;
         if (!NSEqualRects(panel.frame,frame)) [panel setFrame:frame display:NO];
         BOOL visible=copy[i].enabled && copy[i].text[0] && self.parent.visible && !self.parent.miniaturized;
         [self setPanel:panel visible:visible];
-        NSVisualEffectView* material=(NSVisualEffectView*)panel.contentView;
-        material.material=NSVisualEffectMaterialHUDWindow;
-        if ([NSWorkspace sharedWorkspace].accessibilityDisplayShouldReduceTransparency) { material.state=NSVisualEffectStateInactive; panel.backgroundColor=NSColor.windowBackgroundColor; }
-        else { material.state=NSVisualEffectStateActive; panel.backgroundColor=NSColor.clearColor; }
+        applyPanelTheme(panel);
     }
-    if (self.controls) { NSRect frame=self.controls.frame; frame.origin=NSMakePoint(NSMidX(bounds)-frame.size.width/2,NSMinY(bounds)+12); [self.controls setFrame:frame display:NO]; [self setPanel:self.controls visible:self.parent.visible && !self.parent.miniaturized]; }
+    if (self.controls) { applyPanelTheme(self.controls); NSRect frame=self.controls.frame; frame.origin=NSMakePoint(NSMidX(bounds)-frame.size.width/2,NSMinY(bounds)+12); [self.controls setFrame:frame display:NO]; [self setPanel:self.controls visible:self.parent.visible && !self.parent.miniaturized]; }
     } @finally { self.layingOut=NO; }
 }
 - (void)invalidate {

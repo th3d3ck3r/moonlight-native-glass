@@ -26,6 +26,16 @@ assert (app / "Contents/Resources/full-moon.png").read_bytes() == pathlib.Path("
 for name in ["boot-moon.png", "crimson-moon.png", "crimson-full-moon.png", "crimson.icns"]:
     assert (app / "Contents/Resources" / name).read_bytes() == (pathlib.Path("macos-native/Resources") / name).read_bytes(), f"Missing or mismatched artwork: {name}"
 
+# Inspect the real ICNS representation, not an assumed Dock mask.
+subprocess.run(["/usr/bin/swift", "-e", r'''import AppKit
+let image = NSImage(contentsOfFile: CommandLine.arguments[1])!
+let bitmap = NSBitmapImageRep(data: image.tiffRepresentation!)!
+for (x,y) in [(0,0),(bitmap.pixelsWide-1,0),(0,bitmap.pixelsHigh-1),(bitmap.pixelsWide-1,bitmap.pixelsHigh-1)] {
+    precondition(bitmap.colorAt(x:x,y:y)!.alphaComponent < 0.01, "Dock asset must have transparent rounded corners")
+}
+print("Native Dock icon corner transparency verified")
+''', str(app / "Contents/Resources/crimson.icns")], check=True)
+
 checked = 0
 for file in app.rglob("*"):
     if not file.is_file() or file.is_symlink():
