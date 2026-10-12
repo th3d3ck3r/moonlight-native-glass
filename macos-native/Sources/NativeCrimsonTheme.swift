@@ -51,7 +51,7 @@ private struct CrimsonWindowAppearance: NSViewRepresentable {
             window.backgroundColor = enabled ? NativeCrimsonTheme.windowColor : .windowBackgroundColor
             // Extend the same background beneath the real native toolbar.
             // Keep the toolbar, traffic lights and glass controls intact.
-            window.titlebarAppearsTransparent = enabled
+            if enabled || window.titleVisibility != .hidden { window.titlebarAppearsTransparent = enabled }
         }
     }
     func makeNSView(context: Context) -> WindowView { let v = WindowView(); v.enabled = enabled; return v }

@@ -144,11 +144,12 @@ static MLStreamTitlebar* titlebar;
         [self updateWindowToolbar];
     });
 }
-- (void)themeChanged:(NSNotification*)notification { [self updateWindowToolbar]; }
+- (void)themeChanged:(NSNotification*)notification { [self updateWindowToolbar]; [self refresh]; }
 - (void)updateWindowToolbar {
     if (!self.window) return;
     self.window.appearance = crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
-    for (NSButton* button in self.buttons.allValues) button.contentTintColor = crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : nil;
+    // Preserve the green/orange connection and battery warning indicators.
+    ((NSButton*)self.buttons[hostID]).contentTintColor = crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : nil;
     NSWindowStyleMask style=self.window.styleMask;
     BOOL fullscreen=self.windowTransition || self.fullscreenTransition || (style & NSWindowStyleMaskFullScreen) || !(style & NSWindowStyleMaskTitled);
     // Attaching a toolbar changes the Cocoa content geometry. In particular,
@@ -200,11 +201,11 @@ static MLStreamTitlebar* titlebar;
     TitleState copy; { std::lock_guard<std::mutex> lock(stateMutex); copy=state; }
     NSButton* capture=self.buttons[captureID];
     capture.image=[NSImage imageWithSystemSymbolName:copy.captured ? @"cursorarrow.motionlines" : @"cursorarrow" accessibilityDescription:nil];
-    capture.contentTintColor=copy.captured ? NSColor.controlAccentColor : NSColor.labelColor;
+    capture.contentTintColor=copy.captured ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
     capture.toolTip=copy.captured ? @"Input captured by host · Click to release" : @"Input released to Mac · Click to capture";
     [capture setAccessibilityLabel:capture.toolTip]; [capture setAccessibilityValue:copy.captured ? @"Captured" : @"Released"];
     NSButton* stats=self.buttons[statisticsID]; stats.image=[NSImage imageWithSystemSymbolName:@"chart.bar" accessibilityDescription:nil];
-    stats.contentTintColor=copy.statistics ? NSColor.controlAccentColor : NSColor.labelColor;
+    stats.contentTintColor=copy.statistics ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
     stats.toolTip=copy.statistics ? @"Hide Statistics" : @"Show Statistics"; [stats setAccessibilityLabel:stats.toolTip]; [stats setAccessibilityValue:copy.statistics ? @"Shown" : @"Hidden"];
     NSButton* connection=self.buttons[connectionID];
     NSString* symbol=@"circle.fill"; NSColor* tint=NSColor.secondaryLabelColor;

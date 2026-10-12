@@ -122,10 +122,8 @@ static MLOverlayController* controller;
 - (void)dismiss:(id)sender { pushAction(101); }
 - (void)refresh {
     [self.defaults synchronize];
-    for (NSPanel* panel in @[self.stats ?: (id)[NSNull null], self.status ?: (id)[NSNull null]]) {
-        if (![panel isKindOfClass:NSPanel.class]) continue;
-        panel.appearance = crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
-    }
+    NSAppearance* appearance = crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
+    self.stats.appearance = appearance; self.status.appearance = appearance;
     NSDictionary* custom = [self.defaults dictionaryForKey:@"shortcuts"];
     { std::lock_guard<std::mutex> lock(bindingMutex);
       for (int i=0;i<13;i++) {

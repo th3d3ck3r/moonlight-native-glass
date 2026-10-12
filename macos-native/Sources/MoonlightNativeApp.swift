@@ -166,7 +166,7 @@ private struct NativeStatusActions: View {
         attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
                      .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
     credits.addAttributes([.link: URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass")!,
-                           .foregroundColor: NSColor.linkColor,
+                           .foregroundColor: NativeCrimsonTheme.enabled ? NSColor(srgbRed: 0.95, green: 0.19, blue: 0.32, alpha: 1) : NSColor.linkColor,
                            .underlineStyle: NSUnderlineStyle.single.rawValue],
                           range: (credits.string as NSString).range(of: "GitHub Repository"))
     NSApp.orderFrontStandardAboutPanel(options: [
