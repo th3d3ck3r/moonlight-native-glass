@@ -2,7 +2,8 @@
 
 ## 1.1.03U — unreleased — 2026-10-12
 
-- Spread the Apollo connection stars out by reducing the field from 140 to 90.
+- Use the boot animation's golden-angle star layout in the Apollo scene, with
+  sideways travel instead of radial motion and the same star styling.
 - Internal build 32. U download links remain owner-only.
 
 ## 1.1.02U — unreleased — 2026-10-12

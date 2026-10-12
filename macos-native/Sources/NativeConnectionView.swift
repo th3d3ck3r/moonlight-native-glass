@@ -87,19 +87,32 @@ struct NativeConnectionView: View {
     private func drawSpace(_ context: GraphicsContext, size: CGSize, time: Double, arrival: Double) {
         let scale = min(size.width / 800, size.height / 400)
         let center = CGPoint(x: size.width * 0.56, y: size.height * 0.48)
-        // A sparser deterministic sideways field gives each star more space.
-        // Rendezvous slows the field down as Apollo reaches the moon.
-        for i in 0..<90 {
-            let depth = Double((i * 37) % 100) / 100
-            let travel = time * (12 + depth * 32) * (1 - arrival * 0.92)
-            let width = max(1, size.width + 40)
-            let x = (Double((i * 79) % 997) / 997 * width - travel).truncatingRemainder(dividingBy: width)
-            let point = CGPoint(x: x < 0 ? x + width : x, y: Double((i * 131) % 991) / 991 * size.height)
-            let radius = (0.5 + depth) * max(0.7, scale)
-            var streak = Path(); streak.move(to: point)
-            streak.addLine(to: CGPoint(x: point.x + (2 + depth * 13) * (1 - arrival), y: point.y))
-            context.stroke(streak, with: .color(accent.opacity(0.18 + depth * 0.4)), lineWidth: radius)
-            context.fill(Path(ellipseIn: CGRect(x: point.x, y: point.y, width: radius, height: radius)), with: .color(.white.opacity(0.3 + depth * 0.6)))
+        // Use the startup warp's golden-angle lanes and depth distribution.
+        // Translate sideways for Apollo's flight instead of moving radially.
+        let fieldScale = Double(min(size.width, size.height)) / 640
+        let fieldCenter = CGPoint(x: size.width / 2, y: size.height / 2)
+        let speed = 1 - arrival
+        let travel = time * 28 * (1 - arrival * 0.92)
+        let width = max(1, size.width + 40)
+        for i in 0..<150 {
+            let angle = Double(i) * 2.399963
+            let lane = 45 + Double((i * 47) % 210)
+            let depth = Double((i * 73) % 151) / 151
+            let z = 0.15 + depth * 0.85
+            let radius = lane * fieldScale / z
+            let x = (fieldCenter.x + cos(angle) * radius - travel).truncatingRemainder(dividingBy: width)
+            let point = CGPoint(x: x < 0 ? x + width : x, y: fieldCenter.y + sin(angle) * radius)
+            let edge = max(0, min(1, (z - 0.15) / 0.12))
+            var star = context
+            star.opacity = edge * (0.3 + (1 - z) * 0.65) * (0.65 + speed * 0.35)
+            let tail = CGPoint(x: point.x + (12 + 115 * (1 - z)) * fieldScale * speed, y: point.y)
+            var streak = Path(); streak.move(to: tail); streak.addLine(to: point)
+            star.stroke(streak, with: .linearGradient(Gradient(colors: [.clear, accent, .white]),
+                startPoint: tail, endPoint: point),
+                style: StrokeStyle(lineWidth: (0.6 + (1 - z) * 1.2) * fieldScale, lineCap: .round))
+            let dot = (0.6 + (1 - z) * 0.8) * fieldScale
+            star.fill(Path(ellipseIn: CGRect(x: point.x - dot, y: point.y - dot,
+                                             width: dot * 2, height: dot * 2)), with: .color(.white))
         }
         let moonRadius = max(24, min(66 * scale, size.width * 0.12))
         let moon = CGPoint(x: size.width + moonRadius + (center.x - size.width - moonRadius) * arrival, y: center.y)

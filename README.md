@@ -23,7 +23,7 @@ Liquid Glass navigation and controls on **macOS 26+**, standard native styling o
 
 ## 🌙 MoonlightLG builds
 
-**MoonlightLG 1.1.03U** gives the Apollo connection stars more space, with a lighter 90-star field. The app, menu names,
+**MoonlightLG 1.1.03U** uses the boot animation’s star layout for the Apollo scene, traveling sideways. The app, menu names,
 Xcode project and build products now use MoonlightLG; the GitHub repository URL
 stays unchanged. The startup arrival displays **MoonlightLG** beneath the moon. Connection flight
 meets a full moon and orbits until **Continue to Stream**, with real status details below.
@@ -135,8 +135,9 @@ startup, About and title-bar captures are linked from the [current audit](https:
 
 ## 🧪 Testing and known limitations
 
-**Current MoonlightLG 1.1.03U:** The Apollo connection field now uses 90 stars instead of 140
-for more space around the spacecraft and moon. macOS/Xcode validation is in progress.
+**Current MoonlightLG 1.1.03U:** The Apollo scene uses the boot animation's star layout,
+with sideways travel instead of the old diagonal arrangement. macOS/Xcode
+validation is in progress.
 The prior 1.1.02U passed native Continue/Cancel mouse events, both complete builds and
 both 12-test UI suites. Live-host handoff still needs owner acceptance. See the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.03U.md).
 U app download links are shared only directly with the owner.
