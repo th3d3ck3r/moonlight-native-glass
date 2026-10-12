@@ -40,6 +40,13 @@ static bool pending=false;
 }
 @end
 
+// Decorative chrome must not intercept native buttons, drag events or SDL input.
+@interface MLTitlebarBackground : NSView
+@end
+@implementation MLTitlebarBackground
+- (NSView*)hitTest:(NSPoint)point { return nil; }
+@end
+
 static NSString* connectionDescription(NativeConnectionState value) {
     switch (value) {
         case NativeConnectionState::Idle: return @"No stream connection";
@@ -68,6 +75,8 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic, assign) NSWindowTitleVisibility previousTitleVisibility;
 @property(nonatomic, assign) NSWindowToolbarStyle previousToolbarStyle;
 @property(nonatomic, assign) BOOL previousTransparency;
+@property(nonatomic, retain) NSColor* previousBackgroundColor;
+@property(nonatomic, retain) NSView* background;
 @property(nonatomic, retain) NSTitlebarAccessoryViewController* accessory;
 @property(nonatomic, retain) NSView* row;
 @property(nonatomic, retain) NSButton* overflow;
@@ -151,6 +160,8 @@ static MLStreamTitlebar* titlebar;
 }
 - (void)themeChanged:(NSNotification*)notification { [self updateWindowToolbar]; [self refresh]; }
 - (void)removeAccessory {
+    [self.background removeFromSuperview];
+    if (self.window && self.presentationInstalled) self.window.backgroundColor=self.previousBackgroundColor;
     if (!self.window || !self.accessory || !(self.window.styleMask & NSWindowStyleMaskTitled)) return;
     NSUInteger index=[self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory];
     if (index!=NSNotFound) [self.window removeTitlebarAccessoryViewControllerAtIndex:index];
@@ -171,6 +182,17 @@ static MLStreamTitlebar* titlebar;
         self.presentationInstalled=YES;
         self.window.titleVisibility=NSWindowTitleHidden;
         self.window.titlebarAppearsTransparent=YES;
+        // Draw one rounded surface across the full title area, underneath all
+        // native controls. The SDL content view/frame and window style stay intact.
+        self.window.backgroundColor=NSColor.blackColor;
+        NSView* frame=self.window.contentView.superview;
+        CGFloat height=frame.bounds.size.height-self.window.contentLayoutRect.size.height;
+        if (frame && height>0 && height<=40) {
+            self.background.frame=NSMakeRect(0,NSMaxY(frame.bounds)-height,frame.bounds.size.width,height);
+            self.background.subviews.firstObject.frame=self.background.bounds;
+            if (self.background.superview!=frame)
+                [frame addSubview:self.background positioned:NSWindowBelow relativeTo:nil];
+        }
         if ([self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory]==NSNotFound)
             [self.window addTitlebarAccessoryViewController:self.accessory];
         self.accessory.view.frame=NSMakeRect(0,0,MAX(40,self.window.frame.size.width-88),self.accessory.view.frame.size.height);
@@ -335,7 +357,7 @@ static MLStreamTitlebar* titlebar;
     self.toolbar.delegate=nil; self.window=nil;
 }
 - (void)dealloc {
-    [self invalidate]; [_accessory release]; [_row release]; [_overflow release]; [_toolbar release]; [_previousToolbar release]; [_buttons release]; [_details release]; [_detailsID release]; [_batteryDetails release]; [super dealloc];
+    [self invalidate]; [_background release]; [_previousBackgroundColor release]; [_accessory release]; [_row release]; [_overflow release]; [_toolbar release]; [_previousToolbar release]; [_buttons release]; [_details release]; [_detailsID release]; [_batteryDetails release]; [super dealloc];
 }
 @end
 
@@ -361,7 +383,7 @@ void nativeTitlebarControllersChanged() { [titlebar readControllers]; }
 void nativeTitlebarAttach(void* window) {
     nativeTitlebarDetach();
     titlebar=[[MLStreamTitlebar alloc] init]; titlebar.window=(NSWindow*)window;
-    titlebar.previousToolbar=titlebar.window.toolbar; titlebar.previousTitleVisibility=titlebar.window.titleVisibility; titlebar.previousToolbarStyle=titlebar.window.toolbarStyle; titlebar.previousTransparency=titlebar.window.titlebarAppearsTransparent;
+    titlebar.previousToolbar=titlebar.window.toolbar; titlebar.previousTitleVisibility=titlebar.window.titleVisibility; titlebar.previousToolbarStyle=titlebar.window.toolbarStyle; titlebar.previousTransparency=titlebar.window.titlebarAppearsTransparent; titlebar.previousBackgroundColor=titlebar.window.backgroundColor;
     titlebar.toolbar=[[[NSToolbar alloc] initWithIdentifier:@"NativeStreamToolbar"] autorelease];
     titlebar.toolbar.delegate=titlebar; titlebar.toolbar.displayMode=NSToolbarDisplayModeIconOnly;
     titlebar.toolbar.allowsUserCustomization=NO; titlebar.toolbar.autosavesConfiguration=NO;
@@ -375,19 +397,24 @@ void nativeTitlebarAttach(void* window) {
     root.identifier=@"NativeStreamTitlebar";
     titlebar.accessory.view=root;
     titlebar.row=[[[NSView alloc] initWithFrame:root.bounds] autorelease];
+    // The control accessory itself is transparent; one surface spans the
+    // entire bar so its lower-left corner includes the traffic-light region.
+    NSView* controls=[[[NSView alloc] initWithFrame:root.bounds] autorelease];
+    controls.identifier=@"NativeStreamTitlebarControls"; [controls addSubview:titlebar.row]; [root addSubview:controls];
+    titlebar.background=[[[MLTitlebarBackground alloc] initWithFrame:NSZeroRect] autorelease];
+    titlebar.background.identifier=@"NativeStreamTitlebarBackground";
     NSView* glass;
     if (@available(macOS 26.0, *)) {
-        NSGlassEffectView* effect=[[[NSGlassEffectView alloc] initWithFrame:root.bounds] autorelease];
-        effect.cornerRadius=8;
-        effect.contentView=titlebar.row; glass=effect;
+        NSGlassEffectView* effect=[[[NSGlassEffectView alloc] initWithFrame:NSZeroRect] autorelease];
+        effect.cornerRadius=12;
+        effect.contentView=[[[NSView alloc] initWithFrame:NSZeroRect] autorelease]; glass=effect;
     } else {
-        NSVisualEffectView* effect=[[[NSVisualEffectView alloc] initWithFrame:root.bounds] autorelease];
+        NSVisualEffectView* effect=[[[NSVisualEffectView alloc] initWithFrame:NSZeroRect] autorelease];
         effect.material=NSVisualEffectMaterialTitlebar; effect.blendingMode=NSVisualEffectBlendingModeBehindWindow;
         effect.state=NSVisualEffectStateFollowsWindowActiveState; effect.wantsLayer=YES;
-        effect.layer.cornerRadius=8; effect.layer.masksToBounds=YES;
-        [effect addSubview:titlebar.row]; glass=effect;
+        effect.layer.cornerRadius=12; effect.layer.masksToBounds=YES; glass=effect;
     }
-    glass.identifier=@"NativeStreamTitlebarGlass"; [root addSubview:glass];
+    glass.identifier=@"NativeStreamTitlebarGlass"; [titlebar.background addSubview:glass];
     titlebar.overflow=[MLStreamToolbarButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"ellipsis" accessibilityDescription:@"More Stream Controls"] target:titlebar action:@selector(showOverflow:)];
     titlebar.overflow.bordered=NO; titlebar.overflow.identifier=@"NativeOverflow";
     titlebar.overflow.toolTip=@"More Stream Controls"; [titlebar.overflow setAccessibilityLabel:titlebar.overflow.toolTip];

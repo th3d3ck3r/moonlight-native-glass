@@ -18,3 +18,7 @@ static NSButton* titlebarButton(NSWindow* window, NSString* identifier) {
     NSView* view=titlebarFindView(titlebarRoot(window),identifier);
     return [view isKindOfClass:NSButton.class] ? (NSButton*)view : nil;
 }
+
+static NSView* titlebarBackground(NSWindow* window) {
+    return titlebarFindView(window.contentView.superview,@"NativeStreamTitlebarBackground");
+}

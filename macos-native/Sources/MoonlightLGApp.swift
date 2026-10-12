@@ -170,7 +170,7 @@ private struct NativeStatusActions: View {
                           range: (credits.string as NSString).range(of: "GitHub Repository"))
     NSApp.orderFrontStandardAboutPanel(options: [
         .applicationName: "MoonlightLG",
-        .applicationVersion: "\(MoonlightLGVersion.current.display) · Moonlight Qt \(engineVersion)",
+        .applicationVersion: MoonlightLGVersion.current.display,
         .version: "",
         .credits: credits])
     NSApp.keyWindow?.setAccessibilityIdentifier("native-about")

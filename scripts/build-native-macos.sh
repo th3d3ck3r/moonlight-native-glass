@@ -50,12 +50,16 @@ ditto "$engine_app" "$app/Contents/Helpers/MoonlightLGEngine.app"
 # The active streaming process has its own Dock icon. Update the nested bundle
 # before signing, without changing its executable, identity or permissions.
 cp macos-native/Resources/moonlight.icns "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Resources/moonlight.icns"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.moonlight-stream.NativeGlass.Engine' "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleName MoonlightLG Engine' "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName MoonlightLG Engine' "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Info.plist"
-# The frontend owns the sole application Dock icon. Set this before signing so
-# neither helper briefly registers a second icon before its activation setup.
-/usr/libexec/PlistBuddy -c 'Add :LSUIElement bool true' "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Info.plist"
+/usr/bin/python3 - "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Info.plist" <<'PLIST'
+import pathlib, plistlib, sys
+path = pathlib.Path(sys.argv[1])
+info = plistlib.loads(path.read_bytes())
+info.update(CFBundleIdentifier="com.moonlight-stream.NativeGlass.Engine",
+            CFBundleName="MoonlightLG Engine", CFBundleDisplayName="MoonlightLG Engine",
+            NSLocalNetworkUsageDescription="MoonlightLG connects to computers on your local network for game streaming.",
+            LSUIElement=True)
+path.write_bytes(plistlib.dumps(info, sort_keys=False))
+PLIST
 
 # Ad-hoc signatures make all nested code verifiable and retain one bundle
 # identity. This is not Developer ID signing or notarization. Verify all code;

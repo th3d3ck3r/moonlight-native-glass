@@ -50,7 +50,7 @@ import XCTest
                 let name = window.staticTexts["startup-project-name"]
                 let icon = window.images["startup-project-icon"]
                 XCTAssertTrue(name.waitForExistence(timeout: 5))
-                XCTAssertEqual(name.label, "MoonlightLG")
+                XCTAssertEqual(name.value as? String ?? name.label, "MoonlightLG")
                 XCTAssertTrue(icon.exists)
                 XCTAssertGreaterThan(name.frame.minY, icon.frame.maxY, "Project name must sit beneath the icon")
                 XCTAssertEqual(name.frame.midX, icon.frame.midX, accuracy: 1.5)
@@ -179,11 +179,11 @@ import XCTest
         let app = XCUIApplication()
         app.launchArguments = ["--design-preview", "--preview-screen=about", "--dark"]
         app.launch()
-        let about = app.windows["native-about"]
+        let about = app.descendants(matching: .any)["native-about"].firstMatch
         XCTAssertTrue(about.waitForExistence(timeout: 10))
-        XCTAssertTrue(about.staticTexts["MoonlightLG"].exists)
-        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.0.00U")).firstMatch.exists)
-        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Moonlight Qt 6.2.0")).firstMatch.exists)
+        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", "MoonlightLG", "MoonlightLG")).firstMatch.exists)
+        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "1.0.00U", "1.0.00U")).firstMatch.exists)
+        XCTAssertTrue(about.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Moonlight Qt 6.2.0")).firstMatch.exists)
         let shot = XCTAttachment(screenshot: about.screenshot())
         shot.name = "moonlightlg-about-version"; shot.lifetime = .keepAlways; add(shot)
         app.terminate()

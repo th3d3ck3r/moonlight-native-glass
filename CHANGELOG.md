@@ -13,7 +13,9 @@ remains `th3d3ck3r/moonlight-native-glass`.
   E for experimental and no suffix for stable. Packages and About share metadata.
 - Migrate the existing engine-log folder to MoonlightLG safely. Existing settings,
   bundle IDs, host pairing and permission identities are retained.
-- Carry forward the slim rounded stream title row, line-graph icon, stream-owned
+- Extend rounding across the full thin title bar, including the traffic-light side,
+  with a decorative background that passes mouse input through.
+- Carry forward the slim stream title row, line-graph icon, stream-owned
   disconnect sheet, input fixes and safe shutdown from Previews 25–27.
 
 Build/validation links will be added after the complete runs finish. Older preview

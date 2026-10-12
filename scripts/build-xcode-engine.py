@@ -137,7 +137,8 @@ def main():
     info_path = helper / "Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
     info.update(CFBundleIdentifier="com.moonlight-stream.NativeGlass.Engine",
-                CFBundleDisplayName="MoonlightLG Engine", CFBundleName="MoonlightLG Engine", LSUIElement=True)
+                CFBundleDisplayName="MoonlightLG Engine", CFBundleName="MoonlightLG Engine",
+                NSLocalNetworkUsageDescription="MoonlightLG connects to computers on your local network for game streaming.", LSUIElement=True)
     info_path.write_bytes(plistlib.dumps(info, sort_keys=False))
     shutil.copy2(ROOT / "macos-native/Resources/moonlight.icns",
                  helper / "Contents/Resources/moonlight.icns")

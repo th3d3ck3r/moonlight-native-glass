@@ -282,7 +282,7 @@ int main(int argc, char** argv) {
         check(pressed && released,"Accessory stream must still receive SDL keyboard input");
         check(SDL_SetWindowFullscreen(window,SDL_WINDOW_FULLSCREEN_DESKTOP)==0,"Accessory fullscreen entry"); pump(1.0);
         check(NSApp.activationPolicy==NSApplicationActivationPolicyAccessory,"Fullscreen must not promote engine to Dock");
-        check(cocoa(window).toolbar==nil && !titlebarRoot(cocoa(window)),"Borderless fullscreen must not show native title-bar controls");
+        check(cocoa(window).toolbar==nil && !titlebarRoot(cocoa(window)) && !titlebarBackground(cocoa(window)),"Borderless fullscreen must not show native title-bar controls");
         check(SDL_SetWindowFullscreen(window,0)==0,"Accessory fullscreen exit"); pump(1.0);
         nativeWindow=cocoa(window);
         // Keep the title toolbar and customizable overlays in an accessory app.

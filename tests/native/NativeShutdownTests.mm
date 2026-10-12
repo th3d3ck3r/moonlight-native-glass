@@ -91,7 +91,7 @@ int main() { @autoreleasepool {
     check(ran,"Fixture must actually drain deferred main-queue callbacks");
     fprintf(stderr,"AFTER STOP: focus=%p flags=0x%x configured=%d\n",(void*)SDL_GetKeyboardFocus(),SDL_GetWindowFlags(window),nativeOverlayConfigured());
     check(!nativeOverlayConfigured(),"Deferred focus callback reattached native controls after stream teardown");
-    check(cocoa(window).toolbar==nil && !titlebarRoot(cocoa(window)),"Shutdown must leave no orphan native toolbar");
+    check(cocoa(window).toolbar==nil && !titlebarRoot(cocoa(window)) && !titlebarBackground(cocoa(window)),"Shutdown must leave no orphan native toolbar");
     SDL_DestroyWindow(window); SDL_QuitSubSystem(SDL_INIT_VIDEO); drain(false);
     stopNativeStreamWindow(); SDL_Quit();
     puts("PASS: deferred native focus attachment cannot outlive shutdown");
