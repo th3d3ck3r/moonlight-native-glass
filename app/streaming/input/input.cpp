@@ -318,6 +318,10 @@ void SdlInputHandler::notifyFocusLost()
 void SdlInputHandler::notifyFocusGained()
 {
 #ifdef Q_OS_MACOS
+    if (m_NativeControlsVisible && !m_NativeMenuInputSuspended && SDL_GetKeyboardFocus() == m_Window) {
+        nativeOverlayBeginControlsInput(m_Window);
+        return;
+    }
     if (nativeOverlayConfigured() && SDL_GetKeyboardFocus() == m_Window &&
         m_NativeCaptureBeforeFocusLoss && !m_NativeControlsVisible && !m_NativeMenuInputSuspended) {
         // Returning from the frontend's menu must restore both mouse focus and

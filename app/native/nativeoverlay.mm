@@ -320,12 +320,16 @@ void nativeOverlayDetach() {
 bool nativeOverlayControlsVisible() { return controller.showingControls; }
 void nativeOverlaySetControlsVisible(bool visible) { controller.showingControls=visible; [controller refresh]; }
 void nativeOverlayBeginControlsInput(SDL_Window* window) {
-    if (!window || controlsWindow) return;
-    controlsWindow=window; controlsWindowID=SDL_GetWindowID(window);
-    previousMouseGrab=SDL_GetWindowMouseGrab(window);
-    previousCursor=SDL_ShowCursor(SDL_QUERY);
-    const SDL_Rect* rect=SDL_GetWindowMouseRect(window);
-    hadMouseRect=rect!=nullptr; if (rect) previousMouseRect=*rect;
+    if (!window || (controlsWindow && controlsWindow != window)) return;
+    if (!controlsWindow) {
+        controlsWindow=window; controlsWindowID=SDL_GetWindowID(window);
+        previousMouseGrab=SDL_GetWindowMouseGrab(window);
+        previousCursor=SDL_ShowCursor(SDL_QUERY);
+        const SDL_Rect* rect=SDL_GetWindowMouseRect(window);
+        hadMouseRect=rect!=nullptr; if (rect) previousMouseRect=*rect;
+    }
+    // Resize/display/focus updates can replace SDL's constraints while controls
+    // stay open. Reassert local ownership without overwriting the saved state.
     // Capture has already been released by the input handler. Confine the
     // visible local cursor to the whole stream, including its control panel.
     SDL_SetWindowMouseRect(window,nullptr);

@@ -3,6 +3,9 @@
 #include <Limelight.h>
 #include "SDL_compat.h"
 #include "streaming/streamutils.h"
+#ifdef Q_OS_MACOS
+#include "native/nativeoverlay.h"
+#endif
 
 void SdlInputHandler::notifyMouseLeave()
 {
@@ -289,6 +292,14 @@ bool SdlInputHandler::isMouseInVideoRegion(int mouseX, int mouseY, int windowWid
 
 void SdlInputHandler::updatePointerRegionLock()
 {
+#ifdef Q_OS_MACOS
+    // Session calls this after resize, decoder reset and display changes. The
+    // released host capture must not remove Control Center's local confinement.
+    if (m_NativeControlsVisible && !m_NativeMenuInputSuspended) {
+        nativeOverlayBeginControlsInput(m_Window);
+        return;
+    }
+#endif
     // Pointer region lock is irrelevant in relative mouse mode
     if (SDL_GetRelativeMouseMode()) {
         return;

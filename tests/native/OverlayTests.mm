@@ -29,7 +29,9 @@ static void checkCrimson(NSWindow* panel, bool enabled) {
     check([tint hitTest:NSMakePoint(10,10)]==nil,"Tint must never intercept mouse input");
     if (enabled) {
         NSColor* color=[[NSColor colorWithCGColor:tint.layer.backgroundColor] colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
-        check(color.redComponent>color.greenComponent+0.1,"Overlay fill must visibly carry the crimson palette");
+        const bool reduce=[NSWorkspace sharedWorkspace].accessibilityDisplayShouldReduceTransparency;
+        check(color.redComponent>color.greenComponent+(reduce ? 0.015 : 0.1),"Overlay fill must carry the crimson palette in translucent and opaque accessibility modes");
+        check(!reduce || color.alphaComponent==1,"Reduce Transparency must use an opaque overlay fill");
     }
 }
 static bool takeAction(int code) {

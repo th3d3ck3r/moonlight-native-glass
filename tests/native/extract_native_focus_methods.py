@@ -5,18 +5,23 @@ these lifecycle decisions can be exercised without an active streaming host.
 """
 import pathlib
 
-source = pathlib.Path("app/streaming/input/input.cpp").read_text()
-methods = []
-for name in ("notifyFocusLost", "notifyFocusGained", "handleNativeOverlayAction", "nativeMenuCaptureIntent"):
-    source = pathlib.Path("app/streaming/input/keyboard.cpp" if name == "handleNativeOverlayAction" else "app/streaming/input/input.cpp").read_text()
-    start = source.index(("bool" if name == "nativeMenuCaptureIntent" else "void") + " SdlInputHandler::" + name + "(")
+def method(path, signature):
+    source = pathlib.Path(path).read_text()
+    start = source.index(signature)
     body = source.index("{", start)
     depth = 1
     end = body + 1
     while depth:
         depth += (source[end] == "{") - (source[end] == "}")
         end += 1
-    methods.append(source[start:end])
+    return source[start:end]
+
+methods = []
+for name in ("notifyFocusLost", "notifyFocusGained", "handleNativeOverlayAction", "nativeMenuCaptureIntent", "isCaptureActive", "setCaptureActive", "updatePointerRegionLock"):
+    filename = "keyboard.cpp" if name == "handleNativeOverlayAction" else "mouse.cpp" if name == "updatePointerRegionLock" else "input.cpp"
+    returns = "bool" if name in ("nativeMenuCaptureIntent", "isCaptureActive") else "void"
+    methods.append(method("app/streaming/input/" + filename, returns + " SdlInputHandler::" + name + "("))
+methods.insert(0, method("app/streaming/streamutils.cpp", "void StreamUtils::scaleSourceToDestinationSurface("))
 pathlib.Path("build").mkdir(exist_ok=True)
 pathlib.Path("build/NativeFocusMethods.inc").write_text("\n\n".join(methods))
 

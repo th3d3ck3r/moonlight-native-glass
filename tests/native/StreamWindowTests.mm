@@ -8,6 +8,7 @@
 #include <cstring>
 #include "nativeapplication.h"
 #include "nativeoverlay.h"
+#include "nativetitlebar.h"
 
 // Test-only observation of the confinement property already used internally
 // by SDL's Cocoa backend; it is absent from AppKit's public headers.
@@ -58,6 +59,7 @@ struct FixtureOverlays { void setOverlayState(int, bool) {} };
 struct Session { static Session* get() { static Session value; return &value; } FixtureOverlays& getOverlayManager() { return overlays; } FixtureOverlays overlays; };
 static constexpr int BUTTON_LEFT=1,BUTTON_MIDDLE=2,BUTTON_RIGHT=3,BUTTON_X1=4,BUTTON_X2=5,BUTTON_ACTION_RELEASE=0;
 static void LiSendMouseButtonEvent(int,int) {}
+class StreamUtils { public: static void scaleSourceToDestinationSurface(SDL_Rect*, SDL_Rect*); };
 class SdlInputHandler {
 public:
     explicit SdlInputHandler(SDL_Window* window) : m_Window(window) {}
@@ -74,11 +76,17 @@ public:
     void performSpecialKeyCombo(KeyCombo) { check(false,"Native disconnect must not request stock process quit"); }
     void handleNativeOverlayAction(int action);
     bool nativeMenuCaptureIntent();
-    bool isCaptureActive() { return SDL_GetRelativeMouseMode(); }
-    void setCaptureActive(bool active) {
-        check(SDL_SetRelativeMouseMode(active ? SDL_TRUE : SDL_FALSE) == 0, "Fixture capture failed");
-        m_NativeCaptureBeforeFocusLoss = false;
-    }
+    bool m_FakeMouseCaptureActive = false;
+    int m_MouseCursorCapturedVisibilityState = SDL_DISABLE;
+    bool m_PointerRegionLockToggledByUser = false;
+    bool m_PointerRegionLockActive = false;
+    int m_StreamWidth = 1920, m_StreamHeight = 1080;
+    bool isCaptureActive();
+    void setCaptureActive(bool active);
+    void updatePointerRegionLock();
+    void updateKeyboardGrabState() {} // No system-key preferences in this fixture.
+    bool isMouseInVideoRegion(int, int) { return false; } // No remote host cursor sync.
+    void handleMouseMotionEvent(SDL_MouseMotionEvent*) {}
     void raiseAllKeys() {}
     void notifyFocusLost();
     void notifyFocusGained();
@@ -330,8 +338,41 @@ int main(int argc, char** argv) {
             check(SDL_ShowCursor(SDL_QUERY)==SDL_ENABLE && SDL_GetWindowMouseGrab(window),"Controls pointer must be visible and confined in every window mode");
             check(!NSIsEmptyRect(cocoa(window).mouseConfinementRect),"Cocoa must actually confine the controls pointer, not only report SDL grab enabled");
             check(SDL_GetKeyboardFocus()==window,"Controls must preserve SDL keyboard focus");
+            // Run the production capture/region decisions while controls own
+            // the local pointer. Repeat calls must repair SDL state and preserve
+            // the original state restored by EndControlsInput.
+            SdlInputHandler controlsInput(window);
+            controlsInput.m_NativeControlsVisible = true;
+            controlsInput.updatePointerRegionLock();
+            controlsInput.setCaptureActive(true);
+            check(!controlsInput.isCaptureActive(),"Deferred decoder capture must not hide the controls cursor");
+            SDL_SetWindowMouseGrab(window,SDL_FALSE); SDL_ShowCursor(SDL_DISABLE);
+            controlsInput.updatePointerRegionLock(); pump();
+            check(SDL_ShowCursor(SDL_QUERY)==SDL_ENABLE && SDL_GetWindowMouseGrab(window),"Production resize/display updates must repair controls visibility and confinement");
+            check(!NSIsEmptyRect(cocoa(window).mouseConfinementRect),"Production region update must retain actual Cocoa confinement");
+            SDL_SetWindowMouseGrab(window,SDL_FALSE); SDL_ShowCursor(SDL_DISABLE);
+            controlsInput.notifyFocusGained(); pump();
+            check(SDL_ShowCursor(SDL_QUERY)==SDL_ENABLE && SDL_GetWindowMouseGrab(window),"Returning focus must restore the local controls cursor");
+            controlsInput.setCaptureActive(false); pump();
+            check(SDL_ShowCursor(SDL_QUERY)==SDL_ENABLE && SDL_GetWindowMouseGrab(window),"Repeated release must retain controls cursor ownership");
+            controlsInput.m_NativeControlsVisible = false;
             nativeOverlaySetControlsVisible(false); nativeOverlayEndControlsInput();
             check(!SDL_GetWindowMouseGrab(window) && SDL_ShowCursor(SDL_QUERY)==SDL_DISABLE,"Controls dismissal must restore the prior pointer state");
+            for (bool absolute : {false,true}) for (bool captured : {false,true}) {
+                SdlInputHandler cycle(window);
+                cycle.m_AbsoluteMouseMode = absolute;
+                cycle.setCaptureActive(captured);
+                for (int repeat=0; repeat<2; ++repeat) {
+                    cycle.handleNativeOverlayAction(100); pump();
+                    check(!cycle.isCaptureActive() && SDL_ShowCursor(SDL_QUERY)==SDL_ENABLE,"Production Control Center open must release host input and show the local cursor");
+                    cycle.updatePointerRegionLock(); cycle.notifyFocusGained();
+                    check(SDL_GetWindowMouseGrab(window) && !NSIsEmptyRect(cocoa(window).mouseConfinementRect),"Production Control Center must retain confinement in relative and absolute modes");
+                    cycle.handleNativeOverlayAction(101); pump();
+                    check(cycle.isCaptureActive()==captured && !cycle.m_NativeControlsVisible,"Production Done must preserve the prior captured or released intent across repeated cycles");
+                    check(!captured || SDL_GetMouseFocus()==window,"Production Done must restore actual mouse focus when recapturing");
+                }
+                cycle.setCaptureActive(false);
+            }
             // Reproduce a native panel/menu leaving SDL's mouse focus outside
             // the parent stream. Use the production focus restoration helper,
             // not just SDL's relative-mode boolean (which can mask this bug).
