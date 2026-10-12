@@ -126,6 +126,8 @@ Closing the red button in a windowed stream also hides that window. Use the menu
 
 Report problems through [GitHub Issues](https://github.com/th3d3ck3r/moonlight-native-glass/issues) with your macOS version, Intel/Apple Silicon model, host software/version, window mode, reproduction steps and relevant logs. **Open Engine Logs** is available in the app menu. See the [Build 24 audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/NATIVE_APP_AUDIT_PREVIEW_24.md) for fixes, validation evidence and physical acceptance steps.
 
+**Follow-up test build 27:** A native line graph replaces the statistics bars. The stream controls now share a slim, rounded title row, with a measured 32-point window chrome height and a native overflow menu for narrow windows. Fullscreen modes hide the row. [Build 27 audit](docs/NATIVE_APP_AUDIT_PREVIEW_27.md) · [Intel test package](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38271677015/artifacts/11757816102).
+
 ## 🛠️ Build
 
 The [`native-glass-experimental-24` tag](https://github.com/th3d3ck3r/moonlight-native-glass/tree/native-glass-experimental-24) contains the frozen Experimental 24 source. [`feature/native-boot-animation`](https://github.com/th3d3ck3r/moonlight-native-glass/tree/feature/native-boot-animation) contains ongoing fixes after that snapshot. [`native-ui`](https://github.com/th3d3ck3r/moonlight-native-glass/tree/native-ui) retains the earlier native UI development line. `master` retains the stock Moonlight Qt 6.2.0 application sources; its README presents this project.
