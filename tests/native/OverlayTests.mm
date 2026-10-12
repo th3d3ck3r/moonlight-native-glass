@@ -67,6 +67,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     CGFloat stockChrome=window.frame.size.height-window.contentLayoutRect.size.height;
     BOOL originalTransparency=window.titlebarAppearsTransparent;
     NSColor* originalBackground=window.backgroundColor;
+    NSTitlebarSeparatorStyle originalSeparator=window.titlebarSeparatorStyle;
     nativeOverlayAttach(window,"overlay-test"); check(nativeOverlayEventType()!=SDL_USEREVENT,"Must not consume upstream SDL user events");
     pump();
     check(titlebarRoot(window)!=nil && window.toolbar==nil && window.titleVisibility==NSWindowTitleHidden,"Slim native title row installed without a tall toolbar");
@@ -74,7 +75,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     fprintf(stderr,"Titlebar chrome: original=%.1f slim=%.1f points\n",stockChrome,slimChrome);
     check(slimChrome<=32 && slimChrome<=stockChrome+1,"Slim controls must stay in the original title row and preserve drawable geometry");
     NSView* backdrop=titlebarBackground(window);
-    check(backdrop && backdrop.frame.size.width==window.frame.size.width && backdrop.frame.size.height==slimChrome,"Rounded surface must span the full bar, including traffic lights");
+    check(window.titlebarSeparatorStyle==NSTitlebarSeparatorStyleNone && backdrop && backdrop.frame.size.width==window.frame.size.width && backdrop.frame.size.height==slimChrome,"Rounded surface must span the full bar, including traffic lights");
     check([backdrop hitTest:NSMakePoint(10,10)]==nil,"Decorative rounded background must pass all mouse input through");
     check(titlebarButton(window,@"NativeHost") && titlebarButton(window,@"NativeCapture") && titlebarButton(window,@"NativeStatistics") && titlebarButton(window,@"NativeConnection"),"Required title-bar controls");
     check(!titlebarButton(window,@"NativeControllerBattery"),"Controller indicator hidden when none connected");
@@ -199,7 +200,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     for (NSWindow* panel in window.childWindows) check(NSContainsRect(bounds,panel.frame),"Every panel must fit after controls shrink with all actions selected");
     controls=nil; for (NSWindow* panel in window.childWindows) if (!panel.ignoresMouseEvents) controls=panel;
     check(buttonWithTag(controls.contentView,12)!=nil,"Disconnect must remain directly visible in compact controls");
-    nativeOverlayDetach(); check(window.toolbar==nil && !titlebarRoot(window) && window.titleVisibility==NSWindowTitleVisible && window.titlebarAppearsTransparent==originalTransparency && !titlebarBackground(window) && [window.backgroundColor isEqual:originalBackground],"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
+    nativeOverlayDetach(); check(window.toolbar==nil && !titlebarRoot(window) && window.titleVisibility==NSWindowTitleVisible && window.titlebarAppearsTransparent==originalTransparency && !titlebarBackground(window) && [window.backgroundColor isEqual:originalBackground] && window.titlebarSeparatorStyle==originalSeparator,"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
     nativeOverlayAttach(window,"next-session"); check(nativeOverlayConfigured(),"Repeated session attachment"); nativeOverlayDetach();
     if (previous) [defaults setPersistentDomain:previous forName:@"com.moonlight-stream.NativeGlass.Overlay"]; else [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [previous release]; [defaults synchronize];
     SDL_DestroyWindow(stream); SDL_Quit(); puts("Native overlay state, all shortcuts, layout, focus, teardown and preview checks passed"); return 0;

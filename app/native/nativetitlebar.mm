@@ -75,6 +75,7 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic, assign) NSWindowTitleVisibility previousTitleVisibility;
 @property(nonatomic, assign) NSWindowToolbarStyle previousToolbarStyle;
 @property(nonatomic, assign) BOOL previousTransparency;
+@property(nonatomic, assign) NSTitlebarSeparatorStyle previousSeparator;
 @property(nonatomic, retain) NSColor* previousBackgroundColor;
 @property(nonatomic, retain) NSView* background;
 @property(nonatomic, retain) NSTitlebarAccessoryViewController* accessory;
@@ -163,6 +164,7 @@ static MLStreamTitlebar* titlebar;
     [self.background removeFromSuperview];
     if (self.window && self.presentationInstalled) self.window.backgroundColor=self.previousBackgroundColor;
     if (!self.window || !self.accessory || !(self.window.styleMask & NSWindowStyleMaskTitled)) return;
+    if (self.presentationInstalled) self.window.titlebarSeparatorStyle=self.previousSeparator;
     NSUInteger index=[self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory];
     if (index!=NSNotFound) [self.window removeTitlebarAccessoryViewControllerAtIndex:index];
 }
@@ -182,6 +184,7 @@ static MLStreamTitlebar* titlebar;
         self.presentationInstalled=YES;
         self.window.titleVisibility=NSWindowTitleHidden;
         self.window.titlebarAppearsTransparent=YES;
+        self.window.titlebarSeparatorStyle=NSTitlebarSeparatorStyleNone;
         // Draw one rounded surface across the full title area, underneath all
         // native controls. The SDL content view/frame and window style stay intact.
         self.window.backgroundColor=NSColor.blackColor;
@@ -384,6 +387,7 @@ void nativeTitlebarAttach(void* window) {
     nativeTitlebarDetach();
     titlebar=[[MLStreamTitlebar alloc] init]; titlebar.window=(NSWindow*)window;
     titlebar.previousToolbar=titlebar.window.toolbar; titlebar.previousTitleVisibility=titlebar.window.titleVisibility; titlebar.previousToolbarStyle=titlebar.window.toolbarStyle; titlebar.previousTransparency=titlebar.window.titlebarAppearsTransparent; titlebar.previousBackgroundColor=titlebar.window.backgroundColor;
+    titlebar.previousSeparator=(titlebar.window.styleMask & NSWindowStyleMaskTitled) ? titlebar.window.titlebarSeparatorStyle : NSTitlebarSeparatorStyleAutomatic;
     titlebar.toolbar=[[[NSToolbar alloc] initWithIdentifier:@"NativeStreamToolbar"] autorelease];
     titlebar.toolbar.delegate=titlebar; titlebar.toolbar.displayMode=NSToolbarDisplayModeIconOnly;
     titlebar.toolbar.allowsUserCustomization=NO; titlebar.toolbar.autosavesConfiguration=NO;
