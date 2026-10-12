@@ -2065,6 +2065,13 @@ void Session::exec()
             else if (action == 207) {
                 nativeUserMuted = !nativeUserMuted;
                 m_AudioMuted = nativeUserMuted || (m_Preferences->muteOnFocusLoss && !(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS));
+            } else if (action == 216) {
+                nativeRestoreStreamWindow(SDL_GetWindowID(m_Window));
+                m_InputHandler->handleNativeOverlayAction(213);
+                if (!nativeConfirmDisconnectAndExit(m_Window)) m_InputHandler->handleNativeOverlayAction(214);
+            } else if ((action == 214 || action == 215) && nativeStreamDisconnectConfirmationVisible()) {
+                // Closing the frontend menu must not recapture input behind an
+                // independently owned stream sheet. Its reply restores input.
             } else if (action == 209 || action == 212) {
                 // End this session directly. Do not enqueue a second generic
                 // quit or request process exit before readyForDeletion: the

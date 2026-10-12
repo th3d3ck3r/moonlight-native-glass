@@ -133,16 +133,9 @@ import Combine
         case -6: NSApp.terminate(nil)
         case 200: if state.exists { if state.visible { perform?(200) } else { open?() } }
         case 209:
-            guard state.exists else { return }
-            let token = state.token
-            perform?(213)
-            let alert = NSAlert(); alert.messageText = "Disconnect and exit the host game?"
-            alert.informativeText = "This closes the game on the host computer. Unsaved progress may be lost."
-            alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Disconnect and Exit")
-            let confirmed = alert.runModal() == .alertSecondButtonReturn
-            if state.exists && state.token == token {
-                perform?(confirmed ? 209 : 214)
-            }
+            // The helper owns the stream window. It presents and resolves the
+            // confirmation there; frontend AppKit cannot attach across processes.
+            if state.exists { perform?(216) }
         default: if state.exists { perform?(tag) }
         }
     }

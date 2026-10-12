@@ -30,7 +30,7 @@ static std::atomic<bool> menuReaderStopping(true);
 static bool supportedMenuAction(int action) {
     return action == 100 || action == 200 || action == 201 || action == 202 ||
            action == 203 || action == 207 || action == 208 || action == 209 ||
-           action == 210 || action == 212 || action == 213 || action == 214 || action == 215;
+           action == 210 || action == 212 || action == 213 || action == 214 || action == 215 || action == 216;
 }
 void nativeAcknowledgeMenuAction(int action, Uint32 requestID) {
     if (!requestID) return;
@@ -86,6 +86,8 @@ static bool transitionFullscreen(SDL_Window* window, Uint32 flags)
 @property(nonatomic, assign) BOOL changingVisibility;
 @end
 
+static void cancelDisconnectConfirmation(bool restoreInput);
+
 static bool hideStreamWindow(SDL_Window* window)
 {
     NSWindow* nativeWindow = nativeSDLWindow(window);
@@ -93,6 +95,7 @@ static bool hideStreamWindow(SDL_Window* window)
     MLStreamWindowDelegate* delegate = nativeWindow.delegate;
     if (delegate.changingVisibility) return false;
     if (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) return true;
+    cancelDisconnectConfirmation(true);
     const Uint32 fullscreen = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
     delegate.changingVisibility = YES;
     if (fullscreen) nativeTitlebarSetWindowTransition(true);
@@ -130,6 +133,7 @@ static bool hideStreamWindow(SDL_Window* window)
 }
 - (void)windowWillClose:(NSNotification*)notification
 {
+    cancelDisconnectConfirmation(false);
     nativeOverlayDetach();
     self.windowID = 0;
     sendWindowEvent("windowClosed");
@@ -155,6 +159,7 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 @interface MLStreamWindowAccess : NSObject
 @property(nonatomic, retain) MLStreamWindowDelegate* windowDelegate;
 @property(nonatomic, copy) NSString* token;
+@property(nonatomic, retain) NSAlert* disconnectConfirmation;
 - (void)windowBecameKey:(NSNotification*)notification;
 - (void)restore:(NSNotification*)notification;
 - (void)menuAction:(NSNotification*)notification;
@@ -162,6 +167,38 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 @end
 
 static MLStreamWindowAccess* streamWindowAccess;
+
+bool nativeStreamDisconnectConfirmationVisible() { return streamWindowAccess.disconnectConfirmation != nil; }
+static void cancelDisconnectConfirmation(bool restoreInput) {
+    NSAlert* alert = [streamWindowAccess.disconnectConfirmation retain];
+    if (!alert) return;
+    streamWindowAccess.disconnectConfirmation = nil;
+    if (alert.window.sheetParent) [NSApp endSheet:alert.window returnCode:NSModalResponseAbort];
+    if (restoreInput) nativeOverlayPerformAction(214);
+    [alert release];
+}
+bool nativeConfirmDisconnectAndExit(SDL_Window* window) {
+    NSWindow* parent = nativeSDLWindow(window);
+    if (!parent || !streamWindowAccess || streamWindowAccess.windowDelegate.windowID != SDL_GetWindowID(window) || !parent.visible) return false;
+    if (streamWindowAccess.disconnectConfirmation) return true;
+    MLStreamWindowAccess* owner = streamWindowAccess;
+    const Uint32 windowID = SDL_GetWindowID(window);
+    NSAlert* alert = [[[NSAlert alloc] init] autorelease];
+    alert.messageText = @"Disconnect and exit the host game?";
+    alert.informativeText = @"This closes the game on the host computer. Unsaved progress may be lost.";
+    [alert addButtonWithTitle:@"Cancel"]; [alert addButtonWithTitle:@"Disconnect and Exit"];
+    alert.window.appearance = parent.effectiveAppearance;
+    owner.disconnectConfirmation = alert;
+    [NSApp activateIgnoringOtherApps:YES];
+    [alert beginSheetModalForWindow:parent completionHandler:^(NSModalResponse response) {
+        if (owner.disconnectConfirmation != alert) return;
+        owner.disconnectConfirmation = nil;
+        // A replaced/closed session must never receive this sheet's old reply.
+        if (owner != streamWindowAccess || owner.windowDelegate.windowID != windowID || SDL_GetWindowFromID(windowID) != window) return;
+        nativeOverlayPerformAction(response == NSAlertSecondButtonReturn ? 209 : 214);
+    }];
+    return true;
+}
 
 bool nativeStreamMenuCommandsEnabled() { return streamWindowAccess != nil; }
 
@@ -202,7 +239,7 @@ bool nativeStartStreamMenuCommands(int fd) {
                     if (![actionValue isKindOfClass:NSNumber.class] || ![identifier isKindOfClass:NSNumber.class] ||
                         CFGetTypeID((CFTypeRef)actionValue)==CFBooleanGetTypeID() || CFGetTypeID((CFTypeRef)identifier)==CFBooleanGetTypeID()) continue;
                     const double actionNumber=[actionValue doubleValue], idNumber=[identifier doubleValue];
-                    if (actionNumber < 0 || actionNumber > 215 || actionNumber != int(actionNumber) ||
+                    if (actionNumber < 0 || actionNumber > 216 || actionNumber != int(actionNumber) ||
                         idNumber < 1 || idNumber > UINT32_MAX || idNumber != Uint32(idNumber)) continue;
                     const int action=int(actionNumber);
                     if (!supportedMenuAction(action)) continue;
@@ -290,7 +327,7 @@ bool nativeStartStreamMenuCommands(int fd) {
     SDL_Window* window = SDL_GetWindowFromID(self.windowDelegate.windowID);
     NSWindow* nativeWindow = nativeSDLWindow(window);
     if (nativeWindow.delegate == self.windowDelegate) nativeWindow.delegate = self.windowDelegate.original;
-    [_windowDelegate release]; [_token release]; [super dealloc];
+    [_windowDelegate release]; [_token release]; [_disconnectConfirmation release]; [super dealloc];
 }
 @end
 
@@ -336,6 +373,7 @@ void configureNativeStreamWindow(const char* token)
 }
 void stopNativeStreamWindow()
 {
+    cancelDisconnectConfirmation(false);
     nativeStopStreamMenuCommands();
     if (restoreEventType && restoreEventType != Uint32(-1)) SDL_FlushEvent(restoreEventType);
     nativeOverlayDetach();

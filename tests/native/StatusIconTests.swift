@@ -91,16 +91,9 @@ import Combine
         menu.menuAction(connectedMenu.items.first { $0.title == "Disconnect" }!)
         precondition(actions == [202, 208, 212] && libraries == 1)
         let exitItem = connectedMenu.items.first { $0.tag == 209 }!
-        for (reply, replaceStream) in [(NSApplication.ModalResponse.alertFirstButtonReturn,false),(.alertSecondButtonReturn,false),(.alertSecondButtonReturn,true)] {
-            let before = actions.count
-            DispatchQueue.main.async {
-                if replaceStream { menu.state.token = "replaced-during-confirmation" }
-                NSApp.stopModal(withCode: reply)
-            }
-            menu.menuAction(exitItem)
-            let expected = replaceStream ? [213] : [213, reply == .alertSecondButtonReturn ? 209 : 214]
-            precondition(Array(actions.dropFirst(before)) == expected,"Confirmation must suspend input, restore on Cancel, and exit only the same stream")
-        }
+        let beforeExit = actions.count
+        menu.menuAction(exitItem)
+        precondition(Array(actions.dropFirst(beforeExit)) == [216], "Host-exit confirmation must be delegated to the stream owner, never shown by the frontend")
         menu.state.token = "first-stream"
         precondition(!button.trackingAreas.contains { ($0.owner as AnyObject?) === menu }, "Status item must install no hover tracking")
         precondition(!menu.responds(to: NSSelectorFromString("mouseEnteredWithEvent:")), "Status menu must have no hover handler")

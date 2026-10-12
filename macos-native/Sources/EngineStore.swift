@@ -374,7 +374,7 @@ struct PairingRequest: Identifiable {
             return
         }
         guard streamWindowExists, let token = streamWindowToken, let stream else { return }
-        guard [100, 200, 201, 202, 203, 207, 208, 209, 210, 212, 213, 214, 215].contains(action) else { return }
+        guard [100, 200, 201, 202, 203, 207, 208, 209, 210, 212, 213, 214, 215, 216].contains(action) else { return }
         menuRequestID = menuRequestID == .max ? 1 : menuRequestID + 1
         let id = menuRequestID
         do {

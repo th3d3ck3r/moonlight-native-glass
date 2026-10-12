@@ -14,3 +14,7 @@ bool nativeStreamMenuCommandsEnabled();
 void nativeStopStreamMenuCommands();
 void nativeAcknowledgeMenuAction(int action, Uint32 requestID);
 void nativePublishMenuState(SDL_Window* window, bool captured, bool statistics, bool muted);
+
+// Present the host-exit confirmation in the process that owns the SDL window.
+bool nativeConfirmDisconnectAndExit(SDL_Window* window);
+bool nativeStreamDisconnectConfirmationVisible();

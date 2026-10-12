@@ -172,7 +172,7 @@ int main(int argc, char** argv) {
         }
         int commands[2]; check(pipe(commands)==0,"Create live command pipe");
         check(nativeStartStreamMenuCommands(commands[0]),"Start streaming command reader");
-        for (int action : {100,200,201,202,203,207,208,209,210,212,213,214,215,999}) {
+        for (int action : {100,200,201,202,203,207,208,209,210,212,213,214,215,216,999}) {
             for (bool validToken : {false,true}) {
                 SDL_FlushEvent(nativeOverlayEventType());
                 const Uint32 id=Uint32(1000+action);
@@ -326,6 +326,26 @@ int main(int argc, char** argv) {
             menuInput.handleNativeOverlayAction(214); pump();
             check(menuInput.isCaptureActive(),"Cancel must restore capture in every window mode");
             menuInput.setCaptureActive(false);
+            for (NSModalResponse reply : {NSAlertFirstButtonReturn, NSAlertSecondButtonReturn}) {
+                SDL_FlushEvent(nativeOverlayEventType());
+                nativeOverlayRestoreStreamFocus(window);
+                menuInput.setCaptureActive(true);
+                menuInput.handleNativeOverlayAction(213);
+                check(nativeConfirmDisconnectAndExit(window),"Disconnect confirmation must open for the current stream"); pump();
+                check(nativeStreamDisconnectConfirmationVisible() && cocoa(window).attachedSheet != nil,"Confirmation must attach to the SDL stream window in every mode");
+                NSWindow* sheet = cocoa(window).attachedSheet;
+                check(sheet.sheetParent==cocoa(window),"Disconnect dialog must belong to the stream, not a frontend window");
+                check(nativeConfirmDisconnectAndExit(window) && cocoa(window).attachedSheet==sheet,"Repeated requests must reuse one stream confirmation");
+                check(!menuInput.isCaptureActive(),"Input must stay local while the stream confirmation is open");
+                [NSApp endSheet:sheet returnCode:reply]; pump();
+                check(!nativeStreamDisconnectConfirmationVisible(),"Confirmation lifetime must finish with its sheet");
+                SDL_Event response;
+                check(SDL_PeepEvents(&response,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==1,"Confirmation must enqueue exactly one result on the SDL loop");
+                check(response.user.code==(reply==NSAlertSecondButtonReturn ? 209 : 214),"Cancel must restore input; confirm must retain host-exit intent");
+                menuInput.handleNativeOverlayAction(214); pump();
+                check(menuInput.isCaptureActive(),"Cancel path must restore previous capture after the sheet closes");
+                menuInput.setCaptureActive(false);
+            }
             check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
             nativeOverlayRestoreStreamFocus(window);
             check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Fresh relative capture must work before controls");
@@ -437,8 +457,13 @@ int main(int argc, char** argv) {
         pump();
         int width, height; SDL_GetWindowSize(window, &width, &height);
         check(width == 720 && height == 400, "Delegate forwarding broke SDL resizing");
+        SDL_FlushEvent(nativeOverlayEventType());
+        check(nativeConfirmDisconnectAndExit(window),"Teardown fixture must own an open stream confirmation"); pump();
         SDL_DestroyWindow(window);
         pump();
+        check(!nativeStreamDisconnectConfirmationVisible(),"Stream teardown must release its confirmation");
+        SDL_Event staleConfirmation;
+        check(SDL_PeepEvents(&staleConfirmation,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==0,"Destroying a stream must not queue a stale confirmation into the next session");
         [[NSDistributedNotificationCenter defaultCenter] postNotificationName:restoreName
             object:[NSString stringWithUTF8String:token] userInfo:nil deliverImmediately:YES];
         pump();
