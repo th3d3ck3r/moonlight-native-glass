@@ -157,6 +157,7 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 }
 
 @interface MLStreamWindowAccess : NSObject
+@property(nonatomic, assign) BOOL stopped;
 @property(nonatomic, retain) MLStreamWindowDelegate* windowDelegate;
 @property(nonatomic, copy) NSString* token;
 @property(nonatomic, retain) NSAlert* disconnectConfirmation;
@@ -164,6 +165,7 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 - (void)restore:(NSNotification*)notification;
 - (void)menuAction:(NSNotification*)notification;
 - (void)restoreWindow;
+- (void)invalidate;
 @end
 
 static MLStreamWindowAccess* streamWindowAccess;
@@ -259,10 +261,12 @@ bool nativeStartStreamMenuCommands(int fd) {
 @implementation MLStreamWindowAccess
 - (void)windowBecameKey:(NSNotification*)notification
 {
+    if (self.stopped || self != streamWindowAccess) return;
     NSWindow* candidate = notification.object;
     // SDL updates its focus during this notification. Resolve after its handler,
     // never intercept a hidden decoder-test window or the Qt selection window.
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.stopped || self != streamWindowAccess) return;
         SDL_Window* window = SDL_GetKeyboardFocus();
         if (!window || nativeSDLWindow(window) != candidate || !(SDL_GetWindowFlags(window) & SDL_WINDOW_SHOWN)) return;
         if (self.windowDelegate.windowID == SDL_GetWindowID(window)) return;
@@ -280,7 +284,7 @@ bool nativeStartStreamMenuCommands(int fd) {
 }
 - (void)restore:(NSNotification*)notification
 {
-    if (![notification.object isEqualToString:self.token]) return;
+    if (self.stopped || self != streamWindowAccess || ![notification.object isEqualToString:self.token]) return;
     if (!self.windowDelegate.windowID || !restoreEventType || restoreEventType == Uint32(-1)) return;
     // Never run SDL's blocking fullscreen animation inside an AppKit/distributed
     // notification callback. Its completion must be able to drain the main loop.
@@ -291,7 +295,7 @@ bool nativeStartStreamMenuCommands(int fd) {
 }
 - (void)menuAction:(NSNotification*)notification
 {
-    if (![notification.object isEqualToString:self.token] || !self.windowDelegate.windowID) return;
+    if (self.stopped || self != streamWindowAccess || ![notification.object isEqualToString:self.token] || !self.windowDelegate.windowID) return;
     NSString* prefix = @"com.moonlight-stream.NativeGlass.menuAction.";
     if (![notification.name hasPrefix:prefix]) return;
     NSString* suffix = [notification.name substringFromIndex:prefix.length];
@@ -301,6 +305,7 @@ bool nativeStartStreamMenuCommands(int fd) {
 }
 - (void)restoreWindow
 {
+    if (self.stopped || self != streamWindowAccess) return;
     SDL_Window* window = SDL_GetWindowFromID(self.windowDelegate.windowID);
     NSWindow* nativeWindow = nativeSDLWindow(window);
     if (!nativeWindow || self.windowDelegate.changingVisibility) return;
@@ -320,13 +325,22 @@ bool nativeStartStreamMenuCommands(int fd) {
     self.windowDelegate.changingVisibility = NO;
     if (restoringFullscreen) nativeTitlebarSetWindowTransition(false);
 }
-- (void)dealloc
+- (void)invalidate
 {
+    if (self.stopped) return;
+    self.stopped = YES;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
-    SDL_Window* window = SDL_GetWindowFromID(self.windowDelegate.windowID);
-    NSWindow* nativeWindow = nativeSDLWindow(window);
-    if (nativeWindow.delegate == self.windowDelegate) nativeWindow.delegate = self.windowDelegate.original;
+    if (self.windowDelegate.windowID) {
+        SDL_Window* window = SDL_GetWindowFromID(self.windowDelegate.windowID);
+        NSWindow* nativeWindow = nativeSDLWindow(window);
+        if (nativeWindow.delegate == self.windowDelegate) nativeWindow.delegate = self.windowDelegate.original;
+    }
+    self.windowDelegate = nil;
+}
+- (void)dealloc
+{
+    [self invalidate];
     [_windowDelegate release]; [_token release]; [_disconnectConfirmation release]; [super dealloc];
 }
 @end
@@ -373,6 +387,8 @@ void configureNativeStreamWindow(const char* token)
 }
 void stopNativeStreamWindow()
 {
+    // Invalidate synchronously: queued focus blocks may retain the old owner.
+    [streamWindowAccess invalidate];
     cancelDisconnectConfirmation(false);
     nativeStopStreamMenuCommands();
     if (restoreEventType && restoreEventType != Uint32(-1)) SDL_FlushEvent(restoreEventType);

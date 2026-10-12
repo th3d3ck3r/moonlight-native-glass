@@ -2420,7 +2420,7 @@ void Session::exec()
 
 DispatchDeferredCleanup:
 #ifdef Q_OS_MACOS
-    nativeStopStreamMenuCommands();
+    if (nativeStreamMenuCommandsEnabled()) stopNativeStreamWindow();
 #endif
     // Switch back to synchronous logging mode
     StreamUtils::exitAsyncLoggingMode();

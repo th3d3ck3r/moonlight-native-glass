@@ -12,6 +12,8 @@ void nativeRestoreStreamWindow(Uint32 windowID);
 bool nativeStartStreamMenuCommands(int fd = 0);
 bool nativeStreamMenuCommandsEnabled();
 void nativeStopStreamMenuCommands();
+// Invalidate window callbacks and detach presentation before SDL teardown.
+void stopNativeStreamWindow();
 void nativeAcknowledgeMenuAction(int action, Uint32 requestID);
 void nativePublishMenuState(SDL_Window* window, bool captured, bool statistics, bool muted);
 
