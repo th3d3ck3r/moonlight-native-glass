@@ -82,3 +82,23 @@ import SwiftUI
     }
 }
 #Preview("MoonlightLG · Crimson Warp arrival frame") { NativeCrimsonWarpFramePreview() }
+
+
+#Preview("Apollo Connection · Flight") {
+    LibraryView(store: apolloPreview(orbit: false), sizesPreviewWindow: false)
+        .frame(width: 960, height: 640).crimsonGlassTheme()
+}
+#Preview("Apollo Connection · Orbit") {
+    LibraryView(store: apolloPreview(orbit: true), sizesPreviewWindow: false)
+        .frame(width: 960, height: 640).crimsonGlassTheme()
+}
+@MainActor private func apolloPreview(orbit: Bool) -> EngineStore {
+    let store = EngineStore(preview: true)
+    if let host = store.computers.first, let game = host.apps.first {
+        var journey = ConnectionJourney(computer: host, game: game)
+        journey.detail = orbit ? "Connected · Awaiting Continue" : "Starting video stream…"
+        if orbit { journey.phase = .connected; journey.connectedAt = Date().addingTimeInterval(-3) }
+        store.connectionJourney = journey
+    }
+    return store
+}

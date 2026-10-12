@@ -5,6 +5,7 @@
 #include "gui/computermodel.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/session.h"
+#include "nativeapplication.h"
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QJsonArray>
@@ -141,7 +142,7 @@ void NativeBridge::readInput() {
     char chunk[4096];
     for (;;) {
         const ssize_t count = read(STDIN_FILENO, chunk, sizeof(chunk));
-        if (count == 0) { beginShutdown(); QCoreApplication::quit(); return; }
+        if (count == 0) { command({{"command", "shutdown"}}); return; }
         if (count < 0) {
             if (errno == EINTR) continue;
             if (errno != EAGAIN && errno != EWOULDBLOCK) { error("Command channel failed."); QCoreApplication::exit(1); }
@@ -187,9 +188,22 @@ NvComputer* NativeBridge::findComputer(QString uuid) {
 void NativeBridge::command(const QJsonObject& request) {
     if (m_Stopping) return;
     const QString action = request["command"].toString();
-    if (action == "shutdown") { beginShutdown(); QCoreApplication::quit(); return; }
+    if (action == "shutdown" || action == "cancelStream") {
+        if (m_StreamMode && m_Streaming && nativeConnectionWaiting() && Session::get()) {
+            // Keep Qt alive while the gated session drains deferred cleanup.
+            // Session owns connection teardown; never exit around its lifetime.
+            m_Input->setEnabled(false);
+            Session::get()->interrupt();
+        } else { beginShutdown(); QCoreApplication::quit(); }
+        return;
+    }
     if (m_StreamMode) {
-        if (action == "confirmQuit" && m_Launcher && !m_Streaming) m_Launcher->quitRunningApp();
+        if (action == "continueStream" && m_Streaming && nativeConnectionWaiting()) {
+            nativeSetConnectionWaiting(false);
+            m_Input->setEnabled(false);
+            send({{"event", "streaming"}});
+        }
+        else if (action == "confirmQuit" && m_Launcher && !m_Streaming) m_Launcher->quitRunningApp();
         else error("This command is unavailable during streaming.");
         return;
     }
@@ -377,12 +391,14 @@ bool NativeBridge::setPreferences(const QJsonObject& values) {
 }
 
 void NativeBridge::startStream(const QStringList& args) {
-    if (args.size() != 8 || args[3].isEmpty() || args[4].isEmpty() || !QRegularExpression("^[0-9A-Fa-f-]{36}$").match(args[7]).hasMatch()) { error("Invalid native stream arguments."); QCoreApplication::exit(1); return; }
+    if ((args.size() != 8 && (args.size() != 9 || args[8] != "await-continue")) || args[3].isEmpty() || args[4].isEmpty() || !QRegularExpression("^[0-9A-Fa-f-]{36}$").match(args[7]).hasMatch()) { error("Invalid native stream arguments."); QCoreApplication::exit(1); return; }
     bool xValid, yValid, appValid;
     const int appId = args[4].toInt(&appValid);
     const int x = args[5].toInt(&xValid), y = args[6].toInt(&yValid);
     if (!xValid || !yValid || !appValid || appId <= 0) { error("Invalid display coordinates."); QCoreApplication::exit(1); return; }
     configureNativeStreamWindow(args[7].toUtf8().constData());
+    m_AwaitContinue = args.size() == 9;
+    nativeSetConnectionWaiting(m_AwaitContinue);
     m_Window.reset(new QQuickWindow());
     QScreen* selectedScreen = QGuiApplication::primaryScreen();
     for (auto screen : QGuiApplication::screens()) {
@@ -402,10 +418,15 @@ void NativeBridge::startStream(const QStringList& args) {
     connect(m_Launcher, &CliStartStream::Launcher::searchingApp, this, [this] { send({{"event", "stage"}, {"message", "Loading game…"}}); });
     connect(m_Launcher, &CliStartStream::Launcher::appQuitRequired, this, [this](QString app) { send({{"event", "quitRequired"}, {"app", app}}); });
     connect(m_Launcher, &CliStartStream::Launcher::sessionCreated, this, [this](QString, Session* session) {
+        session->setProperty("nativeAwaitContinue", m_AwaitContinue);
         connect(session, &Session::stageStarting, this, [this](QString stage) { send({{"event", "stage"}, {"message", "Starting " + stage + "…"}}); });
         connect(session, &Session::stageFailed, this, [this](QString stage, int code, QString ports) { error(QString("Starting %1 failed (error %2). %3").arg(stage).arg(code).arg(ports.isEmpty() ? QString() : "Check these ports: " + ports)); });
         connect(session, &Session::displayLaunchError, this, [this](QString message) { error(message); });
-        connect(session, &Session::connectionStarted, this, [this] { m_Streaming = true; m_Input->setEnabled(false); send({{"event", "streaming"}}); });
+        connect(session, &Session::connectionStarted, this, [this] {
+            m_Streaming = true;
+            if (!m_AwaitContinue) m_Input->setEnabled(false);
+            send({{"event", m_AwaitContinue ? "connected" : "streaming"}});
+        });
         connect(session, &Session::sessionFinished, this, [this](int ports) { send({{"event", "finished"}, {"portTest", ports}}); });
         connect(session, &Session::readyForDeletion, this, [session] { delete session; QCoreApplication::quit(); });
         if (!session->initialize(m_Window.get())) {

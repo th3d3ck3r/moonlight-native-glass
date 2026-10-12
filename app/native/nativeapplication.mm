@@ -25,6 +25,10 @@ void configureNativeBackgroundApplication()
 
 // This reader never calls AppKit window APIs. It only validates framed commands
 // and queues SDL events; the live Session owns every action on its main thread.
+static bool connectionWaiting = false;
+void nativeSetConnectionWaiting(bool waiting) { connectionWaiting = waiting; }
+bool nativeConnectionWaiting() { return connectionWaiting; }
+
 static std::thread menuReader;
 static std::atomic<bool> menuReaderStopping(true);
 static bool supportedMenuAction(int action) {
@@ -371,6 +375,7 @@ void nativePublishMenuState(SDL_Window* window, bool captured, bool statistics, 
 void configureNativeStreamWindow(const char* token)
 {
     configureNativeBackgroundApplication();
+    connectionWaiting = false;
     lastMenuState.clear();
     nativeTitlebarSetCapture(false);
     nativeTitlebarSetStatistics(false);
@@ -388,6 +393,7 @@ void configureNativeStreamWindow(const char* token)
 }
 void stopNativeStreamWindow()
 {
+    connectionWaiting = false;
     // Invalidate synchronously: queued focus blocks may retain the old owner.
     [streamWindowAccess invalidate];
     cancelDisconnectConfirmation(false);

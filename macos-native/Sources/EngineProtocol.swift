@@ -93,9 +93,9 @@ struct MoonlightLGVersion {
     }
     var display: String { "\(major).\(minor)." + String(format: "%02d", patch) + (channel == "stable" ? "" : channel) }
     static var current: MoonlightLGVersion {
-        MoonlightLGVersion(numeric: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.00",
+        MoonlightLGVersion(numeric: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.1.00",
                            channel: Bundle.main.object(forInfoDictionaryKey: "MoonlightLGReleaseChannel") as? String ?? "U")
-            ?? MoonlightLGVersion(numeric: "1.0.00", channel: "U")!
+            ?? MoonlightLGVersion(numeric: "1.1.00", channel: "U")!
     }
 }
 
@@ -111,4 +111,18 @@ func nativeEngineLogDirectory(home: URL = FileManager.default.homeDirectoryForCu
         }
     }
     return current
+}
+
+
+// One launch identity owns flight, rendezvous and handoff. It is never inferred
+// from UI timers: only real helper events can mark the connection ready.
+struct ConnectionJourney: Identifiable {
+    enum Phase: Equatable { case connecting, connected, entering, failed }
+    let id = UUID()
+    let computer: Computer
+    let game: Game
+    var phase: Phase = .connecting
+    var detail: String = "Preparing stream…"
+    var connectedAt: Date?
+    var error: String?
 }

@@ -44,6 +44,7 @@
 #include <QImage>
 #include <QGuiApplication>
 #include <QCursor>
+#include <QTimer>
 #include <QScreen>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -1791,6 +1792,10 @@ void Session::start()
     // NB: m_InputHandler must be initialize before starting the connection.
     m_InputHandler = new SdlInputHandler(*m_Preferences, m_StreamConfig.width, m_StreamConfig.height);
 
+#ifdef Q_OS_MACOS
+    // Native rendezvous is presentation-only: audio stays silent until entry.
+    if (property("nativeAwaitContinue").toBool()) m_AudioMuted = true;
+#endif
     // Kick off the async connection thread then return to the caller to pump the event loop
     auto thread = new AsyncConnectionStartThread(this);
     QObject::connect(thread, &QThread::finished, this, &Session::exec);
@@ -1812,6 +1817,30 @@ void Session::interrupt()
 
 void Session::exec()
 {
+#ifdef Q_OS_MACOS
+    // Hold BEFORE SDL window/fullscreen/input creation. Qt keeps serving the
+    // private Continue/Cancel pipe, while the stock connection stays live.
+    // A host disconnect/cancel must drain ordinary deferred cleanup even when
+    // the user never chooses Continue. No decoder or transport logic changes.
+    if (m_AsyncConnectionSuccess && property("nativeAwaitContinue").toBool()) {
+        SDL_Event quit = {};
+        if (SDL_PeepEvents(&quit, 1, SDL_GETEVENT, SDL_QUIT, SDL_QUIT) > 0 || m_ShouldExit) {
+            m_AsyncConnectionSuccess = false;
+            m_Preferences->quitAppAfter = false;
+        } else if (nativeConnectionWaiting()) {
+            QTimer::singleShot(50, this, &Session::exec);
+            return;
+        } else {
+            setProperty("nativeAwaitContinue", false);
+            m_AudioMuted = false;
+            // User input generated in the orbit screen must not arrive later
+            // as stale remote presses. Preserve device/lifecycle/quit events.
+            SDL_FlushEvents(SDL_KEYDOWN, SDL_MOUSEWHEEL);
+            SDL_FlushEvents(SDL_CONTROLLERAXISMOTION, SDL_CONTROLLERBUTTONUP);
+            SDL_FlushEvents(SDL_FINGERDOWN, SDL_FINGERMOTION);
+        }
+    }
+#endif
     // If the connection failed, clean up and abort the connection.
     if (!m_AsyncConnectionSuccess) {
         delete m_InputHandler;

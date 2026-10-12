@@ -1,5 +1,17 @@
 # MoonlightLG changelog
 
+## 1.1.00U — unreleased — 2026-10-12
+
+- Add a procedural Apollo spacecraft connection scene, flight through space,
+  a full-moon rendezvous and continuing orbit until Continue to Stream.
+- Show actual connection stages, host/game, warnings, errors and Cancel/Retry at
+  the bottom. Respect Reduce Motion; no video or new bitmap asset is added.
+- Hold stream window/fullscreen/input creation and silence stream audio until
+  Continue. Preserve ordinary Qt launches and deferred connection cleanup.
+- Keep U download links owner-only. Internal build 29.
+
+Validation will be recorded after the complete runs finish.
+
 ## 1.0.00U — unreleased — 2026-10-12
 
 The first MoonlightLG version, following native Preview 27. The repository URL

@@ -38,6 +38,11 @@ jobs:
           python3 tests/native/check_streaming_boundary.py
           xcodebuild -version
       # Exercise process/cancellation failures before the full engine build.
+      - name: Test production Apollo connection gate
+        run: |
+          python3 tests/native/extract_native_exit_shortcut.py
+          c++ -std=c++17 -Ibuild tests/native/ConnectionGateTests.cpp -o build/connection-gate-tests
+          build/connection-gate-tests
       - name: Test native event framing
         run: |
           mkdir -p build

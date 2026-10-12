@@ -20,3 +20,7 @@ void nativePublishMenuState(SDL_Window* window, bool captured, bool statistics, 
 // Present the host-exit confirmation in the process that owns the SDL window.
 bool nativeConfirmDisconnectAndExit(SDL_Window* window);
 bool nativeStreamDisconnectConfirmationVisible();
+
+// Main-thread connection presentation gate; no SDL window/input until Continue.
+void nativeSetConnectionWaiting(bool waiting);
+bool nativeConnectionWaiting();

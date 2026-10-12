@@ -61,6 +61,29 @@ import XCTest
         }
     }
 
+    func testApolloConnectionFlightOrbitAndContinue() throws {
+        for phase in ["flight", "orbit", "error"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--design-preview", "--preview-screen=connection-" + phase, "--connection-frame=5", "--dark"]
+            app.launch()
+            let scene = app.descendants(matching: .any)["connection-journey"]
+            XCTAssertTrue(scene.waitForExistence(timeout: 10))
+            let proceed = app.buttons["connection-continue"]
+            if phase == "orbit" {
+                XCTAssertTrue(proceed.exists)
+                Thread.sleep(forTimeInterval: 2)
+                XCTAssertTrue(scene.exists, "Orbit must remain until the user continues")
+            } else { XCTAssertFalse(proceed.exists) }
+            let capture = XCTAttachment(screenshot: app.screenshot())
+            capture.name = "apollo-connection-" + phase; capture.lifetime = .keepAlways; add(capture)
+            if phase == "orbit" { proceed.click() }
+            else { app.buttons["connection-cancel"].click() }
+            XCTAssertTrue(app.buttons["Refresh"].waitForExistence(timeout: 5))
+            XCTAssertFalse(scene.exists)
+            app.terminate()
+        }
+    }
+
     func testBootCompletesInLibraryWindow() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -182,7 +205,7 @@ import XCTest
         let about = app.descendants(matching: .any)["native-about"].firstMatch
         XCTAssertTrue(about.waitForExistence(timeout: 10))
         XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", "MoonlightLG", "MoonlightLG")).firstMatch.exists)
-        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "1.0.00U", "1.0.00U")).firstMatch.exists)
+        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "1.1.00U", "1.1.00U")).firstMatch.exists)
         XCTAssertTrue(about.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Moonlight Qt 6.2.0")).firstMatch.exists)
         let shot = XCTAttachment(screenshot: about.screenshot())
         shot.name = "moonlightlg-about-version"; shot.lifetime = .keepAlways; add(shot)

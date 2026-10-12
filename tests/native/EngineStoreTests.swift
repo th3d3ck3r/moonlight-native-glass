@@ -39,7 +39,7 @@ func nativeArgument(_ name: String) -> String? { nil }
             case 2: store.add("127.0.0.1")
             default: store.testConnection()
             }
-            try await wait { !store.ready && store.message != nil }
+            try await wait { !store.ready && (store.message != nil || store.connectionJourney?.error != nil) }
             precondition(!store.streamActive && !store.streamStarted, "Launch remained busy after engine exit")
             precondition(store.pairing == nil && !store.addingHost && !store.testingConnection, "Pending operation remained busy")
             store.shutdown()
@@ -72,8 +72,14 @@ func nativeArgument(_ name: String) -> String? { nil }
                 for line in sys.stdin:
                     request = json.loads(line)
                     if request['command'] == 'confirmQuit':
+                        emit({'event': 'connected'})
+                    elif request['command'] == 'continueStream':
+                        pathlib.Path('continued').write_text('continued')
                         emit({'event': 'streaming'})
                         emit({'event': 'windowOpened'})
+                    elif request['command'] == 'cancelStream':
+                        pathlib.Path('cancelled').write_text('cancelled')
+                        sys.exit(0)
                     elif request['command'] == 'menuAction':
                         if '\(mode)' != 'menu-no-ack':
                             emit({'event': 'menuActionAcknowledged', 'action': request['action'], 'requestID': request['requestID']})
@@ -106,10 +112,28 @@ func nativeArgument(_ name: String) -> String? { nil }
         missingAck.send("release", ["index": 0])
         try await wait { missingAck.quitRequired != nil }
         missingAck.confirmQuit()
+        try await wait { missingAck.connectionJourney?.phase == .connected }
+        missingAck.continueToStream()
         try await wait { missingAck.streamWindowExists }
         missingAck.menuAction(209)
         try await wait { missingAck.message?.detail.contains("did not acknowledge") == true }
         missingAck.shutdown()
+        let waitingHelper = try fixture("waiting-cancel")
+        let waiting = EngineStore(executable: waitingHelper)
+        waiting.start(); try await wait { waiting.ready }
+        waiting.startStream(computer, game: game)
+        try await wait { waiting.values["fixtureStep"] as? String == "pause" }
+        waiting.send("release", ["index": 0])
+        try await wait { waiting.quitRequired != nil }
+        waiting.confirmQuit()
+        try await wait { waiting.connectionJourney?.phase == .connected }
+        waiting.cancelLaunch()
+        try await wait { !waiting.streamActive }
+        precondition(waiting.connectionJourney == nil && !waiting.streamWindowExists, "Cancel stranded the rendezvous screen")
+        let cancelled = waitingHelper.deletingLastPathComponent().appendingPathComponent("cancelled")
+        precondition(FileManager.default.fileExists(atPath: cancelled.path), "Orbit cancellation bypassed graceful helper cleanup")
+        waiting.shutdown()
+
         let brokenHelper = try fixture("broken-pipe")
         for operation in 0..<3 {
             let broken = EngineStore(executable: brokenHelper)
@@ -129,7 +153,7 @@ func nativeArgument(_ name: String) -> String? { nil }
         rejected.start()
         try await wait { rejected.ready }
         rejected.startStream(computer, game: game)
-        try await wait { rejected.message?.detail == "Launch rejected" }
+        try await wait { rejected.connectionJourney?.error == "Launch rejected" }
         precondition(rejected.ready && !rejected.streamActive, "Rejected launch stayed busy despite a live helper")
         try await wait { rejected.values["fixtureStep"] as? String == "resume" }
         rejected.shutdown()
@@ -160,7 +184,15 @@ func nativeArgument(_ name: String) -> String? { nil }
         // Dismissal is queued; selecting Confirm in the same turn must win.
         delayed.dismissQuitConfirmation()
         delayed.confirmQuit()
-        try await wait { delayed.streamStarted }
+        try await wait { delayed.connectionJourney?.phase == .connected }
+        precondition(!delayed.streamWindowExists && !delayed.streamStarted, "Stream window/input started before Continue")
+        let continued = delayedHelper.deletingLastPathComponent().appendingPathComponent("continued")
+        try await Task.sleep(for: .milliseconds(250))
+        precondition(!FileManager.default.fileExists(atPath: continued.path), "Flight completed without user Continue")
+        delayed.continueToStream()
+        delayed.continueToStream() // Duplicate clicks must not send another command.
+        try await wait { delayed.streamStarted && delayed.connectionJourney == nil }
+        precondition(FileManager.default.fileExists(atPath: continued.path), "Continue never reached the helper")
         precondition(delayed.streamActive, "Confirmation dismissal cancelled an accepted launch")
         delayed.streamWindowExists = true
         for (action, expected) in [(204, 2), (205, 0), (206, 1)] {

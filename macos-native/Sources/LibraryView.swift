@@ -97,6 +97,14 @@ struct LibraryView: View {
             Button("Quit and Start Selected Game", role: .destructive) { store.confirmQuit() }
             Button("Cancel", role: .cancel) { store.cancelLaunch() }
         } message: { Text("Unsaved progress in the running app may be lost.") }
+        .overlay {
+            if let journey = store.connectionJourney {
+                NativeConnectionView(journey: journey, warnings: store.warnings, canRetry: !store.streamActive,
+                    previewTime: store.preview ? Double(nativeArgument("--connection-frame") ?? "") : nil,
+                    cancel: { store.cancelLaunch() }, proceed: { store.continueToStream() }, retry: { store.retryConnection() })
+                    .id(journey.id)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .nativeAddComputer)) { _ in if controlsEnabled { addPresented = true } }
         .onAppear {
             configureController()

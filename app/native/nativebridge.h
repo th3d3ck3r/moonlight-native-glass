@@ -57,5 +57,6 @@ private:
     bool m_StreamMode = false;
     bool m_TestMode = false;
     bool m_Streaming = false;
+    bool m_AwaitContinue = false;
     bool m_Pairing = false;
 };
