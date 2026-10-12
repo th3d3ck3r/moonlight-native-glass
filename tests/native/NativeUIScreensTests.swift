@@ -10,19 +10,28 @@ import XCTest
         XCTAssertTrue(window.waitForExistence(timeout: 10))
         let toggle = window.descendants(matching: .any)["crimson-glass-toggle"].firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
-        if toggle.value as? String != "1" { toggle.click() }
+        func isEnabled() -> Bool? {
+            if let number = toggle.value as? NSNumber { return number.boolValue }
+            if let text = toggle.value as? String {
+                if text == "1" { return true }; if text == "0" { return false }
+            }
+            return nil
+        }
+        if isEnabled() != true { toggle.click() }
         let frame = window.frame
         let crimson = XCTAttachment(screenshot: window.screenshot())
         crimson.name = "crimson-settings-titlebar"; crimson.lifetime = .keepAlways; add(crimson)
         toggle.click()
-        XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertEqual(isEnabled(), false)
+        let original = XCTAttachment(screenshot: window.screenshot())
+        original.name = "original-settings-after-theme-switch"; original.lifetime = .keepAlways; add(original)
         XCTAssertEqual(window.frame, frame, "Appearance switching must not change window geometry")
         toggle.click()
-        XCTAssertEqual(toggle.value as? String, "1")
+        XCTAssertEqual(isEnabled(), true)
         app.terminate()
         app.launch()
         XCTAssertTrue(toggle.waitForExistence(timeout: 10))
-        XCTAssertEqual(toggle.value as? String, "1", "Crimson preference must persist across launches")
+        XCTAssertEqual(isEnabled(), true, "Crimson preference must persist across launches")
         app.terminate()
     }
 

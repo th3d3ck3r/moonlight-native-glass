@@ -20,7 +20,11 @@ enum NativeCrimsonTheme {
     @MainActor static func apply(_ enabled: Bool) {
         // Canvas previews must not restyle Xcode's own process or Dock icon.
         guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
-        NSApp.appearance = enabled ? NSAppearance(named: .darkAqua) : nil
+        let args = CommandLine.arguments
+        let preview = args.contains("--design-preview")
+        let appearance: NSAppearance.Name? = enabled || (preview && args.contains("--dark"))
+            ? .darkAqua : (preview && args.contains("--light") ? .aqua : nil)
+        NSApp.appearance = appearance.flatMap { NSAppearance(named: $0) }
         let name = enabled ? "crimson" : "moonlight"
         if let url = Bundle.main.url(forResource: name, withExtension: "icns"), let image = NSImage(contentsOf: url) {
             NSApp.applicationIconImage = image
