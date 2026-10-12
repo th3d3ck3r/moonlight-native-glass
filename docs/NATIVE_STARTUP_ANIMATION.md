@@ -93,11 +93,7 @@ light reveal), and Prism Sweep (passing refraction streaks). All finish on the
 same small logo before the existing fade to the sample library. They are
 preview-only alternatives; no selection is applied to the app.
 
-The square noticed in the previous animation was the opaque background baked
-into `moonlight.icns`. `NativeBootLogo` now masks only dark background pixels in
-memory and retains the original bright crescent and small-star artwork. The
-Dock/menu-bar resources remain byte-for-byte unchanged. The mask is also used
-by the current production startup, but the previously packaged Build 22 does
-not include this later source change. A new app package has not been delivered
-for the alternatives. A native test checks transparent corners and opaque moon
-artwork in the actual resource.
+The user's square-removal request still needs visual clarification. The initial
+interpretation that it referred to the icon background was incorrect and that
+mask was reverted. All original logo assets and production startup code remain
+unchanged. The five alternatives are preview-only and retain the same setup.

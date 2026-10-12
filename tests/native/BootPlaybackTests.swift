@@ -29,13 +29,6 @@ import SwiftUI
         require(!NativeBootPresentation(enabled: true, resource: resource, reduceMotion: true).blocksLibrary, "Reduce Motion must bypass startup")
         let invalid = resource.deletingLastPathComponent().appendingPathComponent("boot-animation.mp4")
         require(!NativeBootPresentation(enabled: true, resource: invalid, reduceMotion: false).blocksLibrary, "Non-image artwork must bypass startup")
-        let clean = NativeBootLogo.image(resource)!
-        let cleanCG = clean.cgImage(forProposedRect: nil, context: nil, hints: nil)!
-        let pixels = NSBitmapImageRep(cgImage: cleanCG)
-        require((pixels.colorAt(x: 0, y: 0)?.alphaComponent ?? 1) < 0.01, "Remove the baked square background")
-        let artworkX = Int(Double(cleanCG.width) * 0.37)
-        let artworkY = cleanCG.height / 2
-        require((pixels.colorAt(x: artworkX, y: artworkY)?.alphaComponent ?? 0) > 0.95, "Preserve the actual moon artwork")
         let first = NativeBootPresentation(enabled: true, resource: resource, reduceMotion: false)
         let w = window(); let frame = w.frame; let content = w.contentView
         let mask = w.styleMask; let title = w.titleVisibility; let transparent = w.titlebarAppearsTransparent

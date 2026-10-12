@@ -24,8 +24,8 @@ stages are included. For the five new motion alternatives, open
 **Aurora Bloom**, **Starlight Weave**, **Lunar Eclipse**, and **Prism Sweep**.
 Each Canvas preview has its own Replay button, uses the same small original
 Moonlight logo and three window dots, and fades into the sample library. The
-alternatives do not replace the app's selected animation. The logo's baked navy
-square is masked away in memory for animation use; Dock/status assets are unchanged.
+alternatives do not replace the app's selected animation. All original logo
+assets and the production startup remain unchanged.
 
 No additional source files need to be added manually: the
 project already includes all preview code and resources.
