@@ -281,6 +281,13 @@ static MLOverlayController* controller;
 
 bool nativeOverlayControlsEnabled() { return [controller.defaults boolForKey:@"controlsEnabled"]; }
 bool nativeOverlayConfigured() { return configured.load(); }
+void nativeOverlayInitializeActions() {
+    // Called on the SDL main thread before any helper command producer starts.
+    if (actionEvent == (Uint32)-1) {
+        Uint32 base = SDL_RegisterEvents(2);
+        actionEvent = base == (Uint32)-1 ? base : base + 1;
+    }
+}
 Uint32 nativeOverlayEventType() { return actionEvent; }
 bool nativeOverlayConsumeKeyRelease(bool& consumed, Uint8 state) {
     if (!consumed) return false;
@@ -308,7 +315,7 @@ bool nativeOverlayPresent(int type, bool enabled, const char* text) {
 void nativeOverlayAttach(void* window, const char* token) {
     if (controller && controller.parent == (NSWindow*)window) return;
     nativeOverlayDetach();
-    if (actionEvent==(Uint32)-1) { Uint32 base=SDL_RegisterEvents(2); actionEvent=base == (Uint32)-1 ? base : base+1; }
+    nativeOverlayInitializeActions();
     controller=[[MLOverlayController alloc] init]; controller.parent=(NSWindow*)window; controller.token=[NSString stringWithUTF8String:token];
     @try { [controller refresh]; nativeTitlebarAttach(window); configured=true; }
     @catch (NSException* error) { SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Native overlay unavailable: %s", error.reason.UTF8String); nativeOverlayDetach(); }

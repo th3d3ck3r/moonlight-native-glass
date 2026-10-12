@@ -1905,6 +1905,10 @@ void Session::exec()
 #ifdef Q_OS_MACOS
     // Presentation-only hide/restore uses the same fullscreen transition as
     // the existing shortcut, including its platform-specific safety handling.
+    // Register helper actions before presentation or the command reader starts.
+    if (nativeStreamMenuCommandsEnabled()) {
+        nativeOverlayInitializeActions();
+    }
     nativeSetStreamFullscreenTransition([](SDL_Window* window, Uint32 flags) {
         Session* session = Session::get();
         if (!session || session->m_Window != window || (flags && flags != session->m_FullScreenFlag)) return false;
@@ -2058,7 +2062,10 @@ void Session::exec()
             publishNativeMenu();
             continue;
         }
-        if (event.type == nativeOverlayEventType() && nativeOverlayConfigured()) {
+        if (event.type == nativeOverlayEventType() &&
+            (nativeOverlayConfigured() ||
+             (nativeStreamMenuCommandsEnabled() &&
+              (event.user.code == 209 || event.user.code == 212)))) {
             const int action = event.user.code;
             nativeAcknowledgeMenuAction(action, Uint32(reinterpret_cast<uintptr_t>(event.user.data1)));
             if (action == 200) nativeHideStreamWindow(m_Window);

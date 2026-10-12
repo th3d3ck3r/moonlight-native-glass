@@ -55,7 +55,8 @@ int main() { @autoreleasepool {
     // Compile the actual production E case. Native helper mode must retain
     // deferred cleanup even when native presentation has not attached/failed.
     configureNativeStreamWindow("exit-shortcut-fallback");
-    nativeOverlayAttach(cocoa(window),"exit-shortcut-fallback"); nativeOverlayDetach();
+    nativeOverlayInitializeActions();
+    check(nativeOverlayEventType() != (Uint32)-1,"Helper actions must register before the first native overlay");
     check(nativeStreamMenuCommandsEnabled() && !nativeOverlayConfigured(),"Fixture must exercise native helper mode without native controls");
     SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);
     SdlInputHandler shortcut;
@@ -64,6 +65,8 @@ int main() { @autoreleasepool {
     SDL_Event action;
     check(SDL_PeepEvents(&action,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==1 && action.user.code==209,"Native E fallback must enqueue the same deferred host-exit action");
     check(productionAcceptsDisconnect(action),"Session must accept native disconnect when presentation is unavailable");
+    action.user.code=212;
+    check(productionAcceptsDisconnect(action),"Keep-host-running disconnect must also work without presentation");
     action.user.code=213;
     check(!productionAcceptsDisconnect(action),"Other overlay actions must retain their existing presentation requirement");
     stopNativeStreamWindow();

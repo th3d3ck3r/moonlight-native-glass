@@ -4,6 +4,7 @@
 bool nativeOverlayPresent(int type, bool enabled, const char* text);
 void nativeOverlayAttach(void* window, const char* token);
 void nativeOverlayDetach();
+void nativeOverlayInitializeActions();
 Uint32 nativeOverlayEventType();
 void nativeOverlaySetControlsVisible(bool visible);
 bool nativeOverlayControlsVisible();

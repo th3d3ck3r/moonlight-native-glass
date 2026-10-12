@@ -157,6 +157,15 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Detected quitAndExit key combo");
 
+#ifdef Q_OS_MACOS
+        // Native helper shutdown must always finish deferred Session cleanup,
+        // including when presentation has not attached or is unavailable.
+        if (nativeStreamMenuCommandsEnabled()) {
+            nativeOverlayPerformAction(209);
+            break;
+        }
+#endif
+
         // Indicate that we want to exit afterwards
         Session::get()->setShouldExit(true);
 

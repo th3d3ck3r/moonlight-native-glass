@@ -2,7 +2,7 @@ name: Native presentation shutdown regression
 on:
   push:
     branches: [feature/native-boot-animation]
-    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, tests/native/extract_native_exit_shortcut.py, app/native/nativeapplication.mm, app/streaming/input/keyboard.cpp, app/streaming/session.cpp]
+    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, tests/native/extract_native_exit_shortcut.py, app/native/nativeapplication.mm, app/native/nativeoverlay.mm, app/native/nativeoverlay.h, app/streaming/input/keyboard.cpp, app/streaming/session.cpp]
 permissions:
   contents: read
 jobs:
