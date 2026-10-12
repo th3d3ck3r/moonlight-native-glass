@@ -28,7 +28,7 @@ Xcode project and build products now use MoonlightLG; the GitHub repository URL
 stays unchanged. The startup arrival displays **MoonlightLG** beneath the moon.
 Existing settings, host pairing and permission identities are preserved.
 
-**U builds are development only and are not posted.** Experimental downloads use E;
+**U build links are shared directly with the owner only, not posted here.** Public experimental downloads use E;
 stable releases have no suffix. Validation is recorded in the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.0.00U.md).
 
 | Version | Meaning |
