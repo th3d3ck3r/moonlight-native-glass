@@ -124,5 +124,6 @@ struct ConnectionJourney: Identifiable {
     var phase: Phase = .connecting
     var detail: String = "Preparing stream…"
     var connectedAt: Date?
+    var continueRequested = false
     var error: String?
 }

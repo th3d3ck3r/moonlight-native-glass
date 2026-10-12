@@ -186,11 +186,16 @@ struct PairingRequest: Identifiable {
             self.channel = nil
             self.pairing = nil; self.addingHost = false; self.testingConnection = false
             self.hostDeadline?.cancel()
-            if self.pendingStream != nil {
+            let launchWasPending = self.pendingStream != nil
+            if launchWasPending {
                 self.launchDeadline?.cancel()
                 self.pendingStream = nil; self.streamActive = false; self.streamStarted = false
             }
-            if !self.shuttingDown { self.fail("The streaming engine stopped (\(helper.terminationDescription)). Use Refresh to restart it.") }
+            if !self.shuttingDown {
+                let detail = "The streaming engine stopped (\(helper.terminationDescription)). Use Refresh to restart it."
+                if launchWasPending { self.connectionFailed(detail) }
+                else if self.connectionJourney?.phase != .failed { self.fail(detail) }
+            }
         }
         channel = helper
         do { try helper.start() } catch { channel = nil; fail("Could not start the bundled streaming engine: \(error.localizedDescription)") }
@@ -230,13 +235,17 @@ struct PairingRequest: Identifiable {
                 }
             case "error":
                 testingConnection = false; addingHost = false; hostDeadline?.cancel(); pairing = nil
-                if pendingStream != nil { let journey = connectionJourney; cancelLaunch(); connectionJourney = journey }
-                fail(event["message"] as? String ?? "The engine could not complete this request.")
+                let launchWasPending = pendingStream != nil
+                if launchWasPending { let journey = connectionJourney; cancelLaunch(); connectionJourney = journey }
+                let detail = event["message"] as? String ?? "The engine could not complete this request."
+                if launchWasPending { connectionFailed(detail) } else { fail(detail) }
             default: break
             }
         } catch {
-            if pendingStream != nil { let journey = connectionJourney; cancelLaunch(); connectionJourney = journey }
-            fail("Could not read the engine response: \(error.localizedDescription)")
+            let launchWasPending = pendingStream != nil
+            if launchWasPending { let journey = connectionJourney; cancelLaunch(); connectionJourney = journey }
+            let detail = "Could not read the engine response: \(error.localizedDescription)"
+            if launchWasPending { connectionFailed(detail) } else { fail(detail) }
             channel?.stop()
         }
     }
@@ -300,17 +309,22 @@ struct PairingRequest: Identifiable {
         status = "Preparing \(game.name)…"
         let requestID = UUID().uuidString
         pendingStream = (requestID, computer, game)
-        guard send("pause", ["requestID": requestID]) else { pendingStream = nil; streamActive = false; return }
+        guard send("pause", ["requestID": requestID]) else {
+            pendingStream = nil; streamActive = false
+            connectionFailed(message?.detail ?? "Could not prepare the connection."); message = nil
+            return
+        }
         launchDeadline?.cancel()
         launchDeadline = Task { [weak self] in
             try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled, let self, self.pendingStream?.id == requestID else { return }
-            self.cancelLaunch()
-            self.fail("The streaming engine did not prepare the launch. Use Refresh and try again.")
+            let journey = self.connectionJourney
+            self.cancelLaunch(); self.connectionJourney = journey
+            self.connectionFailed("The streaming engine did not prepare the launch. Use Refresh and try again.")
         }
     }
     private func runStream(_ computer: Computer, game: Game) {
-        guard let executable else { streamActive = false; fail("The bundled streaming engine is missing."); return }
+        guard let executable else { streamActive = false; connectionFailed("The bundled streaming engine is missing."); return }
         let screen = NSApp.keyWindow?.screen ?? NSScreen.main
         let displayID = (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? CGMainDisplayID()
         let bounds = CGDisplayBounds(displayID)
@@ -364,7 +378,7 @@ struct PairingRequest: Identifiable {
             case "streaming": self.streamStarted = true; self.status = "Streaming \(game.name)"
             case "warning": self.warnings.append(event["message"] as? String ?? "")
             case "quitRequired": self.quitRequired = event["app"] as? String
-            case "error": self.fail(event["message"] as? String ?? "Streaming failed.")
+            case "error": self.connectionFailed(event["message"] as? String ?? "Streaming failed.")
             default: break
             }
         }
@@ -381,12 +395,12 @@ struct PairingRequest: Identifiable {
             }
             self.status = "Stream ended"
             if !self.shuttingDown { self.send("resume") }
-            if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil { self.fail("The streaming engine stopped unexpectedly (\(helper.terminationDescription)). Open Engine Logs from the menu bar and save the stream log and macOS crash report.") }
+            if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil && self.connectionJourney == nil { self.fail("The streaming engine stopped unexpectedly (\(helper.terminationDescription)). Open Engine Logs from the menu bar and save the stream log and macOS crash report.") }
         }
         stream = helper
         do { try helper.start() } catch {
             stream = nil; streamWindowToken = nil; streamActive = false
-            send("resume"); fail(error.localizedDescription)
+            send("resume"); connectionFailed(error.localizedDescription)
         }
     }
     private func clearMenuRequests() {
@@ -433,7 +447,7 @@ struct PairingRequest: Identifiable {
     }
     func confirmQuit() {
         quitRequired = nil
-        do { try stream?.send(["command": "confirmQuit"]) } catch { fail(error.localizedDescription) }
+        do { try stream?.send(["command": "confirmQuit"]) } catch { connectionFailed(error.localizedDescription) }
     }
     func continueToStream() {
         if preview { connectionJourney = nil; return }
@@ -441,15 +455,16 @@ struct PairingRequest: Identifiable {
         do {
             try stream.send(["command": "continueStream"])
             connectionJourney?.phase = .entering
+            connectionJourney?.continueRequested = true
             connectionJourney?.detail = "Opening stream window…"
             connectionDeadline?.cancel()
             connectionDeadline = Task { [weak self, weak stream] in
                 try? await Task.sleep(for: .seconds(15))
                 guard !Task.isCancelled, let self, self.stream === stream,
                       self.connectionJourney?.phase == .entering else { return }
-                self.fail("The stream window did not open. Cancel and try again; save Engine Logs if it happens again.")
+                self.connectionFailed("The stream window did not open. Cancel and try again; save Engine Logs if it happens again.")
             }
-        } catch { fail(error.localizedDescription) }
+        } catch { connectionFailed(error.localizedDescription) }
     }
     func retryConnection() {
         guard !streamActive, let journey = connectionJourney, journey.phase == .failed else { return }
@@ -459,7 +474,7 @@ struct PairingRequest: Identifiable {
     }
     func cancelLaunch() {
         connectionDeadline?.cancel()
-        let waiting = connectionJourney?.connectedAt != nil && connectionJourney?.phase != .entering && !streamWindowExists
+        let waiting = connectionJourney?.connectedAt != nil && connectionJourney?.continueRequested == false && !streamWindowExists
         connectionJourney = nil
         quitRequired = nil; launchDeadline?.cancel(); pendingStream = nil
         if waiting, let stream {
@@ -477,10 +492,13 @@ struct PairingRequest: Identifiable {
         }
     }
     func fail(_ detail: String) {
+        message = NativeMessage(title: "MoonlightLG", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true)
+    }
+    private func connectionFailed(_ detail: String) {
         if connectionJourney != nil {
             connectionJourney?.phase = .failed; connectionJourney?.error = detail
             connectionJourney?.detail = "Connection failed"
-        } else { message = NativeMessage(title: "MoonlightLG", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true) }
+        } else { fail(detail) }
     }
     func shutdown() {
         clearMenuRequests()

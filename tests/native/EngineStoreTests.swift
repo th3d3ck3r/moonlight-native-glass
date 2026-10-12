@@ -127,6 +127,10 @@ func nativeArgument(_ name: String) -> String? { nil }
         try await wait { waiting.quitRequired != nil }
         waiting.confirmQuit()
         try await wait { waiting.connectionJourney?.phase == .connected }
+        waiting.fail("Settings rejected a value")
+        precondition(waiting.message?.detail == "Settings rejected a value" && waiting.connectionJourney?.phase == .connected,
+                     "Unrelated Settings errors must not mark a ready connection as failed")
+        waiting.message = nil
         waiting.cancelLaunch()
         try await wait { !waiting.streamActive }
         precondition(waiting.connectionJourney == nil && !waiting.streamWindowExists, "Cancel stranded the rendezvous screen")
