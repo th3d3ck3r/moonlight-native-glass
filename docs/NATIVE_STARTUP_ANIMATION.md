@@ -93,7 +93,8 @@ light reveal), and Prism Sweep (passing refraction streaks). All finish on the
 same small logo before the existing fade to the sample library. They are
 preview-only alternatives; no selection is applied to the app.
 
-The user's square-removal request still needs visual clarification. The initial
-interpretation that it referred to the icon background was incorrect and that
-mask was reverted. All original logo assets and production startup code remain
-unchanged. The five alternatives are preview-only and retain the same setup.
+The square identified in the user's close-up is the faint construction grid
+inside the rotating rings. Only that grid drawing is removed from the current
+startup. The rings, original logo assets, timing, window setup and transition
+remain intact. No logo mask or helper changes are included. The artwork capture
+uses 2.3 seconds, where the removed grid previously would have been visible.

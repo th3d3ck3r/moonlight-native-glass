@@ -4,7 +4,7 @@ import XCTest
     func testNativeStartupArtworkStages() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        for (name, time) in [("seed", 0.12), ("expansion", 0.65), ("construction-rings", 1.85), ("existing-logo", 3.55)] {
+        for (name, time) in [("seed", 0.12), ("expansion", 0.65), ("construction-rings", 2.3), ("existing-logo", 3.55)] {
             app.launchArguments = ["--design-preview", "--boot-preview", "--boot-frame=\(time)", "--dark"]
             app.launch()
             let window = app.windows["native-library"]

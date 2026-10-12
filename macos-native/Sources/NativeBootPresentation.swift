@@ -193,17 +193,7 @@ struct NativeBootView: View {
                                        endAngle: .degrees(rotation + 285), clockwise: false)
                             rings.stroke(arc, with: .color(.white), style: StrokeStyle(lineWidth: 0.8, lineCap: .round))
                         }
-                        var grid = context; grid.opacity = lines * ease(t, 1.9, 0.5) * 0.13
-                        let gridSize = diameter * 2.5
-                        for i in -2...2 {
-                            let offset = Double(i) * gridSize / 4
-                            var path = Path()
-                            path.move(to: CGPoint(x: center.x + offset, y: center.y - gridSize / 2))
-                            path.addLine(to: CGPoint(x: center.x + offset, y: center.y + gridSize / 2))
-                            path.move(to: CGPoint(x: center.x - gridSize / 2, y: center.y + offset))
-                            path.addLine(to: CGPoint(x: center.x + gridSize / 2, y: center.y + offset))
-                            grid.stroke(path, with: .color(.white), lineWidth: 0.65)
-                        }
+
                     }
                     if let logo = presentation.logo {
                         Image(nsImage: logo).resizable().aspectRatio(contentMode: .fit)

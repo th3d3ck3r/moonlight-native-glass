@@ -25,7 +25,8 @@ stages are included. For the five new motion alternatives, open
 Each Canvas preview has its own Replay button, uses the same small original
 Moonlight logo and three window dots, and fades into the sample library. The
 alternatives do not replace the app's selected animation. All original logo
-assets and the production startup remain unchanged.
+assets remain unchanged. The faint square construction grid has been removed
+from the current startup.
 
 No additional source files need to be added manually: the
 project already includes all preview code and resources.

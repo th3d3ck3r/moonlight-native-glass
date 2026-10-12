@@ -66,7 +66,7 @@ import SwiftUI
 }
 
 #Preview("Native Glass · Construction rings") {
-    NativeGlassArtworkPreview(time: 1.85)
+    NativeGlassArtworkPreview(time: 2.3)
 }
 
 #Preview("Native Glass · Existing logo") {
