@@ -33,3 +33,5 @@ void nativeDetachConnectionWindowView();
 void nativeEndConnectionWindow();
 void nativeSetConnectionCommand(std::function<void(int)> command);
 void nativeAttachStreamWindow(SDL_Window* window);
+
+void nativeRestoreConnectionWindow();

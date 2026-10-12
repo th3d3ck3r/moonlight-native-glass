@@ -121,6 +121,9 @@ jobs:
           if-no-files-found: error
       - name: Build app and verify bundle
         run: bash scripts/build-native-macos.sh '${{ matrix.architecture }}'
+      - name: Verify packaged stream window opens before connecting
+        if: matrix.architecture == 'universal'
+        run: python3 tests/native/connection_window_bridge.py 'build/native-universal/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight'
       - name: Test real engine bridge and persistence
         if: matrix.architecture == 'universal'
         env:

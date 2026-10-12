@@ -30,6 +30,8 @@ int main(int argc,char** argv) { @autoreleasepool {
         task.arguments=@[@"-x",[[NSString stringWithUTF8String:argv[1]] stringByAppendingPathComponent:@"apollo-inside-stream-window.png"]];
         [task launch]; [task waitUntilExit]; check(task.terminationStatus==0,"Composited stream-window capture");
     }
+    SDL_MinimizeWindow(window); drain(.2); nativeRestoreConnectionWindow(); drain(.2);
+    check(original.visible && !(SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED),"Restore must bring back the connecting stream window");
     // The red button cancels the connection instead of destroying the SDL view.
     [original performClose:nil]; check(action==2 && original.visible,"Close must route to Cancel while connecting/orbiting");
     nativeSetConnectionWaiting(false); nativeDetachConnectionWindowView();

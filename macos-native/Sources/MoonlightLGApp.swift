@@ -25,7 +25,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Keep SwiftUI's launch/restoration behavior when there is no stream.
         // Intercept only an existing stream, so the library cannot cover it.
-        guard store?.streamWindowExists == true, let openPrimaryWindow else { return true }
+        guard store?.streamWindowExists == true || store?.connectionJourney != nil, let openPrimaryWindow else { return true }
         openPrimaryWindow()
         return false
     }
@@ -136,7 +136,7 @@ private struct NativeStatusActions: View {
                     NSApp.activate(ignoringOtherApps: true)
             }
             let openPrimaryWindow: () -> Void = {
-                if store.streamWindowExists { store.restoreStreamWindow() } else { openLibrary() }
+                if store.streamWindowExists || store.connectionJourney != nil { store.restoreStreamWindow() } else { openLibrary() }
             }
             delegate.statusMenu?.library = openLibrary
             delegate.statusMenu?.perform = { store.menuAction($0) }

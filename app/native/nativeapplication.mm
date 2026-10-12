@@ -101,6 +101,14 @@ bool nativeCreateConnectionWindow(const char* host,const char* game,int x,int y,
     [cocoa makeKeyAndOrderFront:nil];
     return true;
 }
+void nativeRestoreConnectionWindow() {
+    SDL_Window* window = nativeConnectionWindow();
+    if (!window || !nativeConnectionWaiting()) return;
+    [NSApp activateIgnoringOtherApps:YES];
+    if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) SDL_RestoreWindow(window);
+    SDL_ShowWindow(window); SDL_RaiseWindow(window);
+    [nativeSDLWindow(window) makeKeyAndOrderFront:nil];
+}
 void nativeEndConnectionWindow() {
     nativeDetachConnectionWindowView();
     SDL_Window* window = nativeConnectionWindow();
@@ -395,17 +403,17 @@ void nativeAttachStreamWindow(SDL_Window* window) {
     if (!streamWindowAccess || streamWindowAccess.stopped || nativeConnectionWaiting()) return;
     NSWindow* candidate = nativeSDLWindow(window);
     if (!candidate) return;
-        if (streamWindowAccess.windowDelegate.windowID == SDL_GetWindowID(window)) return;
-        MLStreamWindowDelegate* delegate = [[MLStreamWindowDelegate alloc] init];
-        delegate.original = candidate.delegate;
-        delegate.windowID = SDL_GetWindowID(window);
-        streamWindowAccess.windowDelegate = delegate;
-        candidate.delegate = delegate;
-        [delegate release];
-        nativeOverlayAttach(candidate, streamWindowAccess.token.UTF8String);
-        // Overlay attachment reserves SDL_USEREVENT for stock Session events.
-        if (!restoreEventType) restoreEventType = SDL_RegisterEvents(1);
-        sendWindowEvent("windowOpened");
+    if (streamWindowAccess.windowDelegate.windowID == SDL_GetWindowID(window)) return;
+    MLStreamWindowDelegate* delegate = [[MLStreamWindowDelegate alloc] init];
+    delegate.original = candidate.delegate;
+    delegate.windowID = SDL_GetWindowID(window);
+    streamWindowAccess.windowDelegate = delegate;
+    candidate.delegate = delegate;
+    [delegate release];
+    nativeOverlayAttach(candidate, streamWindowAccess.token.UTF8String);
+    // Overlay attachment reserves SDL_USEREVENT for stock Session events.
+    if (!restoreEventType) restoreEventType = SDL_RegisterEvents(1);
+    sendWindowEvent("windowOpened");
 }
 void nativeRestoreStreamWindow(Uint32 windowID)
 {

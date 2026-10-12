@@ -207,7 +207,8 @@ void NativeBridge::command(const QJsonObject& request) {
         return;
     }
     if (m_StreamMode) {
-        if (action == "continueStream" && m_Streaming && nativeConnectionWaiting()) {
+        if (action == "showConnectionWindow" && nativeConnectionWaiting()) nativeRestoreConnectionWindow();
+        else if (action == "continueStream" && m_Streaming && nativeConnectionWaiting()) {
             nativeSetConnectionWaiting(false);
             m_Input->setEnabled(false);
             send({{"event", "streaming"}});

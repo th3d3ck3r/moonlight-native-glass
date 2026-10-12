@@ -387,7 +387,10 @@ struct PairingRequest: Identifiable {
                 self.menuState.controls = event["controls"] as? Bool ?? false
                 self.menuState.muted = event["muted"] as? Bool ?? false
                 self.menuState.mode = event["mode"] as? Int ?? 0
-            case "streaming": self.streamStarted = true; self.status = "Streaming \(game.name)"
+            case "streaming":
+                self.streamStarted = true; self.status = "Streaming \(game.name)"
+                self.connectionJourney?.phase = .entering
+                self.connectionJourney?.continueRequested = true
             case "warning": self.warnings.append(event["message"] as? String ?? "")
             case "quitRequired": self.quitRequired = event["app"] as? String
             case "error": self.connectionFailed(event["message"] as? String ?? "Streaming failed.")
@@ -410,7 +413,11 @@ struct PairingRequest: Identifiable {
                 self.retryAfterExit = false
                 self.send("resume"); self.retryConnection(); return
             }
-            if self.connectionJourney != nil { self.libraryWindow?.makeKeyAndOrderFront(nil) }
+            if let journey = self.connectionJourney {
+                self.connectionJourney = nil
+                if !self.shuttingDown { self.fail(journey.error ?? "The connection ended before entering the stream.") }
+                self.libraryWindow?.makeKeyAndOrderFront(nil)
+            }
             if !self.shuttingDown { self.send("resume") }
             if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil && self.connectionJourney == nil { self.fail("The streaming engine stopped unexpectedly (\(helper.terminationDescription)). Open Engine Logs from the menu bar and save the stream log and macOS crash report.") }
         }
@@ -451,7 +458,11 @@ struct PairingRequest: Identifiable {
         } catch { fail("Could not send the stream menu command. \(error.localizedDescription)") }
     }
     func restoreStreamWindow() {
-        guard connectionJourney == nil else { libraryWindow?.makeKeyAndOrderFront(nil); return }
+        guard connectionJourney == nil else {
+            if let stream { try? stream.send(["command":"showConnectionWindow"]) }
+            else { libraryWindow?.makeKeyAndOrderFront(nil) }
+            return
+        }
         guard streamWindowExists, let token = streamWindowToken else { return }
         DistributedNotificationCenter.default().postNotificationName(
             Notification.Name("com.moonlight-stream.NativeGlass.restoreStreamWindow"),

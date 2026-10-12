@@ -73,6 +73,11 @@ func nativeArgument(_ name: String) -> String? { nil }
                     request = json.loads(line)
                     if request['command'] == 'confirmQuit':
                         emit({'event': 'connected'})
+                        if '\(mode)' == 'owner-continue':
+                            emit({'event': 'streaming'})
+                            emit({'event': 'windowOpened'})
+                    elif request['command'] == 'showConnectionWindow':
+                        pathlib.Path('restored-connection').write_text('restored')
                     elif request['command'] == 'continueStream':
                         pathlib.Path('continued').write_text('continued')
                         emit({'event': 'streaming'})
@@ -129,6 +134,9 @@ func nativeArgument(_ name: String) -> String? { nil }
         try await wait { waiting.quitRequired != nil }
         waiting.confirmQuit()
         try await wait { waiting.connectionJourney?.phase == .connected }
+        waiting.restoreStreamWindow()
+        let restored = waitingHelper.deletingLastPathComponent().appendingPathComponent("restored-connection")
+        try await wait { FileManager.default.fileExists(atPath: restored.path) }
         waiting.fail("Settings rejected a value")
         precondition(waiting.message?.detail == "Settings rejected a value" && waiting.connectionJourney?.phase == .connected,
                      "Unrelated Settings errors must not mark a ready connection as failed")
@@ -139,6 +147,18 @@ func nativeArgument(_ name: String) -> String? { nil }
         let cancelled = waitingHelper.deletingLastPathComponent().appendingPathComponent("cancelled")
         precondition(FileManager.default.fileExists(atPath: cancelled.path), "Orbit cancellation bypassed graceful helper cleanup")
         waiting.shutdown()
+
+        let ownerHelper = try fixture("owner-continue")
+        let owner = EngineStore(executable: ownerHelper)
+        owner.start(); try await wait { owner.ready }
+        owner.startStream(computer, game: game)
+        try await wait { owner.values["fixtureStep"] as? String == "pause" }
+        owner.send("release", ["index": 0]); try await wait { owner.quitRequired != nil }
+        // This fixture simulates the owner window's Continue callback, emitting
+        // real transport events without invoking the frontend Continue method.
+        owner.confirmQuit()
+        try await wait { owner.streamStarted && owner.connectionJourney == nil }
+        owner.shutdown()
 
         let brokenHelper = try fixture("broken-pipe")
         for operation in 0..<3 {
