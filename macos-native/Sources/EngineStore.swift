@@ -420,6 +420,7 @@ struct PairingRequest: Identifiable {
             }
             if !self.shuttingDown { self.send("resume") }
             if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil && self.connectionJourney == nil { self.fail("The streaming engine stopped unexpectedly (\(helper.terminationDescription)). Open Engine Logs from the menu bar and save the stream log and macOS crash report.") }
+            if !self.shuttingDown && self.message != nil { self.libraryWindow?.makeKeyAndOrderFront(nil) }
         }
         stream = helper
         do { try helper.start() } catch {

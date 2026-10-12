@@ -2154,6 +2154,11 @@ void Session::exec()
 #endif
         switch (event.type) {
         case SDL_QUIT:
+#ifdef Q_OS_MACOS
+            // A connection-window Cancel can arrive during the short Continue
+            // handoff. It still disconnects without quitting the host game.
+            if (property("nativeConnectionCancelled").toBool()) m_Preferences->quitAppAfter = false;
+#endif
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "Quit event received");
             goto DispatchDeferredCleanup;

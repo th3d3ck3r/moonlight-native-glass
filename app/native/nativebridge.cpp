@@ -198,7 +198,7 @@ void NativeBridge::command(const QJsonObject& request) {
     const QString action = request["command"].toString();
     if (action == "shutdown" || action == "cancelStream") {
         m_ConnectionCancelled = true;
-        if (m_StreamMode && nativeConnectionWaiting() && Session::get()) {
+        if (m_StreamMode && m_AwaitContinue && Session::get()) {
             m_ConnectionCancelled = true;
             Session::get()->setProperty("nativeConnectionCancelled", true);
             // Keep Qt alive while the gated session drains deferred cleanup.
