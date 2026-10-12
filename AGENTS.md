@@ -11,9 +11,9 @@ and macOS permissions. Do not rebrand upstream copyright/license attribution.
 Start the MoonlightLG release line at **1.0.00**. The user-facing scheme is
 `major.minor.patch` with at least two patch digits, followed by:
 
-- `U`: unreleased development work (initial version **1.0.00U**). Never post U
-  builds as releases, downloadable app artifacts or README download links. CI may
-  build/test them; publish only after deliberate promotion to E or stable and validation.
+- `U`: unreleased development work (initial version **1.0.00U**). Share U build links only directly with the user. Do not post them as public
+  releases or README/changelog download links. CI app artifacts remain available
+  for the user’s testing. Public distribution requires promotion to E or stable.
 - `E`: experimental build (same numeric version, e.g. **1.0.00E**).
 - No suffix: stable release (**1.0.00**).
 

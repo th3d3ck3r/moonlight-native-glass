@@ -61,10 +61,9 @@ Complete Intel and Universal builds passed; both UI suites passed 11 tests, and
 200 engine shutdown cycles passed. The startup/About and full-width title-bar
 compositor captures were inspected.
 
-U builds are development only and are not posted. The workflow suppresses
-downloadable app uploads for U, and experimental publishing requires E.
-CI validation artifacts created before this rule was clarified are not release
-downloads and are not advertised.
+U build links are shared directly with the owner only, never advertised in the
+README/changelog or posted as releases. CI app artifacts remain available for
+the owner’s testing. Experimental release publishing requires E.
 CI runs on Apple Silicon and cross-builds Intel. These no-host fixtures do not
 certify a physical Intel/live stream or establish the exact reported signal-11 stack.
 

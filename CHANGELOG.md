@@ -18,7 +18,8 @@ remains `th3d3ck3r/moonlight-native-glass`.
 - Carry forward the slim stream title row, line-graph icon, stream-owned
   disconnect sheet, input fixes and safe shutdown from Previews 25–27.
 
-U builds are not posted. Promote deliberately to E or stable before distribution.
+U build links go directly to the owner only; no public release/download posts.
+Promote deliberately to E or stable before public distribution.
 
 Validation: [Native macOS](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38278138413),
 [Xcode](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38278138968),

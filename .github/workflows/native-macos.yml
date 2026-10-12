@@ -133,7 +133,6 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/MoonlightLG.app' "build/MoonlightLG-$version-${{ matrix.architecture }}.zip"
           shasum -a 256 "build/MoonlightLG-$version-${{ matrix.architecture }}.zip" > 'build/SHA256-${{ matrix.architecture }}.txt'
       - uses: actions/upload-artifact@v6
-        if: ${{ !endsWith(steps.package.outputs.version, 'U') }}
         with:
           name: MoonlightLG-${{ steps.package.outputs.version }}-${{ matrix.architecture }}
           path: |
