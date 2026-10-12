@@ -7,7 +7,7 @@ installation scripts, services, or helper build changes. Preview build: 22.
 
 The user's supplied Xcode onboarding reference informs the choreography:
 a seed expands into a blue fill, four particles separate, fine construction
-rings and grid lines emerge, and the fill contracts into the **unchanged
+rings emerge, and the fill contracts into the **unchanged
 bundled `moonlight.icns` logo**. The native sequence takes 4.1 seconds plus a
 0.35-second fade. It uses time-driven SwiftUI vector drawing at a requested
 60 Hz, scales to the window/backing resolution, and stops updating on completion.
@@ -98,3 +98,12 @@ inside the rotating rings. Only that grid drawing is removed from the current
 startup. The rings, original logo assets, timing, window setup and transition
 remain intact. No logo mask or helper changes are included. The artwork capture
 uses 2.3 seconds, where the removed grid previously would have been visible.
+
+Grid-free source `787aec1b667db0559e3703c9f23fb5375c80e1c1` passed both
+nine-test UI suites (zero failures): native run `38186802093` and root Xcode
+run `38186802061`. The root project compiled all five alternative Canvas
+providers and built the startup preview scheme. The 2.3-second composited
+artwork capture was inspected: rings remain, with no square/grid behind them.
+The original logo resources, app chrome, streaming and helper boundaries remain
+unchanged by this revision. Actual interactive Canvas playback and perceived
+smoothness on the user's Mac still need local review.
