@@ -23,6 +23,28 @@ static void drain(bool sdl = true) {
         [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.005]];
     }
 }
+#ifndef Q_OS_MACOS
+#define Q_OS_MACOS
+#endif
+struct Session {
+    bool processExit=false;
+    static Session* get() { static Session value; return &value; }
+    void setShouldExit(bool) { processExit=true; }
+};
+class SdlInputHandler {
+public:
+    enum KeyCombo { KeyComboQuitAndExit };
+    void performSpecialKeyCombo(KeyCombo combo) {
+        switch (combo) {
+#include "NativeExitShortcutCase.inc"
+        }
+    }
+};
+static bool productionAcceptsDisconnect(SDL_Event& event) {
+    return
+#include "NativeDisconnectEventPredicate.inc"
+    ;
+}
 int main() { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching];
     SDL_SetMainReady(); check(SDL_Init(SDL_INIT_VIDEO)==0,"SDL video init");
@@ -30,6 +52,27 @@ int main() { @autoreleasepool {
     check(window!=nullptr,"SDL window creation");
     [NSApp activateIgnoringOtherApps:YES]; [cocoa(window) makeKeyAndOrderFront:nil]; drain();
     check(SDL_GetKeyboardFocus()==window,"Fixture must have SDL keyboard focus");
+    // Compile the actual production E case. Native helper mode must retain
+    // deferred cleanup even when native presentation has not attached/failed.
+    configureNativeStreamWindow("exit-shortcut-fallback");
+    nativeOverlayAttach(cocoa(window),"exit-shortcut-fallback"); nativeOverlayDetach();
+    check(nativeStreamMenuCommandsEnabled() && !nativeOverlayConfigured(),"Fixture must exercise native helper mode without native controls");
+    SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);
+    SdlInputHandler shortcut;
+    shortcut.performSpecialKeyCombo(SdlInputHandler::KeyComboQuitAndExit);
+    check(!Session::get()->processExit,"Native E fallback requested process exit before deferred cleanup");
+    SDL_Event action;
+    check(SDL_PeepEvents(&action,1,SDL_GETEVENT,nativeOverlayEventType(),nativeOverlayEventType())==1 && action.user.code==209,"Native E fallback must enqueue the same deferred host-exit action");
+    check(productionAcceptsDisconnect(action),"Session must accept native disconnect when presentation is unavailable");
+    action.user.code=213;
+    check(!productionAcceptsDisconnect(action),"Other overlay actions must retain their existing presentation requirement");
+    stopNativeStreamWindow();
+    SDL_FlushEvents(SDL_FIRSTEVENT,SDL_LASTEVENT);
+    shortcut.performSpecialKeyCombo(SdlInputHandler::KeyComboQuitAndExit);
+    check(Session::get()->processExit,"Ordinary Qt E shortcut must preserve its process-exit behavior");
+    check(SDL_PeepEvents(&action,1,SDL_GETEVENT,SDL_QUIT,SDL_QUIT)==1,"Ordinary Qt E shortcut must still enqueue SDL quit");
+    Session::get()->processExit=false;
+    puts("PASS: production native E fallback preserves deferred cleanup and ordinary Qt behavior");
     // Deliver the real observation, then stop before its deferred attachment
     // runs. A stopped owner must never reinstall an overlay or window delegate.
     configureNativeStreamWindow("shutdown-before-attachment");

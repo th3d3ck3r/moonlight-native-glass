@@ -2,7 +2,7 @@ name: Native presentation shutdown regression
 on:
   push:
     branches: [feature/native-boot-animation]
-    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, app/native/nativeapplication.mm]
+    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, tests/native/extract_native_exit_shortcut.py, app/native/nativeapplication.mm, app/streaming/input/keyboard.cpp, app/streaming/session.cpp]
 permissions:
   contents: read
 jobs:
@@ -18,8 +18,9 @@ jobs:
         run: |
           python3 setup-deps.py
           mkdir -p build
+          python3 tests/native/extract_native_exit_shortcut.py
           xcrun clang++ -std=c++17 -fno-objc-arc -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all \
-            -I libs/mac/include/SDL2 -I app/native \
+            -I libs/mac/include/SDL2 -I app/native -I build \
             app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/NativeShutdownTests.mm \
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/native-shutdown-tests
