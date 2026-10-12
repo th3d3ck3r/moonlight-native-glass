@@ -1,4 +1,5 @@
 #import <AppKit/AppKit.h>
+#import <QuartzCore/QuartzCore.h>
 #include <SDL.h>
 #include <mutex>
 #include "nativetitlebar.h"
@@ -66,6 +67,10 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic, retain) NSToolbar* previousToolbar;
 @property(nonatomic, assign) NSWindowTitleVisibility previousTitleVisibility;
 @property(nonatomic, assign) NSWindowToolbarStyle previousToolbarStyle;
+@property(nonatomic, assign) BOOL previousTransparency;
+@property(nonatomic, retain) NSTitlebarAccessoryViewController* accessory;
+@property(nonatomic, retain) NSView* row;
+@property(nonatomic, retain) NSButton* overflow;
 @property(nonatomic, assign) BOOL presentationInstalled;
 @property(nonatomic, assign) BOOL windowTransition;
 @property(nonatomic, assign) BOOL fullscreenTransition;
@@ -83,6 +88,7 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 - (void)readControllers;
 - (void)updateWindowToolbar;
 - (void)invalidate;
+- (void)layoutControls;
 @end
 static MLStreamTitlebar* titlebar;
 
@@ -108,21 +114,17 @@ static MLStreamTitlebar* titlebar;
     NSDictionary* labels=@{captureID:@"Release / Capture Input",hostID:@"Control Center",statisticsID:@"Show / Hide Statistics",batteryID:@"Controller Battery",connectionID:@"Connection Status"};
     NSButton* button=[MLStreamToolbarButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"circle" accessibilityDescription:labels[identifier]] target:self action:@selector(clicked:)];
     button.bordered=NO; button.bezelStyle=NSBezelStyleTexturedRounded;
-    button.frame=NSMakeRect(0,0,[identifier isEqual:hostID] ? 180 : ([identifier isEqual:batteryID] ? 42 : 28),26);
+    button.frame=NSMakeRect(0,0,[identifier isEqual:hostID] ? 180 : ([identifier isEqual:batteryID] ? 38 : 24),22);
+    button.identifier=identifier;
+    button.image=[button.image imageWithSymbolConfiguration:[NSImageSymbolConfiguration configurationWithPointSize:13 weight:NSFontWeightRegular]];
     if ([identifier isEqual:hostID]) {
         button.title=self.window.title.length ? self.window.title : @"Computer";
         button.image=[NSImage imageWithSystemSymbolName:@"chevron.down" accessibilityDescription:nil];
-        button.imagePosition=NSImageRight; button.font=[NSFont systemFontOfSize:13 weight:NSFontWeightSemibold];
+        button.imagePosition=NSImageRight; button.font=[NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
         button.cell.lineBreakMode=NSLineBreakByTruncatingTail;
     }
     button.toolTip=labels[identifier]; [button setAccessibilityLabel:labels[identifier]];
     self.buttons[identifier]=button; item.view=button; item.label=labels[identifier]; item.paletteLabel=item.label;
-    button.translatesAutoresizingMaskIntoConstraints=NO;
-    [NSLayoutConstraint activateConstraints:@[
-        [button.heightAnchor constraintEqualToConstant:26],
-        [button.widthAnchor constraintGreaterThanOrEqualToConstant:[identifier isEqual:hostID] ? 70 : button.frame.size.width],
-        [button.widthAnchor constraintLessThanOrEqualToConstant:[identifier isEqual:hostID] ? 230 : button.frame.size.width]
-    ]];
     item.visibilityPriority=[identifier isEqual:batteryID] ? NSToolbarItemVisibilityPriorityLow : NSToolbarItemVisibilityPriorityHigh;
     // Native overflow must invoke the same action, including custom view items.
     NSMenuItem* menu=[[[NSMenuItem alloc] initWithTitle:item.label action:@selector(overflowClicked:) keyEquivalent:@""] autorelease];
@@ -145,24 +147,73 @@ static MLStreamTitlebar* titlebar;
     });
 }
 - (void)themeChanged:(NSNotification*)notification { [self updateWindowToolbar]; [self refresh]; }
+- (void)removeAccessory {
+    if (!self.window || !self.accessory) return;
+    NSUInteger index=[self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory];
+    if (index!=NSNotFound) [self.window removeTitlebarAccessoryViewControllerAtIndex:index];
+}
 - (void)updateWindowToolbar {
     if (!self.window) return;
-    self.window.appearance = crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
-    // Preserve the green/orange connection and battery warning indicators.
-    ((NSButton*)self.buttons[hostID]).contentTintColor = crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : nil;
+    self.window.appearance=crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
+    ((NSButton*)self.buttons[hostID]).contentTintColor=crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : nil;
     NSWindowStyleMask style=self.window.styleMask;
     BOOL fullscreen=self.windowTransition || self.fullscreenTransition || (style & NSWindowStyleMaskFullScreen) || !(style & NSWindowStyleMaskTitled);
-    // Attaching a toolbar changes the Cocoa content geometry. In particular,
-    // never install it on SDL's already-borderless initial fullscreen window,
-    // even briefly before a deferred resize callback removes it again.
     if (fullscreen) {
-        if (self.window.toolbar==self.toolbar) self.window.toolbar=nil;
-    } else if (self.window.visible && !self.window.toolbar) {
+        [self removeAccessory];
+        return;
+    }
+    // A right-aligned accessory shares the ordinary thin title row. No toolbar
+    // or FullSizeContentView change: SDL keeps its original drawable geometry.
+    if (self.window.visible) {
         self.presentationInstalled=YES;
         self.window.titleVisibility=NSWindowTitleHidden;
-        self.window.toolbarStyle=NSWindowToolbarStyleUnifiedCompact;
-        self.window.toolbar=self.toolbar;
+        self.window.titlebarAppearsTransparent=YES;
+        if ([self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory]==NSNotFound)
+            [self.window addTitlebarAccessoryViewController:self.accessory];
+        self.accessory.view.frame=NSMakeRect(0,0,MAX(40,self.window.frame.size.width-88),self.accessory.view.frame.size.height);
+        [self layoutControls];
     }
+}
+- (void)layoutControls {
+    CGFloat width=self.accessory.view.bounds.size.width;
+    CGFloat height=self.accessory.view.bounds.size.height;
+    NSView* glass=self.accessory.view.subviews.firstObject;
+    glass.frame=NSMakeRect(0,1,MAX(0,width-4),MAX(0,height-2));
+    self.row.frame=glass.bounds;
+    CGFloat w=self.row.bounds.size.width, h=self.row.bounds.size.height;
+    BOOL compact=w<280;
+    CGFloat right=MAX(0,w-3);
+    NSButton* connection=self.buttons[connectionID];
+    connection.frame=NSMakeRect(MAX(0,right-24),0,24,h); right-=28;
+    self.overflow.hidden=!compact;
+    self.overflow.frame=NSMakeRect(MAX(0,right-24),0,24,h);
+    if (compact) right-=28;
+    BOOL battery=NO; for (NSToolbarItem* item in self.toolbar.items) if ([item.itemIdentifier isEqual:batteryID]) battery=YES;
+    for (NSString* identifier in @[batteryID,statisticsID]) {
+        NSButton* button=self.buttons[identifier];
+        BOOL show=!compact && (![identifier isEqual:batteryID] || battery);
+        button.hidden=!show;
+        if (show) { CGFloat size=[identifier isEqual:batteryID] ? 38 : 24; button.frame=NSMakeRect(right-size,0,size,h); right-=size+4; }
+    }
+    NSButton* capture=self.buttons[captureID]; capture.hidden=compact;
+    capture.frame=NSMakeRect(3,0,24,h);
+    CGFloat left=compact ? 3 : 31;
+    NSButton* host=self.buttons[hostID];
+    CGFloat hostWidth=MIN(230,MAX(0,right-left));
+    CGFloat x=MAX(left,MIN((w-hostWidth)/2,right-hostWidth));
+    host.frame=NSMakeRect(x,0,hostWidth,h);
+    for (NSButton* button in self.buttons.allValues) if (button.superview!=self.row) [self.row addSubview:button];
+    if (self.overflow.superview!=self.row) [self.row addSubview:self.overflow];
+}
+- (void)showOverflow:(NSButton*)sender {
+    NSMenu* menu=[[[NSMenu alloc] initWithTitle:@"Stream Controls"] autorelease];
+    for (NSToolbarItem* item in self.toolbar.items) {
+        if (!item.menuFormRepresentation) continue;
+        NSMenuItem* command=[[item.menuFormRepresentation copy] autorelease];
+        command.image=((NSButton*)item.view).image;
+        [menu addItem:command];
+    }
+    [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0,NSMinY(sender.bounds)) inView:sender];
 }
 - (void)overflowClicked:(NSMenuItem*)sender { [self perform:sender.representedObject anchor:nil]; }
 - (void)clicked:(NSButton*)sender {
@@ -204,7 +255,7 @@ static MLStreamTitlebar* titlebar;
     capture.contentTintColor=copy.captured ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
     capture.toolTip=copy.captured ? @"Input captured by host · Click to release" : @"Input released to Mac · Click to capture";
     [capture setAccessibilityLabel:capture.toolTip]; [capture setAccessibilityValue:copy.captured ? @"Captured" : @"Released"];
-    NSButton* stats=self.buttons[statisticsID]; stats.image=[NSImage imageWithSystemSymbolName:@"chart.bar" accessibilityDescription:nil];
+    NSButton* stats=self.buttons[statisticsID]; stats.image=[NSImage imageWithSystemSymbolName:@"chart.xyaxis.line" accessibilityDescription:nil];
     stats.contentTintColor=copy.statistics ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
     stats.toolTip=copy.statistics ? @"Hide Statistics" : @"Show Statistics"; [stats setAccessibilityLabel:stats.toolTip]; [stats setAccessibilityValue:copy.statistics ? @"Shown" : @"Hidden"];
     NSButton* connection=self.buttons[connectionID];
@@ -232,6 +283,7 @@ static MLStreamTitlebar* titlebar;
     }]; [combined setTemplate:YES]; battery.image=combined;
     battery.contentTintColor=self.batteryLow ? NSColor.systemOrangeColor : NSColor.labelColor;
     battery.toolTip=self.batteryDetails; [battery setAccessibilityLabel:[@"Controller Battery · " stringByAppendingString:self.batteryDetails]];
+    for (NSButton* button in self.buttons.allValues) if (button!=self.buttons[batteryID]) button.image=[button.image imageWithSymbolConfiguration:[NSImageSymbolConfiguration configurationWithPointSize:13 weight:NSFontWeightRegular]];
     [self updateDetails];
 }
 - (void)readControllers {
@@ -255,9 +307,10 @@ static MLStreamTitlebar* titlebar;
     if (!lines.count && present) {
         for (NSUInteger i=0;i<self.toolbar.items.count;i++) if ([self.toolbar.items[i].itemIdentifier isEqual:batteryID]) { [self.toolbar removeItemAtIndex:i]; break; }
         if ([self.detailsID isEqual:batteryID]) [self closeDetails];
+        [self.buttons[batteryID] removeFromSuperview];
         [self.buttons removeObjectForKey:batteryID];
     }
-    [self refresh];
+    [self layoutControls]; [self refresh];
 }
 - (void)closeDetails {
     // Remove the delegate before closing/replacing a popover. A delayed close
@@ -270,14 +323,15 @@ static MLStreamTitlebar* titlebar;
 - (void)invalidate {
     [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
     [[NSNotificationCenter defaultCenter] removeObserver:self]; [self closeDetails]; self.details.delegate=nil;
-    if (self.presentationInstalled && self.window && (self.window.toolbar==self.toolbar || !self.window.toolbar)) {
-        self.window.toolbar=self.previousToolbar; self.window.titleVisibility=self.previousTitleVisibility;
-        self.window.toolbarStyle=self.previousToolbarStyle;
+    [self removeAccessory];
+    if (self.presentationInstalled && self.window) {
+        self.window.titleVisibility=self.previousTitleVisibility;
+        self.window.titlebarAppearsTransparent=self.previousTransparency;
     }
     self.toolbar.delegate=nil; self.window=nil;
 }
 - (void)dealloc {
-    [self invalidate]; [_toolbar release]; [_previousToolbar release]; [_buttons release]; [_details release]; [_detailsID release]; [_batteryDetails release]; [super dealloc];
+    [self invalidate]; [_accessory release]; [_row release]; [_overflow release]; [_toolbar release]; [_previousToolbar release]; [_buttons release]; [_details release]; [_detailsID release]; [_batteryDetails release]; [super dealloc];
 }
 @end
 
@@ -303,12 +357,36 @@ void nativeTitlebarControllersChanged() { [titlebar readControllers]; }
 void nativeTitlebarAttach(void* window) {
     nativeTitlebarDetach();
     titlebar=[[MLStreamTitlebar alloc] init]; titlebar.window=(NSWindow*)window;
-    titlebar.previousToolbar=titlebar.window.toolbar; titlebar.previousTitleVisibility=titlebar.window.titleVisibility; titlebar.previousToolbarStyle=titlebar.window.toolbarStyle;
+    titlebar.previousToolbar=titlebar.window.toolbar; titlebar.previousTitleVisibility=titlebar.window.titleVisibility; titlebar.previousToolbarStyle=titlebar.window.toolbarStyle; titlebar.previousTransparency=titlebar.window.titlebarAppearsTransparent;
     titlebar.toolbar=[[[NSToolbar alloc] initWithIdentifier:@"NativeStreamToolbar"] autorelease];
     titlebar.toolbar.delegate=titlebar; titlebar.toolbar.displayMode=NSToolbarDisplayModeIconOnly;
     titlebar.toolbar.allowsUserCustomization=NO; titlebar.toolbar.autosavesConfiguration=NO;
-    if (@available(macOS 15.0, *)) titlebar.toolbar.centeredItemIdentifiers=[NSSet setWithObject:hostID];
-    else titlebar.toolbar.centeredItemIdentifier=hostID;
+    // Keep command metadata for narrow-window overflow, without installing a
+    // taller NSToolbar on the stream window.
+    for (NSString* identifier in @[captureID,hostID,statisticsID,connectionID])
+        [titlebar.toolbar insertItemWithItemIdentifier:identifier atIndex:titlebar.toolbar.items.count];
+    titlebar.accessory=[[[NSTitlebarAccessoryViewController alloc] init] autorelease];
+    titlebar.accessory.layoutAttribute=NSLayoutAttributeRight;
+    NSView* root=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,MAX(40,titlebar.window.frame.size.width-88),24)] autorelease];
+    root.identifier=@"NativeStreamTitlebar";
+    titlebar.accessory.view=root;
+    titlebar.row=[[[NSView alloc] initWithFrame:root.bounds] autorelease];
+    NSView* glass;
+    if (@available(macOS 26.0, *)) {
+        NSGlassEffectView* effect=[[[NSGlassEffectView alloc] initWithFrame:root.bounds] autorelease];
+        effect.cornerRadius=8; effect.effectIsInteractive=YES;
+        effect.contentView=titlebar.row; glass=effect;
+    } else {
+        NSVisualEffectView* effect=[[[NSVisualEffectView alloc] initWithFrame:root.bounds] autorelease];
+        effect.material=NSVisualEffectMaterialTitlebar; effect.blendingMode=NSVisualEffectBlendingModeBehindWindow;
+        effect.state=NSVisualEffectStateFollowsWindowActiveState; effect.wantsLayer=YES;
+        effect.layer.cornerRadius=8; effect.layer.masksToBounds=YES;
+        [effect addSubview:titlebar.row]; glass=effect;
+    }
+    glass.identifier=@"NativeStreamTitlebarGlass"; [root addSubview:glass];
+    titlebar.overflow=[MLStreamToolbarButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"ellipsis" accessibilityDescription:@"More Stream Controls"] target:titlebar action:@selector(showOverflow:)];
+    titlebar.overflow.bordered=NO; titlebar.overflow.identifier=@"NativeOverflow";
+    titlebar.overflow.toolTip=@"More Stream Controls"; [titlebar.overflow setAccessibilityLabel:titlebar.overflow.toolTip];
     [titlebar updateWindowToolbar]; [titlebar readControllers];
 }
 void nativeTitlebarDetach() {

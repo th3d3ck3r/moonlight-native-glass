@@ -9,6 +9,7 @@
 #include "nativeapplication.h"
 #include "nativeoverlay.h"
 #include "nativetitlebar.h"
+#include "TitlebarFixture.h"
 
 // Test-only observation of the confinement property already used internally
 // by SDL's Cocoa backend; it is absent from AppKit's public headers.
@@ -281,14 +282,12 @@ int main(int argc, char** argv) {
         check(pressed && released,"Accessory stream must still receive SDL keyboard input");
         check(SDL_SetWindowFullscreen(window,SDL_WINDOW_FULLSCREEN_DESKTOP)==0,"Accessory fullscreen entry"); pump(1.0);
         check(NSApp.activationPolicy==NSApplicationActivationPolicyAccessory,"Fullscreen must not promote engine to Dock");
-        check(cocoa(window).toolbar==nil,"Borderless fullscreen must not show native title-bar controls");
+        check(cocoa(window).toolbar==nil && !titlebarRoot(cocoa(window)),"Borderless fullscreen must not show native title-bar controls");
         check(SDL_SetWindowFullscreen(window,0)==0,"Accessory fullscreen exit"); pump(1.0);
         nativeWindow=cocoa(window);
         // Keep the title toolbar and customizable overlays in an accessory app.
-        check(nativeWindow.toolbar!=nil,"Single-Dock engine lost title-bar controls");
-        NSButton* hostButton=nil;
-        for (NSToolbarItem* item in nativeWindow.toolbar.items)
-            if ([item.itemIdentifier isEqual:@"NativeHost"]) hostButton=(NSButton*)item.view;
+        check(titlebarRoot(nativeWindow)!=nil,"Single-Dock engine lost title-bar controls");
+        NSButton* hostButton=titlebarButton(nativeWindow,@"NativeHost");
         check(hostButton!=nil,"Missing computer-name Control Center entry");
         check([NSStringFromClass(hostButton.class) isEqualToString:@"MLStreamToolbarButton"],"Title-bar controls must return tracked mouse-up to SDL");
         // Unlike performClick:, these events exercise AppKit's button tracking
@@ -346,7 +345,7 @@ int main(int argc, char** argv) {
                 check(menuInput.isCaptureActive(),"Cancel path must restore previous capture after the sheet closes");
                 menuInput.setCaptureActive(false);
             }
-            check((cocoa(window).toolbar==nil)==(mode!=0),"Title bar must appear only in windowed mode");
+            check((titlebarRoot(cocoa(window))==nil)==(mode!=0),"Title bar must appear only in windowed mode");
             nativeOverlayRestoreStreamFocus(window);
             check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Fresh relative capture must work before controls");
             pump();

@@ -8,10 +8,7 @@
 #include <cstdlib>
 static void check(bool okay,const char* message) { if (!okay) { fprintf(stderr,"FAIL: %s\n",message); exit(1); } }
 static void pump() { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:.2]; while (end.timeIntervalSinceNow>0) { SDL_PumpEvents(); [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; } }
-static NSToolbarItem* toolbarItem(NSWindow* window, NSString* identifier) {
-    for (NSToolbarItem* item in window.toolbar.items) if ([item.itemIdentifier isEqual:identifier]) return item;
-    return nil;
-}
+#include "TitlebarFixture.h"
 static bool hasLabel(NSView* view, NSString* text) {
     if ([view isKindOfClass:NSTextField.class] && [((NSTextField*)view).stringValue containsString:text]) return true;
     for (NSView* child in view.subviews) if (hasLabel(child,text)) return true;
@@ -67,20 +64,27 @@ int main(int argc,char** argv) { @autoreleasepool {
     [window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
     pump(); [window makeKeyAndOrderFront:nil]; pump();
     check(NSApp.keyWindow==window,"Fixture must own keyboard focus before overlay attachment");
+    CGFloat stockChrome=window.frame.size.height-window.contentLayoutRect.size.height;
+    BOOL originalTransparency=window.titlebarAppearsTransparent;
     nativeOverlayAttach(window,"overlay-test"); check(nativeOverlayEventType()!=SDL_USEREVENT,"Must not consume upstream SDL user events");
-    check(window.toolbar!=nil && window.titleVisibility==NSWindowTitleHidden,"Native compact title toolbar installed");
-    check(toolbarItem(window,@"NativeHost") && toolbarItem(window,@"NativeCapture") && toolbarItem(window,@"NativeStatistics") && toolbarItem(window,@"NativeConnection"),"Required title-bar controls");
-    check(!toolbarItem(window,@"NativeControllerBattery"),"Controller indicator hidden when none connected");
-    NSButton* host=(NSButton*)toolbarItem(window,@"NativeHost").view;
+    pump();
+    check(titlebarRoot(window)!=nil && window.toolbar==nil && window.titleVisibility==NSWindowTitleHidden,"Slim native title row installed without a tall toolbar");
+    CGFloat slimChrome=window.frame.size.height-window.contentLayoutRect.size.height;
+    fprintf(stderr,"Titlebar chrome: original=%.1f slim=%.1f points\n",stockChrome,slimChrome);
+    check(slimChrome<=32 && slimChrome<=stockChrome+1,"Slim controls must stay in the original title row and preserve drawable geometry");
+    check(titlebarButton(window,@"NativeHost") && titlebarButton(window,@"NativeCapture") && titlebarButton(window,@"NativeStatistics") && titlebarButton(window,@"NativeConnection"),"Required title-bar controls");
+    check(!titlebarButton(window,@"NativeControllerBattery"),"Controller indicator hidden when none connected");
+    NSButton* host=titlebarButton(window,@"NativeHost");
     check([host.title isEqual:window.title] && host.imagePosition==NSImageRight,"Computer name and chevron retained");
     [host performClick:nil]; check(takeAction(102),"Computer name queues controls action, not statistics");
-    NSButton* captureButton=(NSButton*)toolbarItem(window,@"NativeCapture").view;
+    NSButton* captureButton=titlebarButton(window,@"NativeCapture");
     [captureButton performClick:nil]; check(takeAction(1),"Title capture uses original SDL action");
-    NSButton* statisticsButton=(NSButton*)toolbarItem(window,@"NativeStatistics").view;
+    NSButton* statisticsButton=titlebarButton(window,@"NativeStatistics");
+    check(statisticsButton.image!=nil,"Native line-graph symbol must be available");
     [statisticsButton performClick:nil]; check(takeAction(3),"Title statistics uses original SDL action");
     nativeTitlebarSetCapture(true); pump(); check([captureButton.toolTip containsString:@"captured by host"],"Capture state refresh");
     nativeTitlebarSetCapture(false); pump(); check([captureButton.toolTip containsString:@"released to Mac"],"Capture release refresh");
-    NSButton* connectionButton=(NSButton*)toolbarItem(window,@"NativeConnection").view;
+    NSButton* connectionButton=titlebarButton(window,@"NativeConnection");
     nativeTitlebarSetConnection(NativeConnectionState::Connecting); pump(); check([connectionButton.toolTip containsString:@"Connecting"],"Connecting state");
     nativeTitlebarSetConnection(NativeConnectionState::Connected); pump(); check([connectionButton.toolTip containsString:@"No connection warning"],"Connected state");
     nativeTitlebarSetConnection(NativeConnectionState::Poor); pump(); check([connectionButton.toolTip containsString:@"poor connection"],"Poor state");
@@ -95,8 +99,8 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(device>=0,"Virtual controller creation");
     SDL_GameController* virtualController=SDL_GameControllerOpen(device); check(virtualController!=nullptr,"Virtual controller open");
     nativeTitlebarControllersChanged(); pump();
-    check(toolbarItem(window,@"NativeControllerBattery")!=nil,"Controller indicator appears after connection");
-    NSButton* batteryButton=(NSButton*)toolbarItem(window,@"NativeControllerBattery").view;
+    check(titlebarButton(window,@"NativeControllerBattery")!=nil,"Controller indicator appears after connection");
+    NSButton* batteryButton=titlebarButton(window,@"NativeControllerBattery");
     check([batteryButton.toolTip containsString:@"unavailable"],"Unknown charge is not fabricated");
     [connectionButton performClick:nil]; pump();
     bool foundDetails=false; for (NSWindow* candidate in NSApp.windows) if (candidate.visible && hasLabel(candidate.contentView,@"not latency or frame pacing")) foundDetails=true;
@@ -105,6 +109,16 @@ int main(int argc,char** argv) { @autoreleasepool {
     bool foundBattery=false; for (NSWindow* candidate in NSApp.windows) if (candidate.visible && hasLabel(candidate.contentView,@"Battery information unavailable")) foundBattery=true;
     check(foundBattery,"Rapid details replacement must keep the current popover state");
     [batteryButton performClick:nil]; pump();
+    NSString* titlebarOut=[NSString stringWithUTF8String:argv[1]];
+    [[NSFileManager defaultManager] createDirectoryAtPath:titlebarOut withIntermediateDirectories:YES attributes:nil error:nil];
+    capture([titlebarOut stringByAppendingPathComponent:@"titlebar-slim-dark.png"]);
+    [window setContentSize:NSMakeSize(300,360)]; pump();
+    NSButton* overflow=titlebarButton(window,@"NativeOverflow");
+    check(overflow && !overflow.hidden && statisticsButton.hidden,"Narrow title row must expose overflow rather than overlapping controls");
+    check(NSMaxX(host.frame)<=NSMinX(overflow.frame)+1,"Computer entry must not overlap narrow-window overflow");
+    capture([titlebarOut stringByAppendingPathComponent:@"titlebar-slim-narrow.png"]);
+    [window setContentSize:NSMakeSize(960,540)]; pump();
+    check(overflow.hidden && !statisticsButton.hidden,"Widening must restore direct title controls");
     const char* sample="Video stream: 1920x1080 60 FPS\nVideo codec: H.264\nIncoming frame rate: 59.98 FPS\nRendering frame rate: 59.98 FPS\nFrames dropped by network: 0.00%\nAverage network latency: 2 ms\nAverage decoding time: 1.2 ms\nAverage frame queue delay: 0.4 ms\nAverage rendering time: 0.8 ms";
     check(nativeOverlayPresent(0,true,sample),"Native statistics ownership"); check(nativeOverlayPresent(1,true,"Design preview · Sample values"),"Status ownership"); pump();
     fprintf(stderr,"Overlay children=%lu visible=%d configured=%d\n",(unsigned long)window.childWindows.count,window.visible,nativeOverlayConfigured());
@@ -163,7 +177,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     [batteryButton performClick:nil]; pump(); capture([out stringByAppendingPathComponent:@"titlebar-controller-details.png"]);
     [batteryButton performClick:nil]; pump();
     SDL_GameControllerClose(virtualController); SDL_JoystickDetachVirtual(device); nativeTitlebarControllersChanged(); pump();
-    check(!toolbarItem(window,@"NativeControllerBattery"),"Controller indicator removed after disconnect");
+    check(!titlebarButton(window,@"NativeControllerBattery"),"Controller indicator removed after disconnect");
     [defaults setDouble:1.5 forKey:@"scale"]; [defaults setObject:@"bottomRight" forKey:@"position"]; [defaults synchronize];
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES];
     [window setContentSize:NSMakeSize(640,360)]; pump();
@@ -181,7 +195,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     for (NSWindow* panel in window.childWindows) check(NSContainsRect(bounds,panel.frame),"Every panel must fit after controls shrink with all actions selected");
     controls=nil; for (NSWindow* panel in window.childWindows) if (!panel.ignoresMouseEvents) controls=panel;
     check(buttonWithTag(controls.contentView,12)!=nil,"Disconnect must remain directly visible in compact controls");
-    nativeOverlayDetach(); check(window.toolbar==nil && window.titleVisibility==NSWindowTitleVisible,"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
+    nativeOverlayDetach(); check(window.toolbar==nil && !titlebarRoot(window) && window.titleVisibility==NSWindowTitleVisible && window.titlebarAppearsTransparent==originalTransparency,"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
     nativeOverlayAttach(window,"next-session"); check(nativeOverlayConfigured(),"Repeated session attachment"); nativeOverlayDetach();
     if (previous) [defaults setPersistentDomain:previous forName:@"com.moonlight-stream.NativeGlass.Overlay"]; else [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [previous release]; [defaults synchronize];
     SDL_DestroyWindow(stream); SDL_Quit(); puts("Native overlay state, all shortcuts, layout, focus, teardown and preview checks passed"); return 0;
