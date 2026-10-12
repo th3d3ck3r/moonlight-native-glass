@@ -35,7 +35,7 @@ private final class ConnectionCloseDelegate: NSObject, NSWindowDelegate {
     override func responds(to selector: Selector!) -> Bool { super.responds(to: selector) || (original?.responds(to: selector) ?? false) }
     override func forwardingTarget(for selector: Selector!) -> Any? { original }
 }
-@MainActor private var connectionHost: (window: NSWindow, view: NSView, model: ConnectionHostModel, delegate: ConnectionCloseDelegate, zoomEnabled: Bool)?
+@MainActor private var connectionHost: (window: NSWindow, view: NSView, model: ConnectionHostModel, delegate: ConnectionCloseDelegate, zoomEnabled: Bool, appearance: NSAppearance?)?
 
 @MainActor @_cdecl("MLConnectionAttach")
 public func connectionAttach(_ raw: UnsafeMutableRawPointer, _ host: UnsafePointer<CChar>, _ game: UnsafePointer<CChar>, _ action: @escaping @convention(c) (Int32) -> Void) {
@@ -49,9 +49,13 @@ public func connectionAttach(_ raw: UnsafeMutableRawPointer, _ host: UnsafePoint
     content.addSubview(view, positioned: .above, relativeTo: nil)
     let delegate = ConnectionCloseDelegate(original: window.delegate, action: action)
     window.delegate = delegate
+    let appearance = window.appearance
+    if UserDefaults(suiteName: NativeCrimsonTheme.suite)?.object(forKey: NativeCrimsonTheme.key) as? Bool ?? true {
+        window.appearance = NSAppearance(named: .darkAqua)
+    }
     let zoom = window.standardWindowButton(.zoomButton)?.isEnabled ?? true
     window.standardWindowButton(.zoomButton)?.isEnabled = false
-    connectionHost = (window, view, model, delegate, zoom)
+    connectionHost = (window, view, model, delegate, zoom, appearance)
 }
 @MainActor @_cdecl("MLConnectionUpdate")
 public func connectionUpdate(_ message: UnsafePointer<CChar>, _ phase: Int32) {
@@ -70,6 +74,7 @@ public func connectionUpdate(_ message: UnsafePointer<CChar>, _ phase: Int32) {
 public func connectionDetach() {
     guard let host = connectionHost else { return }
     if host.window.delegate === host.delegate { host.window.delegate = host.delegate.original }
+    host.window.appearance = host.appearance
     host.window.standardWindowButton(.zoomButton)?.isEnabled = host.zoomEnabled
     host.view.removeFromSuperview()
     connectionHost = nil

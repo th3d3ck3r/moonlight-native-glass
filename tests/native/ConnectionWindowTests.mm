@@ -13,12 +13,16 @@ static void drain(double seconds) { NSDate* end=[NSDate dateWithTimeIntervalSinc
 static NSView* host(NSView* view) { if ([view.identifier isEqualToString:@"stream-connection-host"]) return view; for(NSView* child in view.subviews) { NSView* found=host(child); if(found) return found; } return nil; }
 int main(int argc,char** argv) { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching]; SDL_SetMainReady();
+    NSUserDefaults* defaults=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
+    id previousCrimson=[[defaults objectForKey:@"crimsonGlass"] retain];
+    [defaults setBool:YES forKey:@"crimsonGlass"]; [defaults synchronize];
     configureNativeStreamWindow("connection-window-fixture"); nativeSetConnectionWaiting(true);
     int action=0; nativeSetConnectionCommand([&action](int value) { action=value; });
     check(nativeCreateConnectionWindow("Gaming PC","Desktop",600,420,0),"Connection window must open before any host/Session starts");
     SDL_Window* window=nativeConnectionWindow(); check(window!=nullptr,"Real SDL window created first");
     Uint32 id=SDL_GetWindowID(window); NSWindow* original=cocoa(window); NSView* content=original.contentView;
-    drain(.3); check(original.visible && host(content)!=nil,"Apollo hosted inside the SDL content view");
+    drain(.3); check([original.effectiveAppearance.name isEqualToString:NSAppearanceNameDarkAqua],"Connecting title bar must match Crimson Glass");
+    check(original.visible && host(content)!=nil,"Apollo hosted inside the SDL content view");
     check(!nativeOverlayConfigured(),"Stream controls/input presentation must wait for Continue");
     nativeUpdateConnectionWindow("Starting video stream…",0); drain(.1);
     nativeUpdateConnectionWindow("",1); drain(2.2);
@@ -40,5 +44,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(nativeOverlayConfigured() && nativeConnectionWindow()==window,"Same SDL window accepts the normal stream controls after handoff");
     stopNativeStreamWindow(); nativeEndConnectionWindow();
     check(nativeConnectionWindow()==nullptr,"All connection-window ownership must clear before shutdown");
+    if(previousCrimson) [defaults setObject:previousCrimson forKey:@"crimsonGlass"]; else [defaults removeObjectForKey:@"crimsonGlass"];
+    [defaults synchronize]; [previousCrimson release];
     puts("PASS: actual SDL window opens before connection, hosts Apollo, orbits, handles Close/Cancel, and retains the same window/content on Continue");
 } }
