@@ -50,17 +50,13 @@ struct NativeConnectionView: View {
                     }
                     Spacer(minLength: 12)
                     if journey.phase == .connected {
-                        Button("Continue to Stream", action: proceed)
-                            .buttonStyle(.borderedProminent).tint(accent)
-                            .accessibilityIdentifier("connection-continue")
+                        NativeConnectionButton("Continue to Stream", identifier: "connection-continue", accent: NSColor(accent), action: proceed)
                     } else if journey.phase == .entering {
                         ProgressView().controlSize(.small).padding(8)
                     } else if journey.phase == .failed {
-                        Button("Retry", action: retry).disabled(!canRetry)
-                            .accessibilityIdentifier("connection-retry")
+                        NativeConnectionButton("Retry", identifier: "connection-retry", enabled: canRetry, action: retry)
                     }
-                    Button(journey.phase == .failed ? "Back to Library" : "Cancel", action: cancel)
-                        .accessibilityIdentifier("connection-cancel")
+                    NativeConnectionButton(journey.phase == .failed ? "Back to Library" : "Cancel", identifier: "connection-cancel", action: cancel)
                 }
                 if let error = journey.error {
                     Label(error, systemImage: "exclamationmark.triangle")
@@ -166,4 +162,42 @@ struct NativeConnectionView: View {
         c.stroke(antenna, with: .color(.white.opacity(0.75)), lineWidth: 0.8)
         c.fill(Path(ellipseIn: CGRect(x: -17, y: -23, width: 6, height: 5)), with: .color(Color(white: 0.8)))
     }
+}
+
+// SDL and Qt own this window's event loop. Use AppKit target/action controls
+// so connection actions do not depend on SwiftUI gesture dispatch in that loop.
+private final class ConnectionActionButton: NSButton {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+}
+private struct NativeConnectionButton: NSViewRepresentable {
+    let title: String
+    let identifier: String
+    var enabled = true
+    var accent: NSColor? = nil
+    let action: () -> Void
+    init(_ title: String, identifier: String, enabled: Bool = true, accent: NSColor? = nil, action: @escaping () -> Void) {
+        self.title = title; self.identifier = identifier; self.enabled = enabled; self.accent = accent; self.action = action
+    }
+    final class Coordinator: NSObject {
+        var action: () -> Void
+        init(_ action: @escaping () -> Void) { self.action = action }
+        @objc func press(_ sender: NSButton) { action() }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(action) }
+    func makeNSView(context: Context) -> NSButton {
+        let button = ConnectionActionButton(title: title, target: context.coordinator, action: #selector(Coordinator.press(_:)))
+        button.setButtonType(.momentaryPushIn); button.bezelStyle = .rounded
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return button
+    }
+    func updateNSView(_ button: NSButton, context: Context) {
+        context.coordinator.action = action
+        button.title = title; button.isEnabled = enabled; button.bezelColor = accent
+        button.contentTintColor = accent == nil ? nil : .white
+        button.identifier = NSUserInterfaceItemIdentifier(identifier)
+        button.setAccessibilityIdentifier(identifier)
+    }
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSButton, context: Context) -> CGSize? { nsView.fittingSize }
 }

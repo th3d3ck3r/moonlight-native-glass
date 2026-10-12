@@ -17,19 +17,11 @@ static NSButton* button(NSView* view, NSString* title) {
     for(NSView* child in view.subviews) { NSButton* found=button(child,title); if(found) return found; } return nil;
 }
 static NSView* host(NSView* view) { if ([view.identifier isEqualToString:@"stream-connection-host"]) return view; for(NSView* child in view.subviews) { NSView* found=host(child); if(found) return found; } return nil; }
-static id accessibleButton(id element, NSString* identifier) {
-    if ([element respondsToSelector:@selector(accessibilityIdentifier)] &&
-        [[element accessibilityIdentifier] isEqualToString:identifier]) return element;
-    if ([element respondsToSelector:@selector(accessibilityChildren)]) {
-        for (id child in [element accessibilityChildren]) {
-            id found=accessibleButton(child,identifier); if(found) return found;
-        }
-    }
-    return nil;
-}
-static void click(NSWindow* window, id element) {
-    NSRect frame=[element accessibilityFrame];
-    NSPoint location=[window convertPointFromScreen:NSMakePoint(NSMidX(frame),NSMidY(frame))];
+static void click(NSWindow* window, NSButton* element) {
+    NSRect frame=[element convertRect:element.bounds toView:nil];
+    NSPoint location=NSMakePoint(NSMidX(frame),NSMidY(frame));
+    check([window.contentView hitTest:[window.contentView convertPoint:location fromView:nil]]==element,
+        "Connection button must receive hits inside the SDL content view");
     for (NSNumber* type in @[@(NSEventTypeLeftMouseDown),@(NSEventTypeLeftMouseUp)]) {
         NSEvent* event=[NSEvent mouseEventWithType:(NSEventType)type.integerValue location:location modifierFlags:0
             timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil eventNumber:1 clickCount:1 pressure:1];
@@ -43,8 +35,8 @@ int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepoo
     id previousCrimson=[[defaults objectForKey:@"crimsonGlass"] retain];
     [defaults setBool:YES forKey:@"crimsonGlass"]; [defaults synchronize];
     configureNativeStreamWindow("connection-window-fixture"); nativeSetConnectionWaiting(true);
-    int action=0; nativeSetConnectionCommand([&action](int value) { action=value; });
-    check(nativeCreateConnectionWindow("Gaming PC","Desktop",600,420,0),"Connection window must open before any host/Session starts");
+    int action=0; nativeSetConnectionCommand([&action](int value) { action=value; if(value==1) nativeSetConnectionWaiting(false); });
+    check(nativeCreateConnectionWindow("Gaming PC","Desktop",600,420,SDL_WINDOW_METAL),"Connection window must open before any host/Session starts");
     SDL_Window* window=nativeConnectionWindow(); check(window!=nullptr,"Real SDL window created first");
     Uint32 windowID=SDL_GetWindowID(window); NSWindow* original=cocoa(window); NSView* content=original.contentView;
     drain(.3); check([original.effectiveAppearance.name isEqualToString:NSAppearanceNameDarkAqua],"Connecting title bar must match Crimson Glass");
@@ -70,11 +62,14 @@ int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepoo
     // The red button cancels the connection instead of destroying the SDL view.
     [original performClose:nil]; check(action==2 && original.visible,"Close must route to Cancel while connecting/orbiting");
     action=0;
-    id proceed=accessibleButton(host(content),@"connection-continue");
-    check(proceed!=nil,"Continue must be exposed in the real SDL hosting view");
+    NSButton* cancel=button(host(content),@"Cancel"); check(cancel!=nil,"Native Cancel control");
+    click(original,cancel); check(action==2 && nativeConnectionWaiting(),"Cancel mouse click must reach the bridge");
+    action=0;
+    NSButton* proceed=button(host(content),@"Continue to Stream");
+    check(proceed!=nil,"Continue must be a native control inside the real SDL hosting view");
     click(original,proceed);
     check(action==1,"Mouse click on real Continue must invoke the bridge callback");
-    nativeSetConnectionWaiting(false); nativeDetachConnectionWindowView();
+    check(!nativeConnectionWaiting(),"Actual Continue callback must release the connection gate"); nativeDetachConnectionWindowView();
     check(host(content)==nil && original.contentView==content && SDL_GetWindowID(window)==windowID,"Continue removes only the temporary hosting subview");
     nativeAttachStreamWindow(window); drain(.2);
     check(nativeOverlayConfigured() && nativeConnectionWindow()==window,"Same SDL window accepts the normal stream controls after handoff");

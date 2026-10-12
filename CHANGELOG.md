@@ -1,5 +1,13 @@
 # MoonlightLG changelog
 
+## 1.1.02U — unreleased — 2026-10-12
+
+- Use native AppKit connection buttons with direct target/action callbacks and
+  first-click support inside the Qt/SDL stream window.
+- Test actual Continue and Cancel mouse clicks with Qt, SDL and the SwiftUI
+  animation running together, including Metal and same-window handoff.
+- Internal build 31. U download links remain owner-only.
+
 ## 1.1.01U — unreleased — 2026-10-12
 
 - Correct placement: open the actual SDL stream window before starting host/game
