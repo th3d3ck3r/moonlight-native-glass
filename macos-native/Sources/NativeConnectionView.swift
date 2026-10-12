@@ -8,10 +8,12 @@ struct NativeConnectionView: View {
     var warnings: [String] = []
     var canRetry = false
     var previewTime: Double? = nil
+    var reduceMotionOverride: Bool? = nil
     var cancel: () -> Void
     var proceed: () -> Void
     var retry: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var reduceMotion: Bool { reduceMotionOverride ?? systemReduceMotion }
     @Environment(\.crimsonGlassEnabled) private var crimson
     @State private var startedAt = Date()
     private var accent: Color { crimson ? NativeCrimsonTheme.highlight : Color(red: 0.4, green: 0.8, blue: 1) }
@@ -80,6 +82,7 @@ struct NativeConnectionView: View {
         .background(Color(red: 0.015, green: 0.02, blue: 0.035))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("connection-journey")
+        .environment(\.colorScheme, .dark)
     }
 
     private func smooth(_ value: Double) -> Double {

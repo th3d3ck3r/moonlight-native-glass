@@ -1838,6 +1838,9 @@ void Session::exec()
             SDL_FlushEvents(SDL_KEYDOWN, SDL_MOUSEWHEEL);
             SDL_FlushEvents(SDL_CONTROLLERAXISMOTION, SDL_CONTROLLERBUTTONUP);
             SDL_FlushEvents(SDL_FINGERDOWN, SDL_FINGERMOTION);
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+            SDL_FlushEvents(SDL_CONTROLLERTOUCHPADDOWN, SDL_CONTROLLERSENSORUPDATE);
+#endif
         }
     }
 #endif

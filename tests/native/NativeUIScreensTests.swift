@@ -62,24 +62,27 @@ import XCTest
     }
 
     func testApolloConnectionFlightOrbitAndContinue() throws {
-        for phase in ["flight", "orbit", "error"] {
+        for phase in ["flight", "orbit", "error", "reduced"] {
             let app = XCUIApplication()
             app.launchArguments = ["--design-preview", "--preview-screen=connection-" + phase, "--connection-frame=5", "--dark"]
+            if phase == "reduced" {
+                app.launchArguments = ["--design-preview", "--preview-screen=connection-orbit", "--connection-reduce-motion", "--dark"]
+            }
             app.launch()
             let scene = app.descendants(matching: .any)["connection-journey"]
             XCTAssertTrue(scene.waitForExistence(timeout: 10))
             let proceed = app.buttons["connection-continue"]
-            if phase == "orbit" {
+            if phase == "orbit" || phase == "reduced" {
                 XCTAssertTrue(proceed.exists)
                 Thread.sleep(forTimeInterval: 2)
                 XCTAssertTrue(scene.exists, "Orbit must remain until the user continues")
             } else { XCTAssertFalse(proceed.exists) }
             let capture = XCTAttachment(screenshot: app.screenshot())
             capture.name = "apollo-connection-" + phase; capture.lifetime = .keepAlways; add(capture)
-            if phase == "orbit" { proceed.click() }
+            if phase == "orbit" || phase == "reduced" { proceed.click() }
             else { app.buttons["connection-cancel"].click() }
             XCTAssertTrue(app.buttons["Refresh"].waitForExistence(timeout: 5))
-            XCTAssertFalse(scene.exists)
+            XCTAssertTrue(scene.waitForNonExistence(timeout: 5))
             app.terminate()
         }
     }

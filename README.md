@@ -35,8 +35,8 @@ stable releases have no suffix. Validation is recorded in the [current audit](ht
 | Version | Meaning |
 |---|---|
 | `1.1.00U` | Unreleased development work; no posted download |
-| `1.0.00E` | Experimental build |
-| `1.0.00` | Stable release |
+| `1.1.00E` | Experimental build |
+| `1.1.00` | Stable release |
 
 The final component uses at least two digits. Fixes advance `00 → 01 → 02`;
 feature releases advance the minor version, and major revisions advance the major

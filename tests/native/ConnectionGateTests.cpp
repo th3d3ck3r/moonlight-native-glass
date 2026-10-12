@@ -3,8 +3,9 @@
 #include <vector>
 // Test doubles record the gate's calls; the decision code is extracted directly
 // from Session::exec. Full builds compile it against actual Qt/SDL as well.
+#define SDL_VERSION_ATLEAST(a,b,c) 1
 enum { SDL_GETEVENT, SDL_QUIT, SDL_KEYDOWN, SDL_MOUSEWHEEL,
-       SDL_CONTROLLERAXISMOTION, SDL_CONTROLLERBUTTONUP, SDL_FINGERDOWN, SDL_FINGERMOTION };
+       SDL_CONTROLLERAXISMOTION, SDL_CONTROLLERBUTTONUP, SDL_FINGERDOWN, SDL_FINGERMOTION, SDL_CONTROLLERTOUCHPADDOWN, SDL_CONTROLLERSENSORUPDATE };
 struct SDL_Event {};
 static bool waiting = true, quitQueued = false;
 static int polls = 0, flushes = 0;
@@ -32,7 +33,7 @@ int main() {
     for (int i = 0; i < 100; ++i) session.exec();
     assert(!session.opened && !session.cleaned && session.m_AudioMuted && polls == 100 && flushes == 0);
     waiting = false; session.exec();
-    assert(session.opened && !session.gate && !session.m_AudioMuted && flushes == 3);
+    assert(session.opened && !session.gate && !session.m_AudioMuted && flushes == 4);
     Session cancelled; waiting = true; quitQueued = true; cancelled.exec();
     assert(cancelled.cleaned && !cancelled.opened && !cancelled.prefs.quitAppAfter);
     Session lost; lost.m_ShouldExit = true; lost.exec();

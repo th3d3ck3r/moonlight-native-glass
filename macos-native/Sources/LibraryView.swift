@@ -24,7 +24,7 @@ struct LibraryView: View {
     private var games: [Game] {
         (store.selected?.apps ?? []).filter { (showHidden || !$0.hidden || $0.id == store.selected?.runningApp) && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) }
     }
-    private var controlsEnabled: Bool { store.ready && !store.streamActive && store.pairing == nil && !store.addingHost && !store.testingConnection }
+    private var controlsEnabled: Bool { store.ready && store.connectionJourney == nil && !store.streamActive && store.pairing == nil && !store.addingHost && !store.testingConnection }
 
     var body: some View {
         NavigationSplitView {
@@ -101,6 +101,7 @@ struct LibraryView: View {
             if let journey = store.connectionJourney {
                 NativeConnectionView(journey: journey, warnings: store.warnings, canRetry: !store.streamActive,
                     previewTime: store.preview ? Double(nativeArgument("--connection-frame") ?? "") : nil,
+                    reduceMotionOverride: store.preview && CommandLine.arguments.contains("--connection-reduce-motion") ? true : nil,
                     cancel: { store.cancelLaunch() }, proceed: { store.continueToStream() }, retry: { store.retryConnection() })
                     .id(journey.id)
             }
@@ -119,6 +120,7 @@ struct LibraryView: View {
         .onDisappear { controller.stop() }
         .onChange(of: interactive) { _, enabled in if enabled { configureController() } else { controller.stop() } }
         .onChange(of: store.streamActive) { _, active in if active { controller.stop() } else { configureController() } }
+        .onChange(of: store.connectionJourney?.id) { _, id in if id != nil { controller.stop() } else { configureController() } }
         .onChange(of: store.selectedID) { _, _ in focusedGame = nil; search = "" }
     }
 
@@ -252,7 +254,7 @@ struct LibraryView: View {
     }
     private func configureController() {
         guard interactive else { controller.stop(); return }
-        guard !store.streamActive else { return }
+        guard !store.streamActive && store.connectionJourney == nil else { controller.stop(); return }
         controller.start(move: { direction in if store.libraryWindow?.isKeyWindow == true { moveGames(direction) } }, select: {
             guard controlsEnabled, store.libraryWindow?.isKeyWindow == true, let computer = store.selected else { return }
             if !computer.paired && computer.online { store.pair(computer) }

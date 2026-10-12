@@ -17,5 +17,5 @@ Path('build/NativeDisconnectEventPredicate.inc').write_text(source[a:end-1])
 # Exercise the exact production pre-window gate, not a copied implementation.
 a=source.index('    // Hold BEFORE SDL window/fullscreen/input creation.')
 a=source.index('    if (m_AsyncConnectionSuccess',a)
-b=source.index('\n#endif',a)
+b=source.index('\n#endif\n    // If the connection failed',a)
 Path('build/NativeConnectionGate.inc').write_text(source[a:b])
