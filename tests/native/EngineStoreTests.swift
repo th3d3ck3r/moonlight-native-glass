@@ -234,8 +234,14 @@ func nativeArgument(_ name: String) -> String? { nil }
         try await wait { silent.ready }
         silent.startStream(computer, game: game)
         try await wait(seconds: 12) { !silent.streamActive }
-        precondition(silent.ready && silent.message?.detail.contains("did not prepare") == true,
+        precondition(silent.ready && silent.connectionJourney?.error?.contains("did not prepare") == true,
                      "A silent, live helper left launch stuck indefinitely")
+        let failedJourney = silent.connectionJourney?.id
+        silent.retryConnection()
+        precondition(silent.streamActive && silent.connectionJourney?.id != failedJourney && silent.connectionJourney?.phase == .connecting,
+                     "Retry must create a fresh launch identity and flight")
+        silent.cancelLaunch()
+        precondition(silent.connectionJourney == nil, "Cancel after Retry retained the old failure screen")
         silent.shutdown()
         let malformed = EngineStore(executable: try fixture("malformed"))
         malformed.start()
