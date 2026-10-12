@@ -93,7 +93,6 @@ struct LibraryView: View {
             configureController()
             guard store.preview, !previewConfigured else { return }
             previewConfigured = true
-            let args = CommandLine.arguments
             guard let screen = nativeArgument("--preview-screen") else { return }
             if screen.hasPrefix("settings-") { openSettings() }
             else if screen == "add" { addPresented = true }

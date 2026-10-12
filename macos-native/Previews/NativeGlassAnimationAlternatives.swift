@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// Preview-only alternatives. The production app keeps its current choreography.
+// Five preview-only alternatives plus the user-selected production Warp Arrival.
 // All variants use the dedicated transparent boot logo resource.
 private enum MoonlightMotion: String, CaseIterable {
     case orbit = "Orbit Reveal"

@@ -5,13 +5,9 @@ This change starts at the validated Preview 20 source checkpoint
 `feature/native-boot-animation`. It contains no AWDL helper source, settings,
 installation scripts, services, or helper build changes. Preview build: 22.
 
-The user's supplied Xcode onboarding reference informs the choreography:
-a seed expands into a blue fill, four particles separate, fine construction
-rings emerge, and the fill contracts into the **unchanged
-bundled `moonlight.icns` logo**. The native sequence takes 4.1 seconds plus a
-0.35-second fade. It uses time-driven SwiftUI vector drawing at a requested
-60 Hz, scales to the window/backing resolution, and stops updating on completion.
-No video decoder is involved; the previous movie remains an unused resource.
+The current production startup is the user's edited Warp Arrival: perspective stars accelerate and then brake, the small crimson moon approaches, and two satellites orbit it before the library fades in. Its star lane starts at 45, preserving the user's change. Startup lasts 4.1 seconds plus a 0.35-second fade. Rendering uses native SwiftUI Canvas with a requested 60 Hz cadence and stops on completion; no video decoder is involved. The previous movie remains an unused resource.
+
+The earlier Xcode onboarding sequence and the other five alternatives remain available as Canvas previews. The current app-wide default is Crimson Glass; Settings → Appearance can restore the original palette.
 
 During startup only the artwork and genuine macOS close/minimize/zoom buttons
 appear. No library, title text, toolbar, sidebar, search field, or visible Skip
@@ -44,7 +40,7 @@ and the existing streaming/input/engine checks remain required before delivery.
 Exact perceived smoothness and matching on the user's Intel/OCLP Mac require
 local testing; 60 Hz scheduling is a target, not a hardware frame-rate guarantee.
 
-## Verified artwork and validation evidence
+## Historical validation evidence (before Crimson Glass)
 
 Production source `661631e3a04332e05b3064f308d7b57cd83971e5` passed the
 nine-test native UI suite in run `38159249193`, job `114528519269`.

@@ -153,7 +153,7 @@ private struct NativeStatusActions: View {
 
 // Keep these credits fixed across builds. AppKit reads the build number from
 // CFBundleVersion for the preview number; release notes belong on GitHub.
-func showNativeAboutPanel() {
+@MainActor func showNativeAboutPanel() {
     NativeCrimsonTheme.apply(NativeCrimsonTheme.enabled)
     let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "22"
     let engineBundle = Bundle(url: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app"))
