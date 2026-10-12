@@ -75,6 +75,11 @@ final class EngineChannel {
         data.append(0x0A)
         try input.fileHandleForWriting.write(contentsOf: data)
     }
+    func stopGracefully(_ request: [String: Any]) throws {
+        try send(request)
+        closed = true // Ignore late messages and classify the eventual exit as intentional.
+        try? input.fileHandleForWriting.close()
+    }
     func stop() {
         guard !closed else { return }
         closed = true
@@ -335,7 +340,7 @@ struct PairingRequest: Identifiable {
         streamWindowExists = false
         let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y), token, "await-continue"])
         helper.onEvent = { [weak self, weak helper] event in
-            guard let self, !self.shuttingDown, self.stream === helper else { return }
+            guard let self, !self.shuttingDown, self.stream === helper, helper?.stopRequested == false else { return }
             switch event["event"] as? String {
             case "stage":
                 self.status = event["message"] as? String ?? "Starting stream…"
@@ -478,7 +483,7 @@ struct PairingRequest: Identifiable {
         connectionJourney = nil
         quitRequired = nil; launchDeadline?.cancel(); pendingStream = nil
         if waiting, let stream {
-            do { try stream.send(["command": "cancelStream"]) }
+            do { try stream.stopGracefully(["command": "cancelStream"]) }
             catch { stream.stop() }
         } else { stream?.stop() }
         if stream == nil { streamActive = false; status = "Launch cancelled"; send("resume") }

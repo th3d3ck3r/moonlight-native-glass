@@ -78,6 +78,8 @@ func nativeArgument(_ name: String) -> String? { nil }
                         emit({'event': 'streaming'})
                         emit({'event': 'windowOpened'})
                     elif request['command'] == 'cancelStream':
+                        emit({'event': 'error', 'message': 'Late error after intentional cancel'})
+                        emit({'event': 'windowOpened'})
                         pathlib.Path('cancelled').write_text('cancelled')
                         sys.exit(0)
                     elif request['command'] == 'menuAction':
@@ -133,7 +135,7 @@ func nativeArgument(_ name: String) -> String? { nil }
         waiting.message = nil
         waiting.cancelLaunch()
         try await wait { !waiting.streamActive }
-        precondition(waiting.connectionJourney == nil && !waiting.streamWindowExists, "Cancel stranded the rendezvous screen")
+        precondition(waiting.connectionJourney == nil && !waiting.streamWindowExists && waiting.message == nil, "Cancel or a late message stranded the rendezvous screen")
         let cancelled = waitingHelper.deletingLastPathComponent().appendingPathComponent("cancelled")
         precondition(FileManager.default.fileExists(atPath: cancelled.path), "Orbit cancellation bypassed graceful helper cleanup")
         waiting.shutdown()
