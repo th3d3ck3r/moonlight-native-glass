@@ -1,14 +1,14 @@
 <div align="center">
 
-![Moonlight Native Glass](https://raw.githubusercontent.com/th3d3ck3r/moonlight-native-glass/native-ui/readme-assets/images/native-glass-banner.svg)
+![MoonlightLG](https://raw.githubusercontent.com/th3d3ck3r/moonlight-native-glass/feature/native-boot-animation/readme-assets/images/moonlightlg-banner.svg)
 
-# 🌙 Moonlight Native Glass
+# 🌙 MoonlightLG
 
 ### Your games. Your Mac. A native interface.
 
-**🧪 Experimental Build 24 · Crimson Glass · Moonlight Qt 6.2.0 · Intel + Universal · Manual updates**
+**🌙 1.0.00U · Unreleased · Crimson Glass · Moonlight Qt 6.2.0 · Intel + Universal · Manual updates**
 
-[![Experimental build](https://img.shields.io/badge/release-Experimental_24-crimson)](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-experimental-24)
+[![Version](https://img.shields.io/badge/version-1.0.00U-crimson)](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/CHANGELOG.md)
 [![Native macOS validation](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml/badge.svg?branch=feature/native-boot-animation)](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-silver)
 ![Manual updates](https://img.shields.io/badge/updates-Manual_only-8A2BE2)
@@ -17,11 +17,35 @@
 A native macOS frontend for Sunshine and compatible GameStream hosts.
 Liquid Glass navigation and controls on **macOS 26+**, standard native styling on **macOS 15**, with a near-black **Crimson Glass** theme, crimson accents and matching moon artwork. Turn Crimson Glass off in Appearance settings to follow the system appearance.
 
-[🧪 Download Experimental 24](#-download-experimental-build-24) · [✨ Features](#-features) · [🖼️ Screenshots](#-screenshots) · [🧪 Testing](#-testing-and-known-limitations) · [🛠️ Build](#-build)
+[🌙 MoonlightLG builds](#-moonlightlg-builds) · [✨ Features](#-features) · [🖼️ Screenshots](#-screenshots) · [🧪 Testing](#-testing-and-known-limitations) · [🛠️ Build](#-build)
 
 </div>
 
+## 🌙 MoonlightLG builds
+
+**MoonlightLG 1.0.00U** begins the project's new version scheme. The app, menu names,
+Xcode project and build products now use MoonlightLG; the GitHub repository URL
+stays unchanged. The startup arrival displays **MoonlightLG** beneath the moon.
+Existing settings, host pairing and permission identities are preserved.
+
+**U builds are development only and are not posted.** Experimental downloads use E;
+stable releases have no suffix. Validation is recorded in the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.0.00U.md).
+
+| Version | Meaning |
+|---|---|
+| `1.0.00U` | Unreleased development work; no posted download |
+| `1.0.00E` | Experimental build |
+| `1.0.00` | Stable release |
+
+The final component uses at least two digits. Fixes advance `00 → 01 → 02`;
+feature releases advance the minor version, and major revisions advance the major
+version. Changing U/E/stable status preserves the numeric version. Each published
+build also has a monotonically increasing internal build number. See
+[version maintenance rules](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/AGENTS.md) and [changelog](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/CHANGELOG.md).
+
 ## 🧪 Download Experimental Build 24
+
+The current project is **MoonlightLG**. Experimental 24 is the archived release under its previous name; new builds use **MoonlightLG.app**. The repository URL stays the same.
 
 **This is an experimental pre-release for testing, not a stable release. Requires macOS 15 or later.**
 
@@ -33,7 +57,7 @@ Liquid Glass navigation and controls on **macOS 26+**, standard native styling o
 [Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-experimental-24) · [SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/native-glass-experimental-24/SHA256SUMS.txt) · [Earlier RC1](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/native-glass-rc1) · [All releases](https://github.com/th3d3ck3r/moonlight-native-glass/releases)
 
 1. Download and extract the ZIP for your Mac.
-2. Move **Moonlight Native Glass.app** into Applications and open it through Finder.
+2. For the archived Experimental 24 release, move **Moonlight Native Glass.app** into Applications and open it through Finder.
 3. Allow Local Network access, add or discover your host, then pair it in this app.
 
 Packages are **ad-hoc signed and verified**, but **not Developer ID signed or notarized**. macOS may require approval before opening. Updates are manual; download a new package when you choose.
@@ -81,6 +105,9 @@ Closing the red button in a windowed stream also hides that window. Use the menu
 
 ## 🖼️ Screenshots
 
+These images show the archived Experimental 24 snapshot. Current MoonlightLG
+startup, About and title-bar captures are linked from the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.0.00U.md).
+
 **Actual composited app captures from macOS CI using sample hosts and games. They show the interface, not live streaming performance.**
 
 | Crimson library | Stream overlays |
@@ -120,9 +147,13 @@ Closing the red button in a windowed stream also hides that window. Use the menu
 
 **Reported issues under investigation:** The disconnect confirmation can appear with the library instead of the stream window, and Control–Option–Shift–E has been reported to crash the streaming helper with signal 11. These reports are not resolved by Build 24.
 
+**Follow-up test build 26:** The confirmation is now a sheet owned by the stream window. Native E also retains deferred cleanup when controls are unavailable, and stopped window owners reject queued focus callbacks. Both shutdown failures were reproduced in CI before their fixes. [Build 26 audit and validation](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/NATIVE_APP_AUDIT_PREVIEW_26.md) · [Intel test package](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38228271873/artifacts/11737731988). The physical live-stream signal-11 report still needs confirmation on a Mac; Experimental 24 remains the published snapshot.
+
 **Experimental limitations:** Test Control Center's cursor visibility, confinement and immediate remote input after Done on a live host in Windowed, Full Screen and Borderless Full Screen. Also test discovery/pairing, host actions, audio/controllers, reconnects, sleep/wake, display changes and startup smoothness on your Mac. Optional physical exclusive fullscreen (`I_WANT_BUGGY_FULLSCREEN`) retains upstream limitations. Packages are not notarized. Passing CI does not establish real-device streaming correctness.
 
 Report problems through [GitHub Issues](https://github.com/th3d3ck3r/moonlight-native-glass/issues) with your macOS version, Intel/Apple Silicon model, host software/version, window mode, reproduction steps and relevant logs. **Open Engine Logs** is available in the app menu. See the [Build 24 audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/NATIVE_APP_AUDIT_PREVIEW_24.md) for fixes, validation evidence and physical acceptance steps.
+
+**Follow-up test build 27:** A native line graph replaces the statistics bars. The stream controls now share a slim, rounded title row, with a measured 32-point window chrome height and a native overflow menu for narrow windows. Fullscreen modes hide the row. [Build 27 audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/NATIVE_APP_AUDIT_PREVIEW_27.md) · [Intel test package](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38271677015/artifacts/11757816102).
 
 ## 🛠️ Build
 
@@ -134,14 +165,14 @@ The [`native-glass-experimental-24` tag](https://github.com/th3d3ck3r/moonlight-
 Use Xcode 26+, Qt 6.11.2 and Python 3 with a recursive checkout:
 
 ```bash
-git clone --recurse-submodules --branch native-glass-experimental-24 https://github.com/th3d3ck3r/moonlight-native-glass.git
+git clone --recurse-submodules --branch feature/native-boot-animation https://github.com/th3d3ck3r/moonlight-native-glass.git
 cd moonlight-native-glass
 bash scripts/build-native-macos.sh universal
 # Intel only:
 # bash scripts/build-native-macos.sh x86_64
 ```
 
-Open **MoonlightNativeGlass.xcodeproj** for the full app and the **Moonlight Startup Preview** / **Moonlight UI Preview** schemes. The script above builds the same Qt engine and native frontend, bundles them for macOS 15+, signs ad-hoc and audits dependencies. Run the UI tests with:
+Open **MoonlightLG.xcodeproj** for the full app and the **MoonlightLG Startup Preview** / **MoonlightLG UI Preview** schemes. The script above builds the same Qt engine and native frontend, bundles them for macOS 15+, signs ad-hoc and audits dependencies. Run the UI tests with:
 
 ```bash
 xcodebuild -project tests/native/NativeUITests.xcodeproj \
