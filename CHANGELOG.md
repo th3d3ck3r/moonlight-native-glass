@@ -10,7 +10,11 @@
   window. Add real SDL/SwiftUI owner and handoff identity regression coverage.
 - Internal build 30. U build links remain owner-only.
 
-Validation pending.
+[Native macOS](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38294786786)
+and [Xcode](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38294786858)
+passed, including both 12-test UI suites, real window-first helper tests, same-window
+handoff/confirmation/restore, complete Intel/Universal bundles, sanitizers and 200
+shutdown cycles. See [audit](docs/MOONLIGHTLG_1.1.01U.md).
 
 ## 1.1.00U — unreleased — 2026-10-12
 

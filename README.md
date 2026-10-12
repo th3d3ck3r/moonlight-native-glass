@@ -36,7 +36,7 @@ stable releases have no suffix. Validation is recorded in the [current audit](ht
 |---|---|
 | `1.1.01U` | Unreleased development work; no posted download |
 | `1.1.01E` | Experimental build |
-| `1.1.00` | Stable release |
+| `1.1.01` | Stable release |
 
 The final component uses at least two digits. Fixes advance `00 → 01 → 02`;
 feature releases advance the minor version, and major revisions advance the major
@@ -136,8 +136,8 @@ startup, About and title-bar captures are linked from the [current audit](https:
 ## 🧪 Testing and known limitations
 
 **Current MoonlightLG 1.1.01U:** The actual stream window opens before connecting,
-with Apollo flight, bottom details and full-moon orbit until Continue. Corrected
-window-ownership validation is in progress. See the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.01U.md).
+with Apollo flight, bottom details and full-moon orbit until Continue. Both complete builds and both 12-test UI suites passed, including real
+window-first creation, same-window handoff, confirmation ownership and restore. See the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.01U.md).
 U app download links are shared only directly with the owner.
 
 **Archived Experimental 24 validation:** [Native validation run 38219537762](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537762) and [Xcode validation run 38219537999](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537999) passed at application/test source **`4d8ee8a4`**.
