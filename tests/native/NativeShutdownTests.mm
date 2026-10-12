@@ -34,7 +34,15 @@ int main() { @autoreleasepool {
     // runs. A stopped owner must never reinstall an overlay or window delegate.
     configureNativeStreamWindow("shutdown-before-attachment");
     [[NSNotificationCenter defaultCenter] postNotificationName:NSWindowDidBecomeKeyNotification object:cocoa(window)];
-    stopNativeStreamWindow(); drain();
+    fprintf(stderr,"BEFORE STOP: focus=%p window=%p flags=0x%x visible=%d active=%d\n",(void*)SDL_GetKeyboardFocus(),(void*)window,SDL_GetWindowFlags(window),cocoa(window).visible,NSApp.active);
+    stopNativeStreamWindow();
+    [NSApp activateIgnoringOtherApps:YES]; [cocoa(window) makeKeyAndOrderFront:nil];
+    SDL_RaiseWindow(window);
+    check(SDL_GetKeyboardFocus()==window,"Stopped-owner fixture must retain SDL focus during the delayed callback");
+    __block bool ran=false; dispatch_async(dispatch_get_main_queue(), ^{ ran=true; });
+    drain();
+    check(ran,"Fixture must actually drain deferred main-queue callbacks");
+    fprintf(stderr,"AFTER STOP: focus=%p flags=0x%x configured=%d\n",(void*)SDL_GetKeyboardFocus(),SDL_GetWindowFlags(window),nativeOverlayConfigured());
     check(!nativeOverlayConfigured(),"Deferred focus callback reattached native controls after stream teardown");
     check(cocoa(window).toolbar==nil,"Shutdown must leave no orphan native toolbar");
     SDL_DestroyWindow(window); SDL_QuitSubSystem(SDL_INIT_VIDEO); drain(false);
