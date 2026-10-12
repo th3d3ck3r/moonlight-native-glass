@@ -20,6 +20,14 @@ jobs:
       RELEASE_TAG: native-glass-experimental-24
     steps:
       - uses: actions/checkout@v5
+      - name: Refuse unreleased development builds
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          with open("macos-native/Info.plist", "rb") as stream:
+              channel = plistlib.load(stream).get("MoonlightLGReleaseChannel")
+          assert channel == "E", "Only validated E builds may use experimental publishing; U builds are never posted."
+          PY
       - name: Verify exact source, complete builds and Xcode validation
         run: |
           gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN" > /tmp/build-run.json

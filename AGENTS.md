@@ -11,7 +11,9 @@ and macOS permissions. Do not rebrand upstream copyright/license attribution.
 Start the MoonlightLG release line at **1.0.00**. The user-facing scheme is
 `major.minor.patch` with at least two patch digits, followed by:
 
-- `U`: unreleased development work (initial version **1.0.00U**).
+- `U`: unreleased development work (initial version **1.0.00U**). Never post U
+  builds as releases, downloadable app artifacts or README download links. CI may
+  build/test them; publish only after deliberate promotion to E or stable and validation.
 - `E`: experimental build (same numeric version, e.g. **1.0.00E**).
 - No suffix: stable release (**1.0.00**).
 
@@ -29,7 +31,8 @@ Maintain versions autonomously when changing this project:
    retain its count across the old preview/new MoonlightLG naming transition.
 4. New development after a distributed version uses the next numeric version + U.
    Update the changelog, README/current download links, and any development-version
-   fallbacks in EngineProtocol.swift together with Info.plist. Keep archived release
+   fallbacks in EngineProtocol.swift and version-specific UI assertions together
+   with Info.plist. Keep archived release
    filenames/links and historical validation evidence accurate.
 5. Package names derive from bundle metadata via scripts/moonlightlg-version.py;
    About uses the same numeric/channel metadata. Do not hardcode a different package
