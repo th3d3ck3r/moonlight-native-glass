@@ -335,6 +335,7 @@ bool nativeStartStreamMenuCommands(int fd) {
         SDL_Window* window = SDL_GetWindowFromID(self.windowDelegate.windowID);
         NSWindow* nativeWindow = nativeSDLWindow(window);
         if (nativeWindow.delegate == self.windowDelegate) nativeWindow.delegate = self.windowDelegate.original;
+        if (nativeWindow) sendWindowEvent("windowClosed");
     }
     self.windowDelegate = nil;
 }
