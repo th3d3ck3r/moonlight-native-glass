@@ -10,7 +10,11 @@
   Continue. Preserve ordinary Qt launches and deferred connection cleanup.
 - Keep U download links owner-only. Internal build 29.
 
-Validation will be recorded after the complete runs finish.
+[Native macOS validation](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38287571187)
+and [Xcode validation](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38287571088)
+passed. Intel/Universal bundles, both 12-test UI suites, fullscreen/input fixtures,
+sanitizers and 200 engine shutdown cycles passed. See [audit](docs/MOONLIGHTLG_1.1.00U.md).
+U app download links are shared directly with the owner only.
 
 ## 1.0.00U — unreleased — 2026-10-12
 
