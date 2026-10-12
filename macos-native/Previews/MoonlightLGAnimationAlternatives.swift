@@ -106,6 +106,8 @@ private enum MoonlightMotion: String, CaseIterable {
                                 } else { Color.white }
                             }
                     }
+                    NativeBootProjectName(diameter: diameter)
+                        .opacity(ease(t, 2.5, 0.65))
                 }
             }
         }

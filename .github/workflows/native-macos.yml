@@ -1,4 +1,4 @@
-name: Native macOS Validation
+name: MoonlightLG macOS Validation
 on:
   push:
     branches: [native-ui, feature/native-boot-animation]
@@ -112,8 +112,8 @@ jobs:
         run: |
           mkdir -p build/previews
           xcrun clang++ -std=c++17 -dynamiclib -undefined dynamic_lookup -g tests/native/NativeCrashTrace.cpp -o build/helper-backtrace.dylib
-          python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
-          env -u MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB python3 tests/native/bridge_smoke.py 'build/native-universal/Moonlight Native Glass.app/Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight'
+          python3 tests/native/bridge_smoke.py 'build/native-universal/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
+          env -u MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB python3 tests/native/bridge_smoke.py 'build/native-universal/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight'
       - name: Test actual menu bar icon state
         if: matrix.architecture == 'universal'
         run: |
@@ -125,21 +125,24 @@ jobs:
           name: Native-Status-Icon-Previews
           path: build/status-icon-previews/*.png
           if-no-files-found: error
-      - name: Package preview artifact
+      - name: Package versioned artifact
+        id: package
         run: |
-          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/Moonlight Native Glass.app' 'build/Moonlight-Native-Glass-Preview-27-${{ matrix.architecture }}.zip'
-          shasum -a 256 'build/Moonlight-Native-Glass-Preview-27-${{ matrix.architecture }}.zip' > 'build/SHA256-${{ matrix.architecture }}.txt'
+          version=$(python3 scripts/moonlightlg-version.py 'build/native-${{ matrix.architecture }}/MoonlightLG.app/Contents/Info.plist')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/MoonlightLG.app' "build/MoonlightLG-$version-${{ matrix.architecture }}.zip"
+          shasum -a 256 "build/MoonlightLG-$version-${{ matrix.architecture }}.zip" > 'build/SHA256-${{ matrix.architecture }}.txt'
       - uses: actions/upload-artifact@v6
         with:
-          name: Native-Glass-Preview-27-${{ matrix.architecture }}
+          name: MoonlightLG-${{ steps.package.outputs.version }}-${{ matrix.architecture }}
           path: |
-            build/Moonlight-Native-Glass-Preview-27-${{ matrix.architecture }}.zip
+            build/MoonlightLG-*-${{ matrix.architecture }}.zip
             build/SHA256-${{ matrix.architecture }}.txt
           if-no-files-found: error
 
   # Capture native screens; verify Dock reopen/relaunch and status-item Settings/Quit.
   native-windows:
-    name: Native UI window smoke test
+    name: MoonlightLG UI window smoke test
     runs-on: macos-26
     timeout-minutes: 10
     steps:

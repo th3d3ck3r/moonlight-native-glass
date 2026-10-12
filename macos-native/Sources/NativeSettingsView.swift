@@ -65,7 +65,7 @@ struct NativeSettingsView: View {
                             Button("Open Local Network Settings") {
                                 if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_LocalNetwork") { NSWorkspace.shared.open(url) }
                             }
-                            Text("Allow Moonlight Native Glass to access your local network. Host networking and pairing are handled by the Moonlight Qt engine.").foregroundStyle(.secondary)
+                            Text("Allow MoonlightLG to access your local network. Host networking and pairing are handled by the Moonlight Qt engine.").foregroundStyle(.secondary)
                         }
                         .disabled(!store.ready || store.streamActive || store.pairing != nil)
                     }

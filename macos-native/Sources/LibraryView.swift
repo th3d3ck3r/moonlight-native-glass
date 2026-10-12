@@ -58,7 +58,7 @@ struct LibraryView: View {
                 statusBar
             }
             .background(crimson ? NativeCrimsonTheme.surface : Color(nsColor: .windowBackgroundColor))
-            .navigationTitle(store.selected?.name ?? "Moonlight Native Glass")
+            .navigationTitle(store.selected?.name ?? "MoonlightLG")
             .searchable(text: $search, prompt: "Search games")
             .toolbar {
                 ToolbarItemGroup {

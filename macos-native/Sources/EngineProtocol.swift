@@ -79,6 +79,36 @@ struct NativeMenuState: Equatable {
     var nextMode = 0
 }
 
-func nativeEngineLogDirectory() -> URL {
-    FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/MoonlightNativeGlass", isDirectory: true)
+struct MoonlightLGVersion {
+    let major: Int
+    let minor: Int
+    let patch: Int
+    let channel: String
+    init?(numeric: String, channel: String) {
+        let parts = numeric.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy({ $0.isASCII && $0.isNumber }) }),
+              let major = Int(parts[0]), let minor = Int(parts[1]), let patch = Int(parts[2]),
+              ["U", "E", "stable"].contains(channel) else { return nil }
+        self.major = major; self.minor = minor; self.patch = patch; self.channel = channel
+    }
+    var display: String { "\(major).\(minor)." + String(format: "%02d", patch) + (channel == "stable" ? "" : channel) }
+    static var current: MoonlightLGVersion {
+        MoonlightLGVersion(numeric: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.00",
+                           channel: Bundle.main.object(forInfoDictionaryKey: "MoonlightLGReleaseChannel") as? String ?? "U")
+            ?? MoonlightLGVersion(numeric: "1.0.00", channel: "U")!
+    }
+}
+
+func nativeEngineLogDirectory(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+    let manager = FileManager.default
+    let current = home.appendingPathComponent("Library/Logs/MoonlightLG", isDirectory: true)
+    let legacy = home.appendingPathComponent("Library/Logs/MoonlightNativeGlass", isDirectory: true)
+    if manager.fileExists(atPath: legacy.path), !manager.fileExists(atPath: current.path) {
+        do { try manager.moveItem(at: legacy, to: current) }
+        catch {
+            // A concurrent first launch may have completed the same move.
+            if !manager.fileExists(atPath: current.path) { return legacy }
+        }
+    }
+    return current
 }

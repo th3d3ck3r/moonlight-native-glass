@@ -1,4 +1,4 @@
-name: Native presentation shutdown regression
+name: MoonlightLG presentation shutdown regression
 on:
   push:
     branches: [feature/native-boot-animation]

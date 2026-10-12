@@ -129,7 +129,7 @@ struct PairingRequest: Identifiable {
 
     var selected: Computer? { computers.first { $0.id == selectedID } }
     var executable: URL? {
-        executableOverride ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app/Contents/MacOS/Moonlight")
+        executableOverride ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight")
     }
 
     init(preview: Bool = false, executable: URL? = nil) {
@@ -417,7 +417,7 @@ struct PairingRequest: Identifiable {
             self.cancelLaunch()
         }
     }
-    func fail(_ detail: String) { message = NativeMessage(title: "Moonlight Native Glass", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true) }
+    func fail(_ detail: String) { message = NativeMessage(title: "MoonlightLG", detail: detail, settingsScene: settingsWindow?.isKeyWindow == true) }
     func shutdown() {
         clearMenuRequests()
         shuttingDown = true; hostDeadline?.cancel(); launchDeadline?.cancel(); pendingStream = nil

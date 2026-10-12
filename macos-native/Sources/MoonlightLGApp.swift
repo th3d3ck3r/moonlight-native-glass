@@ -46,7 +46,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) { boot?.finishImmediately(); store?.shutdown() }
 }
 
-@main struct MoonlightNativeApp: App {
+@main struct MoonlightLGApp: App {
     @NSApplicationDelegateAdaptor(NativeAppDelegate.self) private var delegate
     @StateObject private var store = EngineStore(preview: CommandLine.arguments.contains("--design-preview"))
     @StateObject private var boot = NativeBootPresentation(
@@ -61,7 +61,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             ? CommandLine.arguments.contains("--boot-reduce-motion")
             : NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
     var body: some Scene {
-        Window("Moonlight Native Glass", id: "library") {
+        Window("MoonlightLG", id: "library") {
             ZStack {
                 NativeBootView.background.ignoresSafeArea()
                 if boot.blocksLibrary {
@@ -88,7 +88,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         .defaultSize(width: 1080, height: 720)
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("About Moonlight Native Glass") {
+                Button("About MoonlightLG") {
                     showNativeAboutPanel()
                 }
             }
@@ -151,18 +151,17 @@ private struct NativeStatusActions: View {
     }
 }
 
-// Keep these credits fixed across builds. AppKit reads the build number from
-// CFBundleVersion for the preview number; release notes belong on GitHub.
+// Keep author and engine attribution across builds. About displays the app
+// version/channel from bundle metadata, separately from the engine version.
 @MainActor func showNativeAboutPanel() {
     NativeCrimsonTheme.apply(NativeCrimsonTheme.enabled)
-    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "23"
-    let engineBundle = Bundle(url: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app"))
+    let engineBundle = Bundle(url: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightLGEngine.app"))
     let engineVersion = engineBundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "6.2.0"
+        ?? "6.2.0"
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .center
     let credits = NSMutableAttributedString(
-        string: "SwiftUI/AppKit interface\nMoonlight Qt \(engineVersion) streaming engine\nManual updates · GPL-3.0\n\nNative Glass created and maintained by Th3D3ck3r\n\nGitHub Repository",
+        string: "SwiftUI/AppKit interface\nMoonlight Qt \(engineVersion) streaming engine\nManual updates · GPL-3.0\n\nMoonlightLG created and maintained by Th3D3ck3r\n\nGitHub Repository",
         attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
                      .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
     credits.addAttributes([.link: URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass")!,
@@ -170,8 +169,8 @@ private struct NativeStatusActions: View {
                            .underlineStyle: NSUnderlineStyle.single.rawValue],
                           range: (credits.string as NSString).range(of: "GitHub Repository"))
     NSApp.orderFrontStandardAboutPanel(options: [
-        .applicationName: "Moonlight Native Glass",
-        .applicationVersion: "Native UI Preview \(build) - Moonlight \(engineVersion)",
+        .applicationName: "MoonlightLG",
+        .applicationVersion: "\(MoonlightLGVersion.current.display) · Moonlight Qt \(engineVersion)",
         .version: "",
         .credits: credits])
     NSApp.keyWindow?.setAccessibilityIdentifier("native-about")

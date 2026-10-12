@@ -31,7 +31,7 @@ Keep both states the same displayed size (18 points), padding and optical alignm
 2. Add only the final full-moon resource and verified project/build-script references. Keep the existing app ICNS and bundle identity intact.
 3. Extend `NativeStatusMenu` to cache both `NSImage` objects at 18 points. Bind it once to `EngineStore.$streamWindowExists`, remove duplicate state values and apply image updates on the main thread.
 4. Retain that observation in the app-owned status controller, not in the library view's appearance lifecycle. Updates must continue while the library and/or stream window is hidden or closed. Use a weak controller capture and cancel the observation on teardown.
-5. Initialize from the current existence value; use the approved crescent if the new resource cannot load. Update only the status image, tooltip and accessibility label. Suggested labels: “Moonlight Native Glass — no stream window” and “Moonlight Native Glass — stream window open”. Keep the restore/right-click instructions in the tooltip.
+5. Initialize from the current existence value; use the approved crescent if the new resource cannot load. Update only the status image, tooltip and accessibility label. Suggested labels: “MoonlightLG — no stream window” and “MoonlightLG — stream window open”. Keep the restore/right-click instructions in the tooltip.
 6. Use an immediate, static swap. No timer, frame polling, pulsing, morphing or opacity animation. This respects Reduce Motion and adds no streaming render work. Keep state distinguishable by shape and accessible text, not color alone; check increased contrast and Reduce Transparency.
 7. Validate the state transitions below and review the diff for accidental streaming/settings changes. Build the full x86_64 and Universal apps, verify resources/signatures/bridges and rerun existing UI/SDL lifecycle checks.
 8. Only after an implementation request and passing checks, increment the build number, create a separately labeled preview and update GitHub/README. Keep the current Preview 5 and prior releases intact.
@@ -51,5 +51,5 @@ Keep both states the same displayed size (18 points), padding and optical alignm
 
 - Built Preview 5 application source: `e96caef79fde987b495f9a62c245215e28f29057`.
 - Current status/window state: `macos-native/Sources/EngineStore.swift` (`streamWindowExists`, `windowOpened`, `windowClosed`, helper exit).
-- Current status controller: `macos-native/Sources/MoonlightNativeApp.swift` (`NativeStatusMenu`, `NativeStatusActions`).
+- Current status controller: `macos-native/Sources/MoonlightLGApp.swift` (`NativeStatusMenu`, `NativeStatusActions`).
 - This directory is a proposal and is not referenced by the application or build scripts.

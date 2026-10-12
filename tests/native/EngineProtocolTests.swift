@@ -2,6 +2,23 @@ import Foundation
 
 @main struct EngineProtocolTests {
     static func main() throws {
+        precondition(MoonlightLGVersion(numeric: "1.0.00", channel: "U")?.display == "1.0.00U")
+        precondition(MoonlightLGVersion(numeric: "1.2.9", channel: "E")?.display == "1.2.09E")
+        precondition(MoonlightLGVersion(numeric: "1.0.00", channel: "stable")?.display == "1.0.00")
+        precondition(MoonlightLGVersion(numeric: "1.0.00U", channel: "U") == nil)
+        precondition(MoonlightLGVersion(numeric: "1.0", channel: "U") == nil)
+        precondition(MoonlightLGVersion(numeric: "1.0.00", channel: "X") == nil)
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let legacy = home.appendingPathComponent("Library/Logs/MoonlightNativeGlass")
+        try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
+        try Data("existing diagnostic".utf8).write(to: legacy.appendingPathComponent("stream.log"))
+        let renamed = nativeEngineLogDirectory(home: home)
+        precondition(renamed.lastPathComponent == "MoonlightLG")
+        let diagnostic = try Data(contentsOf: renamed.appendingPathComponent("stream.log"))
+        precondition(diagnostic == Data("existing diagnostic".utf8))
+        precondition(nativeEngineLogDirectory(home: home) == renamed)
+        print("PASS: U/E/stable version formatting, invalid metadata rejection, preserved log migration")
         var decoder = EngineLineDecoder()
         let event = Data("{\"event\":\"stage\",\"message\":\"Starting 🎮…\"}\n{\"event\":\"finished\"}\n".utf8)
         var received = [[String: Any]]()

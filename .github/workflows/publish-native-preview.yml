@@ -1,4 +1,4 @@
-name: Publish Native Glass Experimental Build
+name: Publish MoonlightLG Experimental Build
 on:
   push:
     branches: [feature/native-boot-animation]

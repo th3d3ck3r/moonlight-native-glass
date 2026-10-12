@@ -18,12 +18,12 @@ the window in the same process doesn't replay; a fresh app launch does.
 
 ## Live preview
 
-Open `MoonlightNativeGlass.xcodeproj`, select **Moonlight UI Preview**, and open
-`macos-native/Previews/NativeGlassLivePreview.swift`. Enable **Editor > Canvas**
+Open `MoonlightLG.xcodeproj`, select **MoonlightLG UI Preview**, and open
+`macos-native/Previews/MoonlightLGPreviews.swift`. Enable **Editor > Canvas**
 and its live mode. Choose **Native Glass · Live startup** and use **Replay
 Startup** to repeat. Dark and light sample-library previews and fixed artwork stages are also included.
-Use **Moonlight Startup Preview** with Command-R to inspect the actual window
-chrome; use **Moonlight UI Preview** to go straight to the sample library.
+Use **MoonlightLG Startup Preview** with Command-R to inspect the actual window
+chrome; use **MoonlightLG UI Preview** to go straight to the sample library.
 The Canvas represents the three window buttons visually; the running app uses
 actual AppKit controls. Sample previews do not launch the streaming engine.
 
@@ -66,7 +66,7 @@ to `661631e3a04332e05b3064f308d7b57cd83971e5`.
 Final Xcode/scheme/test revision `8039226cfb3d5bead2f2c696f466c35f5c6d6f28`
 passed both complete nine-test UI suites (zero failures): native run
 `38160139878`, job `114531133654`, and root-project run `38160139957`, job
-`114531133727`. The latter also built **Moonlight Startup Preview** and verified
+`114531133727`. The latter also built **MoonlightLG Startup Preview** and verified
 that its app contains no streaming engine. The close-during-startup case passed
 in both suites after holding the preview frame. Canvas preview source compiled
 through the root Xcode target. The interactive Xcode Canvas itself and physical
@@ -82,7 +82,7 @@ No public release was created and no helper was installed or activated.
 
 ## Five Xcode motion alternatives
 
-`macos-native/Previews/NativeGlassAnimationAlternatives.swift` adds five live
+`macos-native/Previews/MoonlightLGAnimationAlternatives.swift` adds five live
 Canvas choices: Orbit Reveal (converging comet arcs), Aurora Bloom (soft flowing
 light curtains), Starlight Weave (gathering star trails), Lunar Eclipse (a gradual
 light reveal), and Prism Sweep (passing refraction streaks). All finish on the

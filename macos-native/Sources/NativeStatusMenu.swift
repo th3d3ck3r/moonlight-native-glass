@@ -65,7 +65,7 @@ import Combine
         let active = NativeCrimsonTheme.enabled ? (crimsonFullMoon ?? fullMoon ?? idle) : (fullMoon ?? idle)
         item.button?.image = exists ? active : idle
         let state = exists ? "stream window open" : "no stream window"
-        item.button?.setAccessibilityLabel("Moonlight Native Glass — " + state)
+        item.button?.setAccessibilityLabel("MoonlightLG — " + state)
         item.button?.toolTip = nil
         item.button?.setAccessibilityHelp("Click to restore the stream window or open the library. Right-click for stream actions and settings.")
     }
@@ -95,8 +95,8 @@ import Combine
         entry("Disconnect", 212, state.exists)
         entry("Disconnect and Exit Host Game…", 209, state.exists)
         menu.addItem(.separator())
-        entry("Settings…", -2); entry("Open Engine Logs", -3); entry("About Moonlight Native Glass", -4)
-        menu.addItem(.separator()); entry("Quit Moonlight Native Glass", -6)
+        entry("Settings…", -2); entry("Open Engine Logs", -3); entry("About MoonlightLG", -4)
+        menu.addItem(.separator()); entry("Quit MoonlightLG", -6)
         return menu
     }
     private func refreshMenu(_ menu: NSMenu) {

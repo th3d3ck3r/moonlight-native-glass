@@ -1,26 +1,26 @@
-# Open Moonlight Native Glass in Xcode
+# Open MoonlightLG in Xcode
 
 For the native startup animation and Canvas previews, use branch
 `feature/native-boot-animation`. It starts from the validated Preview 20
 checkpoint and includes **no AWDL helper changes**. The stable `native-ui`
 branch remains at that checkpoint.
 
-Open **MoonlightNativeGlass.xcodeproj** at the repository root with **Xcode 26**.
+Open **MoonlightLG.xcodeproj** at the repository root with **Xcode 26**.
 Choose:
 
-- **Moonlight Native Glass**: build and run the real app with its existing
+- **MoonlightLG**: build and run the real app with its existing
   streaming engine. Dependency setup stays automatic.
-- **Moonlight UI Preview**: run the sample library immediately, skipping both
+- **MoonlightLG UI Preview**: run the sample library immediately, skipping both
   engine setup and startup animation.
-- **Moonlight Startup Preview**: run the native startup animation in the actual
+- **MoonlightLG Startup Preview**: run the native startup animation in the actual
   macOS window, then show the sample library; no streaming engine is built.
 
 For live Canvas previews, open
-`macos-native/Previews/NativeGlassLivePreview.swift`, choose **Moonlight UI
+`macos-native/Previews/MoonlightLGPreviews.swift`, choose **MoonlightLG UI
 Preview**, and enable **Editor > Canvas** and live mode. Use **Replay Startup**
 to repeat the animation. Dark/light libraries and fixed construction-ring/logo
 stages are included. For the five new motion alternatives, open
-`macos-native/Previews/NativeGlassAnimationAlternatives.swift`: **Orbit Reveal**,
+`macos-native/Previews/MoonlightLGAnimationAlternatives.swift`: **Orbit Reveal**,
 **Aurora Bloom**, **Starlight Weave**, **Lunar Eclipse**, and **Prism Sweep**.
 Each Canvas preview has its own Replay button, uses the same small original
 Moonlight logo and three window dots, and fades into the sample library. The
@@ -93,4 +93,4 @@ without the engine, and all Canvas preview code compiled. See
 
 ### Crimson Glass and the edited warp
 
-Pull `feature/native-boot-animation` to get the app-wide Crimson Glass appearance, transparent menu-bar states and the user-edited Warp Arrival startup (star lane 45). All source/resource memberships are already included in the project. Settings → Appearance switches between Crimson Glass and the original palette. Choose **Moonlight Startup Preview** to run the real startup window; choose **Moonlight UI Preview** and open `macos-native/Previews/NativeGlassLivePreview.swift` for Canvas startup/library previews. The other five animation alternatives remain in `NativeGlassAnimationAlternatives.swift`.
+Pull `feature/native-boot-animation` to get the app-wide Crimson Glass appearance, transparent menu-bar states and the user-edited Warp Arrival startup (star lane 45). All source/resource memberships are already included in the project. Settings → Appearance switches between Crimson Glass and the original palette. Choose **MoonlightLG Startup Preview** to run the real startup window; choose **MoonlightLG UI Preview** and open `macos-native/Previews/MoonlightLGPreviews.swift` for Canvas startup/library previews. The other five animation alternatives remain in `MoonlightLGAnimationAlternatives.swift`.

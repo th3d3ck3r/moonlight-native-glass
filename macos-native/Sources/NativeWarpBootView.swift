@@ -28,14 +28,18 @@ struct NativeWarpBootView: View {
                             .frame(width: diameter, height: diameter)
                             .scaleEffect(0.12 + 0.88 * ease(t, 1.65, 1.1))
                             .opacity(ease(t, 1.55, 0.85))
+                            .accessibilityLabel("MoonlightLG icon")
+                            .accessibilityIdentifier("startup-project-icon")
                     }
+                    NativeBootProjectName(diameter: diameter)
+                        .opacity(ease(t, 2.0, 0.65))
                 }
             }
         }
         .ignoresSafeArea()
         .opacity(presentation.phase == .fading ? 0 : 1)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Moonlight warp startup animation. Press Escape to skip.")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("MoonlightLG warp startup animation. Press Escape to skip.")
         .accessibilityIdentifier("native-boot-animation")
         .accessibilityAction(named: Text("Skip startup animation")) { presentation.finish() }
         .onAppear { if previewTime == nil { presentation.start() } }

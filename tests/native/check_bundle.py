@@ -8,9 +8,15 @@ import sys
 app = pathlib.Path(sys.argv[1])
 required = {"x86_64", "arm64"} if sys.argv[2] == "universal" else {"x86_64"}
 for bundle, identity in [(app, "com.moonlight-stream.NativeGlass"),
-                         (app / "Contents/Helpers/MoonlightEngine.app", "com.moonlight-stream.NativeGlass.Engine")]:
+                         (app / "Contents/Helpers/MoonlightLGEngine.app", "com.moonlight-stream.NativeGlass.Engine")]:
     info = plistlib.loads((bundle / "Contents/Info.plist").read_bytes())
     assert info["CFBundleIdentifier"] == identity
+    assert info["CFBundleDisplayName"] == ("MoonlightLG" if bundle == app else "MoonlightLG Engine")
+    assert info["CFBundleName"] == ("MoonlightLG" if bundle == app else "MoonlightLG Engine")
+    if bundle == app:
+        assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]{2,}", info["CFBundleShortVersionString"])
+        assert info["MoonlightLGReleaseChannel"] in {"U", "E", "stable"}
+        assert info["CFBundleExecutable"] == "MoonlightLG"
     assert bool(info.get("LSUIElement", False)) == (bundle != app), "Only the frontend may own a Dock application icon"
     assert info["NSLocalNetworkUsageDescription"]
     assert "_nvstream._tcp" in info["NSBonjourServices"]

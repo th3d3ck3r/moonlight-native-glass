@@ -4,7 +4,7 @@ Status: planning only. Double-checked against the source and revised to reflect 
 
 ## Goal and boundaries
 
-Replace the current stream overlay presentation with UI matching Moonlight Native Glass. Make it scale correctly with the stream window, Retina/non-Retina displays and an optional user-selected size. Preserve the user's currently successful latency and frame pacing.
+Replace the current stream overlay presentation with UI matching MoonlightLG. Make it scale correctly with the stream window, Retina/non-Retina displays and an optional user-selected size. Preserve the user's currently successful latency and frame pacing.
 
 Keep networking, discovery/pairing, codec selection, VideoToolbox decoding, HDR, audio, video layers, rendering/presentation scheduling and input-capture behavior unchanged. Existing menu bar hide/restore and moon states remain intact. Microphone work is a separate plan and is not a dependency.
 

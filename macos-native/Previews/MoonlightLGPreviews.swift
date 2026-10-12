@@ -1,13 +1,13 @@
 import AppKit
 import SwiftUI
 
-// Open this file with the "Moonlight UI Preview" scheme selected, then enable
+// Open this file with the "MoonlightLG UI Preview" scheme selected, then enable
 // Editor > Canvas. These previews use sample data and never launch the engine.
-@MainActor private struct NativeGlassStartupPreview: View {
+@MainActor private struct MoonlightLGStartupPreview: View {
     @State private var replay = UUID()
     var body: some View {
         VStack(spacing: 12) {
-            NativeGlassStartupPreviewCycle().id(replay)
+            MoonlightLGStartupPreviewCycle().id(replay)
                 .frame(width: 960, height: 640)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             Button("Replay Startup") { replay = UUID() }
@@ -16,7 +16,7 @@ import SwiftUI
     }
 }
 
-@MainActor private struct NativeGlassStartupPreviewCycle: View {
+@MainActor private struct MoonlightLGStartupPreviewCycle: View {
     @StateObject private var boot = NativeBootPresentation(enabled: true, reduceMotion: false)
     @StateObject private var store = EngineStore(preview: true)
     var body: some View {
@@ -41,24 +41,24 @@ import SwiftUI
     }
 }
 
-@MainActor private struct NativeGlassLibraryPreview: View {
+@MainActor private struct MoonlightLGLibraryPreview: View {
     @StateObject private var store = EngineStore(preview: true)
     var body: some View { LibraryView(store: store, sizesPreviewWindow: false).frame(width: 1080, height: 720) }
 }
 
-#Preview("Native Glass · Live startup") {
-    NativeGlassStartupPreview().preferredColorScheme(.dark)
+#Preview("MoonlightLG · Live startup") {
+    MoonlightLGStartupPreview().preferredColorScheme(.dark)
 }
 
-#Preview("Native Glass · Library · Dark") {
-    NativeGlassLibraryPreview().preferredColorScheme(.dark)
+#Preview("MoonlightLG · Library · Dark") {
+    MoonlightLGLibraryPreview().preferredColorScheme(.dark)
 }
 
-#Preview("Native Glass · Library · Light") {
-    NativeGlassLibraryPreview().preferredColorScheme(.light)
+#Preview("MoonlightLG · Library · Light") {
+    MoonlightLGLibraryPreview().preferredColorScheme(.light)
 }
 
-@MainActor private struct NativeGlassArtworkPreview: View {
+@MainActor private struct MoonlightLGArtworkPreview: View {
     @StateObject private var boot = NativeBootPresentation(enabled: true, reduceMotion: false)
     let time: Double
     var body: some View {
@@ -66,12 +66,12 @@ import SwiftUI
     }
 }
 
-#Preview("Native Glass · Construction rings") {
-    NativeGlassArtworkPreview(time: 2.3)
+#Preview("MoonlightLG · Construction rings") {
+    MoonlightLGArtworkPreview(time: 2.3)
 }
 
-#Preview("Native Glass · Existing logo") {
-    NativeGlassArtworkPreview(time: 3.55)
+#Preview("MoonlightLG · Existing logo") {
+    MoonlightLGArtworkPreview(time: 3.55)
 }
 
 @MainActor private struct NativeCrimsonWarpFramePreview: View {
@@ -81,4 +81,4 @@ import SwiftUI
             .frame(width: 960, height: 640).crimsonGlassTheme()
     }
 }
-#Preview("Crimson Glass · Warp arrival frame") { NativeCrimsonWarpFramePreview() }
+#Preview("MoonlightLG · Crimson Warp arrival frame") { NativeCrimsonWarpFramePreview() }

@@ -46,6 +46,15 @@ import XCTest
             XCTAssertTrue(window.descendants(matching: .any)["native-boot-animation"].firstMatch.waitForExistence(timeout: 5))
             XCTAssertFalse(window.searchFields.firstMatch.exists)
             XCTAssertFalse(window.buttons["Add Computer"].exists)
+            if time == 3.55 {
+                let name = window.staticTexts["startup-project-name"]
+                let icon = window.images["startup-project-icon"]
+                XCTAssertTrue(name.waitForExistence(timeout: 5))
+                XCTAssertEqual(name.label, "MoonlightLG")
+                XCTAssertTrue(icon.exists)
+                XCTAssertGreaterThan(name.frame.minY, icon.frame.maxY, "Project name must sit beneath the icon")
+                XCTAssertEqual(name.frame.midX, icon.frame.midX, accuracy: 1.5)
+            }
             let shot = XCTAttachment(screenshot: window.screenshot())
             shot.name = "native-startup-" + name; shot.lifetime = .keepAlways; add(shot)
             app.terminate()
@@ -165,6 +174,21 @@ import XCTest
         app.terminate()
     }
 
+    func testMoonlightLGAboutVersion() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--design-preview", "--preview-screen=about", "--dark"]
+        app.launch()
+        let about = app.windows["native-about"]
+        XCTAssertTrue(about.waitForExistence(timeout: 10))
+        XCTAssertTrue(about.staticTexts["MoonlightLG"].exists)
+        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "1.0.00U")).firstMatch.exists)
+        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Moonlight Qt 6.2.0")).firstMatch.exists)
+        let shot = XCTAttachment(screenshot: about.screenshot())
+        shot.name = "moonlightlg-about-version"; shot.lifetime = .keepAlways; add(shot)
+        app.terminate()
+    }
+
     func testNativeScreens() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -234,8 +258,8 @@ import XCTest
         XCTAssertFalse(menu.menuItems["Capture Input"].isEnabled)
         XCTAssertFalse(menu.menuItems["Disconnect"].isEnabled)
         XCTAssertTrue(menu.menuItems["Open Engine Logs"].exists)
-        XCTAssertTrue(menu.menuItems["About Moonlight Native Glass"].exists)
-        XCTAssertTrue(menu.menuItems["Quit Moonlight Native Glass"].exists)
+        XCTAssertTrue(menu.menuItems["About MoonlightLG"].exists)
+        XCTAssertTrue(menu.menuItems["Quit MoonlightLG"].exists)
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "menu-bar"
         attachment.lifetime = .keepAlways
@@ -247,7 +271,7 @@ import XCTest
         menu.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(app.windows["native-settings"].waitForExistence(timeout: 5))
         item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
-        XCTAssertTrue(menu.menuItems["Quit Moonlight Native Glass"].waitForExistence(timeout: 5))
+        XCTAssertTrue(menu.menuItems["Quit MoonlightLG"].waitForExistence(timeout: 5))
         menu.typeKey("q", modifierFlags: [])
         menu.typeKey(.return, modifierFlags: [])
         let quit = NSPredicate(format: "state == %d", XCUIApplication.State.notRunning.rawValue)
@@ -266,7 +290,7 @@ import XCTest
         XCTAssertFalse(window.exists)
         let dock = XCUIApplication(bundleIdentifier: "com.apple.dock")
         // Dock exposes macOS items by title, rather than their empty label.
-        let icon = dock.dockItems["MoonlightNative"]
+        let icon = dock.dockItems["MoonlightLG"]
         XCTAssertTrue(icon.waitForExistence(timeout: 5), "Frontend Dock icon missing")
         // Any coordinate rooted in Dock asks XCTest to activate that system
         // process. Read its icon frame, but synthesize from our app instead.

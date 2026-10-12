@@ -202,15 +202,31 @@ struct NativeBootView: View {
                             .scaleEffect(0.86 + 0.14 * ease(t, 2.95, 0.5))
                             .opacity(ease(t, 2.95, 0.38))
                     }
+                    NativeBootProjectName(diameter: diameter)
+                        .opacity(ease(t, 3.0, 0.38))
                 }
             }
         }
         .ignoresSafeArea()
         .opacity(presentation.phase == .fading ? 0 : 1)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Moonlight startup animation. Press Escape to skip.")
+        .accessibilityLabel("MoonlightLG startup animation. Press Escape to skip.")
         .accessibilityIdentifier("native-boot-animation")
         .accessibilityAction(named: Text("Skip startup animation")) { presentation.finish() }
         .onAppear { if previewTime == nil { presentation.start() } }
+    }
+}
+
+// Independent placement keeps the user's warp destination/icon centered.
+struct NativeBootProjectName: View {
+    let diameter: CGFloat
+    var body: some View {
+        Text("MoonlightLG")
+            .font(.system(size: max(20, min(28, diameter * 0.27)), weight: .semibold, design: .rounded))
+            .tracking(0.8)
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.45), radius: 4, y: 2)
+            .offset(y: diameter / 2 + 30)
+            .accessibilityIdentifier("startup-project-name")
     }
 }

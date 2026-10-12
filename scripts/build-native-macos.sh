@@ -28,15 +28,15 @@ sdk=$(xcrun --sdk macosx --show-sdk-path)
 for cpu in "${native_archs[@]}"; do
     xcrun swiftc -swift-version 5 -parse-as-library -O -sdk "$sdk" \
         -target "$cpu-apple-macos15.0" macos-native/Sources/*.swift \
-        -o "$build_root/bin/MoonlightNative-$cpu"
+        -o "$build_root/bin/MoonlightLG-$cpu"
     lipo "$engine_app/Contents/MacOS/Moonlight" -verify_arch "$cpu"
 done
-app="$build_root/Moonlight Native Glass.app"
+app="$build_root/MoonlightLG.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Helpers"
 if [ "$arch_set" = universal ]; then
-    lipo -create "$build_root/bin/MoonlightNative-x86_64" "$build_root/bin/MoonlightNative-arm64" -output "$app/Contents/MacOS/MoonlightNative"
+    lipo -create "$build_root/bin/MoonlightLG-x86_64" "$build_root/bin/MoonlightLG-arm64" -output "$app/Contents/MacOS/MoonlightLG"
 else
-    cp "$build_root/bin/MoonlightNative-x86_64" "$app/Contents/MacOS/MoonlightNative"
+    cp "$build_root/bin/MoonlightLG-x86_64" "$app/Contents/MacOS/MoonlightLG"
 fi
 cp macos-native/Resources/moonlight.icns "$app/Contents/Resources/moonlight.icns"
 cp macos-native/Resources/crimson-moon.png "$app/Contents/Resources/crimson-moon.png"
@@ -46,15 +46,16 @@ cp macos-native/Resources/boot-moon.png "$app/Contents/Resources/boot-moon.png"
 cp macos-native/Resources/full-moon.png "$app/Contents/Resources/full-moon.png"
 cp macos-native/Resources/boot-animation.mp4 "$app/Contents/Resources/boot-animation.mp4"
 cp macos-native/Info.plist "$app/Contents/Info.plist"
-ditto "$engine_app" "$app/Contents/Helpers/MoonlightEngine.app"
+ditto "$engine_app" "$app/Contents/Helpers/MoonlightLGEngine.app"
 # The active streaming process has its own Dock icon. Update the nested bundle
 # before signing, without changing its executable, identity or permissions.
-cp macos-native/Resources/moonlight.icns "$app/Contents/Helpers/MoonlightEngine.app/Contents/Resources/moonlight.icns"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.moonlight-stream.NativeGlass.Engine' "$app/Contents/Helpers/MoonlightEngine.app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Moonlight Native Glass Engine' "$app/Contents/Helpers/MoonlightEngine.app/Contents/Info.plist"
+cp macos-native/Resources/moonlight.icns "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Resources/moonlight.icns"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.moonlight-stream.NativeGlass.Engine' "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleName MoonlightLG Engine' "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName MoonlightLG Engine' "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Info.plist"
 # The frontend owns the sole application Dock icon. Set this before signing so
 # neither helper briefly registers a second icon before its activation setup.
-/usr/libexec/PlistBuddy -c 'Add :LSUIElement bool true' "$app/Contents/Helpers/MoonlightEngine.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Add :LSUIElement bool true' "$app/Contents/Helpers/MoonlightLGEngine.app/Contents/Info.plist"
 
 # Ad-hoc signatures make all nested code verifiable and retain one bundle
 # identity. This is not Developer ID signing or notarization. Verify all code;

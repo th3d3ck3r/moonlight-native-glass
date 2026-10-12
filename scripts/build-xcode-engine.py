@@ -120,7 +120,7 @@ def main():
     fingerprint = hashlib.sha256("\n".join(digest_file(path) for path in (
         binary, raw_app / "Contents/Info.plist", pathlib.Path(__file__),
         ROOT / "macos-native/Resources/moonlight.icns")).encode()).hexdigest()
-    helper = products / "MoonlightEngine.app"
+    helper = products / "MoonlightLGEngine.app"
     marker = products / ".moonlight-engine.sha256"
     if helper.exists() and marker.exists() and marker.read_text().strip() == fingerprint:
         print("The bundled engine is up to date", flush=True)
@@ -137,7 +137,7 @@ def main():
     info_path = helper / "Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
     info.update(CFBundleIdentifier="com.moonlight-stream.NativeGlass.Engine",
-                CFBundleDisplayName="Moonlight Native Glass Engine", LSUIElement=True)
+                CFBundleDisplayName="MoonlightLG Engine", CFBundleName="MoonlightLG Engine", LSUIElement=True)
     info_path.write_bytes(plistlib.dumps(info, sort_keys=False))
     shutil.copy2(ROOT / "macos-native/Resources/moonlight.icns",
                  helper / "Contents/Resources/moonlight.icns")
