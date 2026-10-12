@@ -121,3 +121,13 @@ All six animation previews use the theme, including Warp Arrival and its satelli
 Assets: `crimson-moon.png` and `crimson-full-moon.png` are genuinely transparent menu/boot assets. `crimson.icns` is the dark-backed Dock variant. Existing original assets are preserved. The built-in image editor recolored the supplied crescent/full-moon artwork to ruby/crimson and rose highlights, preserving the moon-and-two-dots design; the Dock prompt added a flat near-black background. Both projects and native packaging include the artwork.
 
 Only native presentation files change in the engine. Streaming, pairing, input handlers, codecs and helper integrations are untouched. The optional AWDL helper branch remains separate.
+
+## Crimson Glass validation
+
+Production revision `77ce524959a3e5fab4cbc72e01dba59cd6ad2fed` passed full Intel and Universal packaging in Native macOS run `38193808840`, jobs `114632104233` and `114632104470`. Both packages passed permissions, identities, dependencies and all 105 Mach-O architecture checks. The Universal job also passed native overlay/shortcut/focus/teardown checks, fullscreen and borderless startup, live SDL pipe commands, hide/restore and sanitizer lifetime checks, and real-engine bridge/persistence tests.
+
+Root Xcode run `38193808826`, job `114632077285`, passed fresh and incremental Universal full-app builds, real embedded-engine tests, source ZIP dependency recovery, and startup-preview compilation. Its UI suite and the initial native UI suite exposed a test querying a numeric Switch value as text; nine other UI cases passed.
+
+Final revision `5ae657e99c8e4aac8b2e227d5cc06d73a0252050` corrects the accessibility-value assertion and preserves explicit `--dark` / `--light` design-preview appearance when switching themes. Normal production launch behavior and engine sources are unchanged from the fully packaged revision. Both final ten-test UI suites passed with zero failures: native run `38194648101`, job `114634535554`, and root Xcode run `38194648134`, job `114634551133`. The root scheme compiled all Canvas alternatives and the shared production warp renderer without embedding the engine.
+
+Inspected captures verify the small crimson moon, two satellites, star field, startup-only traffic lights, crimson sidebar, matching main title bar and readable Settings layout. Appearance switching restores the original palette, preserves window frame and persists across launches; both original/crimson settings captures were inspected. Hardware streaming performance and perceived animation smoothness on the user's physical Intel/OCLP Mac remain local checks. No AWDL helper changes are included.

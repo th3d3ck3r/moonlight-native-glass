@@ -90,3 +90,7 @@ run, without changing the app's production source. Final revision `8039226cfb3d5
 UI suites in runs `38160139878` and `38160139957`. The startup scheme built
 without the engine, and all Canvas preview code compiled. See
 `docs/NATIVE_STARTUP_ANIMATION.md` for evidence and physical-test limits.
+
+### Crimson Glass and the edited warp
+
+Pull `feature/native-boot-animation` to get the app-wide Crimson Glass appearance, transparent menu-bar states and the user-edited Warp Arrival startup (star lane 45). All source/resource memberships are already included in the project. Settings → Appearance switches between Crimson Glass and the original palette. Choose **Moonlight Startup Preview** to run the real startup window; choose **Moonlight UI Preview** and open `macos-native/Previews/NativeGlassLivePreview.swift` for Canvas startup/library previews. The other five animation alternatives remain in `NativeGlassAnimationAlternatives.swift`.
