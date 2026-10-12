@@ -1545,7 +1545,14 @@ void Session::toggleFullscreen()
 #endif
 
     // Actually enter/leave fullscreen
+#ifdef Q_OS_MACOS
+    // Detach the native title row before SDL removes the titled window style.
+    nativeTitlebarSetWindowTransition(true);
+#endif
     SDL_SetWindowFullscreen(m_Window, fullScreen ? m_FullScreenFlag : 0);
+#ifdef Q_OS_MACOS
+    nativeTitlebarSetWindowTransition(false);
+#endif
 
 #ifdef Q_OS_DARWIN
     // SDL on macOS has a bug that causes the window size to be reset to crazy

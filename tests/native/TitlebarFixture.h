@@ -6,6 +6,10 @@ static NSView* titlebarFindView(NSView* view, NSString* identifier) {
     return nil;
 }
 static NSView* titlebarRoot(NSWindow* window) {
+    if (!(window.styleMask & NSWindowStyleMaskTitled)) {
+        NSView* root=titlebarFindView(window.contentView.superview,@"NativeStreamTitlebar");
+        return root.hiddenOrHasHiddenAncestor ? nil : root;
+    }
     for (NSTitlebarAccessoryViewController* accessory in window.titlebarAccessoryViewControllers)
         if ([accessory.view.identifier isEqual:@"NativeStreamTitlebar"]) return accessory.view;
     return nil;

@@ -109,7 +109,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     bool foundBattery=false; for (NSWindow* candidate in NSApp.windows) if (candidate.visible && hasLabel(candidate.contentView,@"Battery information unavailable")) foundBattery=true;
     check(foundBattery,"Rapid details replacement must keep the current popover state");
     [batteryButton performClick:nil]; pump();
-    NSString* titlebarOut=[NSString stringWithUTF8String:argv[1]];
+    NSString* titlebarOut=argc>1 ? [NSString stringWithUTF8String:argv[1]] : @"/tmp/native-overlay-previews";
     [[NSFileManager defaultManager] createDirectoryAtPath:titlebarOut withIntermediateDirectories:YES attributes:nil error:nil];
     capture([titlebarOut stringByAppendingPathComponent:@"titlebar-slim-dark.png"]);
     [window setContentSize:NSMakeSize(300,360)]; pump();

@@ -139,6 +139,9 @@ static MLStreamTitlebar* titlebar;
     else if ([notification.name isEqual:NSWindowDidEnterFullScreenNotification] || [notification.name isEqual:NSWindowDidExitFullScreenNotification]
         || [notification.name isEqual:@"NSWindowDidFailToEnterFullScreenNotification"] || [notification.name isEqual:@"NSWindowDidFailToExitFullScreenNotification"])
         self.fullscreenTransition=NO;
+    // Detach while the native title still exists; a borderless window rejects
+    // all titlebarAccessoryViewControllers operations, including reads.
+    if (self.fullscreenTransition) [self removeAccessory];
     // Defer until SDL/AppKit finish changing the window style. Borderless
     // desktop fullscreen has no titled mask; native fullscreen has FullScreen.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -148,7 +151,7 @@ static MLStreamTitlebar* titlebar;
 }
 - (void)themeChanged:(NSNotification*)notification { [self updateWindowToolbar]; [self refresh]; }
 - (void)removeAccessory {
-    if (!self.window || !self.accessory) return;
+    if (!self.window || !self.accessory || !(self.window.styleMask & NSWindowStyleMaskTitled)) return;
     NSUInteger index=[self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory];
     if (index!=NSNotFound) [self.window removeTitlebarAccessoryViewControllerAtIndex:index];
 }
@@ -200,7 +203,8 @@ static MLStreamTitlebar* titlebar;
     CGFloat left=compact ? 3 : 31;
     NSButton* host=self.buttons[hostID];
     CGFloat hostWidth=MIN(230,MAX(0,right-left));
-    CGFloat x=MAX(left,MIN((w-hostWidth)/2,right-hostWidth));
+    CGFloat middle=width-self.window.frame.size.width/2;
+    CGFloat x=MAX(left,MIN(middle-hostWidth/2,right-hostWidth));
     host.frame=NSMakeRect(x,0,hostWidth,h);
     for (NSButton* button in self.buttons.allValues) if (button.superview!=self.row) [self.row addSubview:button];
     if (self.overflow.superview!=self.row) [self.row addSubview:self.overflow];
