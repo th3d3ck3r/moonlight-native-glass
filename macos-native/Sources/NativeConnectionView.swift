@@ -87,8 +87,9 @@ struct NativeConnectionView: View {
     private func drawSpace(_ context: GraphicsContext, size: CGSize, time: Double, arrival: Double) {
         let scale = min(size.width / 800, size.height / 400)
         let center = CGPoint(x: size.width * 0.56, y: size.height * 0.48)
-        // Repeat a deterministic sideways flight field; rendezvous slows it down.
-        for i in 0..<140 {
+        // A sparser deterministic sideways field gives each star more space.
+        // Rendezvous slows the field down as Apollo reaches the moon.
+        for i in 0..<90 {
             let depth = Double((i * 37) % 100) / 100
             let travel = time * (12 + depth * 32) * (1 - arrival * 0.92)
             let width = max(1, size.width + 40)
