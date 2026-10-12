@@ -111,3 +111,7 @@ smoothness on the user's Mac still need local review.
 ## Transparent boot artwork
 
 Startup and all five Xcode animation alternatives use `macos-native/Resources/boot-moon.png`, a separate transparent crescent-and-dots asset extracted from the existing logo using the built-in image editor. The Dock and menu bar resources remain unchanged. The PNG is bundled by both Xcode projects and the native packaging script. Image-edit prompt: remove only the navy background, preserve the glossy crescent and two dots, and output genuine transparency.
+
+## Warp Arrival alternative
+
+The sixth Canvas preview, `Moonlight · Warp Arrival`, accelerates through 150 perspective star trails, eases to a stop, approaches the transparent moon logo, and reveals two gently orbiting satellites with solar panels. It uses the same finite startup timeline and library fade as the other alternatives; production startup selection is unchanged.

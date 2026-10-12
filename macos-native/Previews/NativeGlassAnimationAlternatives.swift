@@ -9,6 +9,7 @@ private enum MoonlightMotion: String, CaseIterable {
     case starlight = "Starlight Weave"
     case eclipse = "Lunar Eclipse"
     case prism = "Prism Sweep"
+    case warp = "Warp Arrival"
 }
 
 @MainActor private struct MoonlightAlternativePreview: View {
@@ -80,6 +81,7 @@ private enum MoonlightMotion: String, CaseIterable {
                         case .starlight: drawStarlight(context, center, scale, t)
                         case .eclipse: drawEclipse(context, center, scale, t)
                         case .prism: drawPrism(context, size, center, scale, t)
+                        case .warp: drawWarp(context, size, center, scale, t)
                         }
                     }
                     if let logo = boot.logo {
@@ -109,6 +111,7 @@ private enum MoonlightMotion: String, CaseIterable {
 
     private func logoScale(_ t: Double) -> Double {
         switch motion {
+        case .warp: return 0.12 + 0.88 * ease(t, 1.65, 1.1)
         case .aurora: return 0.83 + 0.17 * ease(t, 1.6, 1.2)
         case .starlight: return 0.94 + 0.06 * ease(t, 2, 0.9)
         default: return 0.9 + 0.1 * ease(t, 0.7, 1.9)
@@ -121,6 +124,7 @@ private enum MoonlightMotion: String, CaseIterable {
         case .starlight: return ease(t, 1.9, 0.9)
         case .eclipse: return ease(t, 0.1, 0.55)
         case .prism: return ease(t, 1.3, 1.3)
+        case .warp: return ease(t, 1.55, 0.85)
         }
     }
 
@@ -199,6 +203,59 @@ private enum MoonlightMotion: String, CaseIterable {
             style: StrokeStyle(lineWidth: 1.25 * scale, lineCap: .round))
     }
 
+    // Deterministic perspective field: accelerate, brake smoothly, then hold
+    // the destination. No random regeneration, timers, or external media.
+    private func drawWarp(_ context: GraphicsContext, _ size: CGSize, _ center: CGPoint, _ scale: Double, _ t: Double) {
+        let speed = ease(t, 0, 0.6) * (1 - ease(t, 1.35, 1.05))
+        let travel = 2.8 * ease(t, 0, 2.4)
+        let arrival = ease(t, 1.8, 0.85)
+        for i in 0..<150 {
+            let angle = Double(i) * 2.399963
+            let lane = 20 + Double((i * 47) % 210)
+            let depth = Double((i * 73) % 151) / 151 - travel
+            let z = 0.15 + (depth - floor(depth)) * 0.85
+            let radius = lane * scale / z
+            let point = CGPoint(x: center.x + cos(angle) * radius,
+                                y: center.y + sin(angle) * radius)
+            let tailRadius = max(0, radius - (12 + 115 * (1 - z)) * scale * speed)
+            let tail = CGPoint(x: center.x + cos(angle) * tailRadius,
+                               y: center.y + sin(angle) * tailRadius)
+            let edge = max(0, min(1, (z - 0.15) / 0.12))
+            var c = context
+            c.opacity = edge * (0.3 + (1 - z) * 0.65) * (0.65 + speed * 0.35)
+            var streak = Path(); streak.move(to: tail); streak.addLine(to: point)
+            c.stroke(streak, with: .linearGradient(Gradient(colors: [.clear, cyan, .white]),
+                startPoint: tail, endPoint: point),
+                style: StrokeStyle(lineWidth: (0.6 + (1 - z) * 1.2) * scale, lineCap: .round))
+            let dot = (0.6 + (1 - z) * 0.8) * scale
+            c.fill(Path(ellipseIn: CGRect(x: point.x - dot, y: point.y - dot,
+                width: dot * 2, height: dot * 2)), with: .color(.white))
+        }
+        glow(context, center, 120 * scale, arrival * 0.3)
+        for i in 0..<2 {
+            let angle = Double(i) * .pi + t * 0.5
+            let radius = (83 + Double(i) * 21) * scale
+            let point = CGPoint(x: center.x + cos(angle) * radius,
+                                y: center.y + sin(angle) * radius * 0.65)
+            var c = context; c.opacity = arrival
+            c.translateBy(x: point.x, y: point.y)
+            c.rotate(by: .radians(sin(t * 0.4 + Double(i)) * 0.25))
+            // Two solar panels, connecting boom, metallic body and dish.
+            for side in [-1.0, 1.0] {
+                let panel = CGRect(x: side < 0 ? -15 * scale : 6 * scale,
+                    y: -5 * scale, width: 9 * scale, height: 10 * scale)
+                c.fill(Path(roundedRect: panel, cornerRadius: scale), with: .color(blue.opacity(0.85)))
+                c.stroke(Path(roundedRect: panel, cornerRadius: scale), with: .color(cyan.opacity(0.7)), lineWidth: 0.6 * scale)
+            }
+            var boom = Path(); boom.move(to: CGPoint(x: -6 * scale, y: 0)); boom.addLine(to: CGPoint(x: 6 * scale, y: 0))
+            c.stroke(boom, with: .color(.white.opacity(0.8)), lineWidth: scale)
+            c.fill(Path(roundedRect: CGRect(x: -3 * scale, y: -4 * scale, width: 6 * scale, height: 8 * scale), cornerRadius: scale),
+                with: .linearGradient(Gradient(colors: [.white, cyan.opacity(0.65)]),
+                    startPoint: CGPoint(x: -3 * scale, y: -4 * scale), endPoint: CGPoint(x: 3 * scale, y: 4 * scale)))
+            c.fill(Path(ellipseIn: CGRect(x: -2 * scale, y: -8 * scale, width: 4 * scale, height: 3 * scale)), with: .color(.white.opacity(0.85)))
+        }
+    }
+
     private func drawPrism(_ context: GraphicsContext, _ size: CGSize, _ center: CGPoint, _ scale: Double, _ t: Double) {
         let visible = envelope(t)
         let travel = ease(t, 0.2, 2.4)
@@ -220,3 +277,5 @@ private enum MoonlightMotion: String, CaseIterable {
 #Preview("Moonlight · Starlight Weave") { MoonlightAlternativePreview(motion: .starlight) }
 #Preview("Moonlight · Lunar Eclipse") { MoonlightAlternativePreview(motion: .eclipse) }
 #Preview("Moonlight · Prism Sweep") { MoonlightAlternativePreview(motion: .prism) }
+
+#Preview("Moonlight · Warp Arrival") { MoonlightAlternativePreview(motion: .warp) }
