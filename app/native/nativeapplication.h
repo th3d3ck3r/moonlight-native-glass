@@ -24,3 +24,12 @@ bool nativeStreamDisconnectConfirmationVisible();
 // Main-thread connection presentation gate; no SDL window/input until Continue.
 void nativeSetConnectionWaiting(bool waiting);
 bool nativeConnectionWaiting();
+
+#include <functional>
+bool nativeCreateConnectionWindow(const char* host, const char* game, int x, int y, Uint32 flags);
+SDL_Window* nativeConnectionWindow();
+void nativeUpdateConnectionWindow(const char* message, int phase);
+void nativeDetachConnectionWindowView();
+void nativeEndConnectionWindow();
+void nativeSetConnectionCommand(std::function<void(int)> command);
+void nativeAttachStreamWindow(SDL_Window* window);

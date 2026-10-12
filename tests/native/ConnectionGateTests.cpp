@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstdio>
 #include <vector>
+#include <cstring>
 // Test doubles record the gate's calls; the decision code is extracted directly
 // from Session::exec. Full builds compile it against actual Qt/SDL as well.
 #define SDL_VERSION_ATLEAST(a,b,c) 1
@@ -12,6 +13,8 @@ static int polls = 0, flushes = 0;
 bool nativeConnectionWaiting() { return waiting; }
 int SDL_PeepEvents(SDL_Event*, int, int, int, int) { bool q = quitQueued; quitQueued = false; return q; }
 void SDL_FlushEvents(int, int) { ++flushes; }
+void SDL_PumpEvents() {}
+void nativeDetachConnectionWindowView() {}
 struct Flag { bool value; bool toBool() const { return value; } };
 struct QTimer { template<class T> static void singleShot(int ms, T*, void(T::*)()) { assert(ms == 50); ++polls; } };
 struct Preferences { bool quitAppAfter = true; };
@@ -20,7 +23,7 @@ struct Session {
     bool opened = false, cleaned = false;
     Preferences prefs;
     Preferences* m_Preferences = &prefs;
-    Flag property(const char*) { return {gate}; }
+    Flag property(const char* name) { return {std::strcmp(name,"nativeAwaitContinue") == 0 ? gate : false}; }
     void setProperty(const char*, bool value) { gate = value; }
     void exec() {
 #include "NativeConnectionGate.inc"
@@ -31,9 +34,9 @@ struct Session {
 int main() {
     Session session;
     for (int i = 0; i < 100; ++i) session.exec();
-    assert(!session.opened && !session.cleaned && session.m_AudioMuted && polls == 100 && flushes == 0);
+    assert(!session.opened && !session.cleaned && session.m_AudioMuted && polls == 100 && flushes == 200);
     waiting = false; session.exec();
-    assert(session.opened && !session.gate && !session.m_AudioMuted && flushes == 4);
+    assert(session.opened && !session.gate && !session.m_AudioMuted && flushes == 204);
     Session cancelled; waiting = true; quitQueued = true; cancelled.exec();
     assert(cancelled.cleaned && !cancelled.opened && !cancelled.prefs.quitAppAfter);
     Session lost; lost.m_ShouldExit = true; lost.exec();

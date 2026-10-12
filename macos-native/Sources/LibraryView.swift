@@ -98,7 +98,7 @@ struct LibraryView: View {
             Button("Cancel", role: .cancel) { store.cancelLaunch() }
         } message: { Text("Unsaved progress in the running app may be lost.") }
         .overlay {
-            if let journey = store.connectionJourney {
+            if store.preview, let journey = store.connectionJourney {
                 NativeConnectionView(journey: journey, warnings: store.warnings, canRetry: !store.streamActive,
                     previewTime: store.preview ? Double(nativeArgument("--connection-frame") ?? "") : nil,
                     reduceMotionOverride: store.preview && CommandLine.arguments.contains("--connection-reduce-motion") ? true : nil,

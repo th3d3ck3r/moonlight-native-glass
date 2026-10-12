@@ -58,5 +58,6 @@ private:
     bool m_TestMode = false;
     bool m_Streaming = false;
     bool m_AwaitContinue = false;
+    bool m_ConnectionCancelled = false;
     bool m_Pairing = false;
 };

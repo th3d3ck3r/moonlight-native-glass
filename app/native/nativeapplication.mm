@@ -19,6 +19,8 @@ void configureNativeBackgroundApplication()
 #include <unistd.h>
 #include <cerrno>
 #include <exception>
+#include <dlfcn.h>
+#include <functional>
 #include "nativeoverlay.h"
 #include "nativetitlebar.h"
 #include "nativeapplication.h"
@@ -58,6 +60,55 @@ static NSWindow* nativeSDLWindow(SDL_Window* window)
     SDL_SysWMinfo info;
     SDL_VERSION(&info.version);
     return SDL_GetWindowWMInfo(window, &info) && info.subsystem == SDL_SYSWM_COCOA ? info.info.cocoa.window : nil;
+}
+
+static Uint32 connectionWindowID;
+static bool connectionVideoReference;
+static void* connectionLibrary;
+static void (*attachConnection)(void*,const char*,const char*,void(*)(int));
+static void (*updateConnection)(const char*,int);
+static void (*detachConnection)();
+static std::function<void(int)> connectionCommand;
+void nativeSetConnectionCommand(std::function<void(int)> command) { connectionCommand = std::move(command); }
+static void connectionAction(int action) { if (connectionCommand) connectionCommand(action); }
+SDL_Window* nativeConnectionWindow() { return connectionWindowID ? SDL_GetWindowFromID(connectionWindowID) : nullptr; }
+void nativeUpdateConnectionWindow(const char* message, int phase) { if (updateConnection && connectionWindowID) updateConnection(message,phase); }
+void nativeDetachConnectionWindowView() { if (detachConnection) detachConnection(); }
+bool nativeCreateConnectionWindow(const char* host,const char* game,int x,int y,Uint32 flags) {
+    if (!connectionLibrary) {
+        const char* overridePath = getenv("MOONLIGHT_NATIVE_CONNECTION_LIBRARY");
+        NSString* path = overridePath ? [NSString stringWithUTF8String:overridePath] :
+            [NSBundle.mainBundle.privateFrameworksPath stringByAppendingPathComponent:@"libMoonlightLGConnection.dylib"];
+        connectionLibrary = dlopen(path.UTF8String,RTLD_NOW|RTLD_LOCAL);
+        if (!connectionLibrary) { SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Connection view could not load: %s",dlerror()); return false; }
+        attachConnection = reinterpret_cast<decltype(attachConnection)>(dlsym(connectionLibrary,"MLConnectionAttach"));
+        updateConnection = reinterpret_cast<decltype(updateConnection)>(dlsym(connectionLibrary,"MLConnectionUpdate"));
+        detachConnection = reinterpret_cast<decltype(detachConnection)>(dlsym(connectionLibrary,"MLConnectionDetach"));
+        if (!attachConnection || !updateConnection || !detachConnection) return false;
+    }
+    if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0) return false;
+    connectionVideoReference = true;
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,8); SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,8); SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,8);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,0); SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE,0);
+    SDL_Window* window = SDL_CreateWindow(host,x-480,y-320,960,640,
+        SDL_WINDOW_ALLOW_HIGHDPI|SDL_WINDOW_RESIZABLE|flags);
+    if (!window && flags) window = SDL_CreateWindow(host,x-480,y-320,960,640,SDL_WINDOW_ALLOW_HIGHDPI|SDL_WINDOW_RESIZABLE);
+    NSWindow* cocoa = nativeSDLWindow(window);
+    if (!cocoa) { if (window) SDL_DestroyWindow(window); SDL_QuitSubSystem(SDL_INIT_VIDEO); connectionVideoReference=false; return false; }
+    connectionWindowID = SDL_GetWindowID(window);
+    attachConnection(cocoa,host,game,connectionAction);
+    [NSApp activateIgnoringOtherApps:YES];
+    [cocoa makeKeyAndOrderFront:nil];
+    return true;
+}
+void nativeEndConnectionWindow() {
+    nativeDetachConnectionWindowView();
+    SDL_Window* window = nativeConnectionWindow();
+    connectionWindowID = 0;
+    if (window) SDL_DestroyWindow(window);
+    if (connectionVideoReference) SDL_QuitSubSystem(SDL_INIT_VIDEO);
+    connectionVideoReference = false;
+    connectionCommand = {};
 }
 
 static void sendWindowEvent(const char* event)
@@ -265,25 +316,15 @@ bool nativeStartStreamMenuCommands(int fd) {
 @implementation MLStreamWindowAccess
 - (void)windowBecameKey:(NSNotification*)notification
 {
-    if (self.stopped || self != streamWindowAccess) return;
+    if (self.stopped || self != streamWindowAccess || nativeConnectionWaiting()) return;
     NSWindow* candidate = notification.object;
     // SDL updates its focus during this notification. Resolve after its handler,
     // never intercept a hidden decoder-test window or the Qt selection window.
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (self.stopped || self != streamWindowAccess) return;
+        if (self.stopped || self != streamWindowAccess || nativeConnectionWaiting()) return;
         SDL_Window* window = SDL_GetKeyboardFocus();
         if (!window || nativeSDLWindow(window) != candidate || !(SDL_GetWindowFlags(window) & SDL_WINDOW_SHOWN)) return;
-        if (self.windowDelegate.windowID == SDL_GetWindowID(window)) return;
-        MLStreamWindowDelegate* delegate = [[MLStreamWindowDelegate alloc] init];
-        delegate.original = candidate.delegate;
-        delegate.windowID = SDL_GetWindowID(window);
-        self.windowDelegate = delegate;
-        candidate.delegate = delegate;
-        [delegate release];
-        nativeOverlayAttach(candidate, self.token.UTF8String);
-        // Overlay attachment reserves SDL_USEREVENT for stock Session events.
-        if (!restoreEventType) restoreEventType = SDL_RegisterEvents(1);
-        sendWindowEvent("windowOpened");
+        nativeAttachStreamWindow(window);
     });
 }
 - (void)restore:(NSNotification*)notification
@@ -350,6 +391,22 @@ bool nativeStartStreamMenuCommands(int fd) {
 }
 @end
 
+void nativeAttachStreamWindow(SDL_Window* window) {
+    if (!streamWindowAccess || streamWindowAccess.stopped || nativeConnectionWaiting()) return;
+    NSWindow* candidate = nativeSDLWindow(window);
+    if (!candidate) return;
+        if (streamWindowAccess.windowDelegate.windowID == SDL_GetWindowID(window)) return;
+        MLStreamWindowDelegate* delegate = [[MLStreamWindowDelegate alloc] init];
+        delegate.original = candidate.delegate;
+        delegate.windowID = SDL_GetWindowID(window);
+        streamWindowAccess.windowDelegate = delegate;
+        candidate.delegate = delegate;
+        [delegate release];
+        nativeOverlayAttach(candidate, streamWindowAccess.token.UTF8String);
+        // Overlay attachment reserves SDL_USEREVENT for stock Session events.
+        if (!restoreEventType) restoreEventType = SDL_RegisterEvents(1);
+        sendWindowEvent("windowOpened");
+}
 void nativeRestoreStreamWindow(Uint32 windowID)
 {
     if (windowID && streamWindowAccess.windowDelegate.windowID == windowID)

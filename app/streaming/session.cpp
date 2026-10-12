@@ -1818,21 +1818,25 @@ void Session::interrupt()
 void Session::exec()
 {
 #ifdef Q_OS_MACOS
-    // Hold BEFORE SDL window/fullscreen/input creation. Qt keeps serving the
+    // Hold fullscreen/decoder/input entry in the already-open SDL window. Qt keeps serving the
     // private Continue/Cancel pipe, while the stock connection stays live.
     // A host disconnect/cancel must drain ordinary deferred cleanup even when
     // the user never chooses Continue. No decoder or transport logic changes.
     if (m_AsyncConnectionSuccess && property("nativeAwaitContinue").toBool()) {
         SDL_Event quit = {};
-        if (SDL_PeepEvents(&quit, 1, SDL_GETEVENT, SDL_QUIT, SDL_QUIT) > 0 || m_ShouldExit) {
+        if (SDL_PeepEvents(&quit, 1, SDL_GETEVENT, SDL_QUIT, SDL_QUIT) > 0 || m_ShouldExit || property("nativeConnectionCancelled").toBool()) {
             m_AsyncConnectionSuccess = false;
             m_Preferences->quitAppAfter = false;
         } else if (nativeConnectionWaiting()) {
+            SDL_PumpEvents();
+            SDL_FlushEvents(SDL_KEYDOWN, SDL_MOUSEWHEEL);
+            SDL_FlushEvents(SDL_CONTROLLERAXISMOTION, SDL_CONTROLLERBUTTONUP);
             QTimer::singleShot(50, this, &Session::exec);
             return;
         } else {
             setProperty("nativeAwaitContinue", false);
             m_AudioMuted = false;
+            nativeDetachConnectionWindowView();
             // User input generated in the orbit screen must not arrive later
             // as stale remote presses. Preserve device/lifecycle/quit events.
             SDL_FlushEvents(SDL_KEYDOWN, SDL_MOUSEWHEEL);
@@ -1911,7 +1915,16 @@ void Session::exec()
     std::string windowName = QString(m_Computer->name + " - Moonlight").toStdString();
 #endif
 
-    m_Window = SDL_CreateWindow(windowName.c_str(),
+#ifdef Q_OS_MACOS
+    // Adopt the SAME SDL window opened before host/game lookup. Never wrap or
+    // replace its content view; the temporary SwiftUI subview is already gone.
+    m_Window = nativeConnectionWindow();
+    if (m_Window) {
+        SDL_SetWindowTitle(m_Window,windowName.c_str());
+        SDL_SetWindowSize(m_Window,width,height);
+    }
+#endif
+    if (!m_Window) m_Window = SDL_CreateWindow(windowName.c_str(),
                                 x,
                                 y,
                                 width,
@@ -1956,6 +1969,9 @@ void Session::exec()
     });
 #endif
     m_InputHandler->setWindow(m_Window);
+#ifdef Q_OS_MACOS
+    if (nativeConnectionWindow() == m_Window) nativeAttachStreamWindow(m_Window);
+#endif
 
     QSvgRenderer svgIconRenderer(QString(":/res/moonlight.svg"));
     QImage svgImage(ICON_SIZE, ICON_SIZE, QImage::Format_RGBA8888);

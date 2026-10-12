@@ -58,6 +58,16 @@ jobs:
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
           build/boot-playback-tests "$PWD/macos-native/Resources/boot-moon.png"
+      - name: Test Apollo inside the actual stream window
+        if: matrix.architecture == 'universal'
+        run: |
+          python3 setup-deps.py
+          python3 scripts/build-connection-view.py build/libMoonlightLGConnection.dylib arm64
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
+            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/ConnectionWindowTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/connection-window-tests
+          MOONLIGHT_NATIVE_CONNECTION_LIBRARY="$PWD/build/libMoonlightLGConnection.dylib" build/connection-window-tests build/connection-window-previews
       - name: Test native overlays and capture composited previews
         if: matrix.architecture == 'universal'
         run: |
@@ -105,7 +115,9 @@ jobs:
         if: matrix.architecture == 'universal'
         with:
           name: Native-Stream-Overlay-Previews
-          path: build/overlay-previews/*.png
+          path: |
+            build/overlay-previews/*.png
+            build/connection-window-previews/*.png
           if-no-files-found: error
       - name: Build app and verify bundle
         run: bash scripts/build-native-macos.sh '${{ matrix.architecture }}'

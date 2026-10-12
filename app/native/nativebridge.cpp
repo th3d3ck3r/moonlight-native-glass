@@ -5,6 +5,7 @@
 #include "gui/computermodel.h"
 #include "settings/streamingpreferences.h"
 #include "streaming/session.h"
+#include "streaming/streamutils.h"
 #include "nativeapplication.h"
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -124,18 +125,23 @@ void NativeBridge::beginShutdown()
 NativeBridge::~NativeBridge()
 {
     beginShutdown();
-    if (m_StreamMode) stopNativeStreamWindow();
+    if (m_StreamMode) { nativeEndConnectionWindow(); stopNativeStreamWindow(); }
 }
 
 void NativeBridge::send(QJsonObject event) {
     if (m_Stopping) return;
+    if (m_AwaitContinue && event["event"].toString() == "stage")
+        nativeUpdateConnectionWindow(event["message"].toString().toUtf8().constData(),0);
     const QByteArray data = QJsonDocument(event).toJson(QJsonDocument::Compact) + '\n';
     // Pipe writes are serialized on the main thread. Ignore SIGPIPE in main;
     // a vanished frontend ends this helper instead of retaining discovery.
     if (fwrite(data.constData(), 1, size_t(data.size()), stdout) != size_t(data.size()) || fflush(stdout) != 0)
         QCoreApplication::exit(1);
 }
-void NativeBridge::error(QString message) { send({{"event", "error"}, {"message", message}}); }
+void NativeBridge::error(QString message) {
+    if (m_AwaitContinue && nativeConnectionWindow()) nativeUpdateConnectionWindow(message.toUtf8().constData(),2);
+    send({{"event", "error"}, {"message", message}});
+}
 
 void NativeBridge::readInput() {
     if (m_Stopping) return;
@@ -189,7 +195,10 @@ void NativeBridge::command(const QJsonObject& request) {
     if (m_Stopping) return;
     const QString action = request["command"].toString();
     if (action == "shutdown" || action == "cancelStream") {
-        if (m_StreamMode && m_Streaming && nativeConnectionWaiting() && Session::get()) {
+        m_ConnectionCancelled = true;
+        if (m_StreamMode && nativeConnectionWaiting() && Session::get()) {
+            m_ConnectionCancelled = true;
+            Session::get()->setProperty("nativeConnectionCancelled", true);
             // Keep Qt alive while the gated session drains deferred cleanup.
             // Session owns connection teardown; never exit around its lifetime.
             m_Input->setEnabled(false);
@@ -391,13 +400,13 @@ bool NativeBridge::setPreferences(const QJsonObject& values) {
 }
 
 void NativeBridge::startStream(const QStringList& args) {
-    if ((args.size() != 8 && (args.size() != 9 || args[8] != "await-continue")) || args[3].isEmpty() || args[4].isEmpty() || !QRegularExpression("^[0-9A-Fa-f-]{36}$").match(args[7]).hasMatch()) { error("Invalid native stream arguments."); QCoreApplication::exit(1); return; }
+    if ((args.size() != 8 && ((args.size() != 9 && args.size() != 11) || args[8] != "await-continue")) || args[3].isEmpty() || args[4].isEmpty() || !QRegularExpression("^[0-9A-Fa-f-]{36}$").match(args[7]).hasMatch()) { error("Invalid native stream arguments."); QCoreApplication::exit(1); return; }
     bool xValid, yValid, appValid;
     const int appId = args[4].toInt(&appValid);
     const int x = args[5].toInt(&xValid), y = args[6].toInt(&yValid);
     if (!xValid || !yValid || !appValid || appId <= 0) { error("Invalid display coordinates."); QCoreApplication::exit(1); return; }
     configureNativeStreamWindow(args[7].toUtf8().constData());
-    m_AwaitContinue = args.size() == 9;
+    m_AwaitContinue = args.size() >= 9;
     nativeSetConnectionWaiting(m_AwaitContinue);
     m_Window.reset(new QQuickWindow());
     QScreen* selectedScreen = QGuiApplication::primaryScreen();
@@ -410,10 +419,26 @@ void NativeBridge::startStream(const QStringList& args) {
         m_Window->setGeometry(bounds.x() + 20, bounds.y() + 20,
                               qMin(960, bounds.width() - 40), qMin(640, bounds.height() - 40));
     }
+    if (m_AwaitContinue) {
+        nativeSetConnectionCommand([this](int action) {
+            if (m_Stopping) return;
+            if (action == 1) command({{"command","continueStream"}});
+            else if (action == 2) { send({{"event","connectionCancelled"}}); command({{"command","cancelStream"}}); }
+            else if (action == 3 && !Session::get()) { send({{"event","connectionRetry"}}); QCoreApplication::quit(); }
+        });
+        const QString host = args.size() == 11 ? args[9] : args[3];
+        const QString game = args.size() == 11 ? args[10] : "Game " + args[4];
+        if (!nativeCreateConnectionWindow(host.toUtf8().constData(),game.toUtf8().constData(),x,y,StreamUtils::getPlatformWindowFlags())) {
+            error("Could not open the stream connection window."); QCoreApplication::exit(1); return;
+        }
+        send({{"event","connectionWindowOpened"}});
+    }
     // A hidden window conveys upstream's display-selection contract. It never
     // owns or wraps the SDL streaming video surface and loads no QML frontend.
     m_Launcher = new CliStartStream::Launcher(args[3], appId, m_Preferences, this);
-    connect(m_Launcher, &CliStartStream::Launcher::failed, this, [this](QString message) { if (!m_Stopping) { error(message); QCoreApplication::exit(1); } });
+    connect(m_Launcher, &CliStartStream::Launcher::failed, this, [this](QString message) {
+        if (!m_Stopping) { error(message); if (m_AwaitContinue && nativeConnectionWindow()) nativeUpdateConnectionWindow("",3); else QCoreApplication::exit(1); }
+    });
     connect(m_Launcher, &CliStartStream::Launcher::searchingComputer, this, [this] { send({{"event", "stage"}, {"message", "Connecting to computer…"}}); });
     connect(m_Launcher, &CliStartStream::Launcher::searchingApp, this, [this] { send({{"event", "stage"}, {"message", "Loading game…"}}); });
     connect(m_Launcher, &CliStartStream::Launcher::appQuitRequired, this, [this](QString app) { send({{"event", "quitRequired"}, {"app", app}}); });
@@ -424,17 +449,25 @@ void NativeBridge::startStream(const QStringList& args) {
         connect(session, &Session::displayLaunchError, this, [this](QString message) { error(message); });
         connect(session, &Session::connectionStarted, this, [this] {
             m_Streaming = true;
+            if (m_AwaitContinue) nativeUpdateConnectionWindow("",1);
             if (!m_AwaitContinue) m_Input->setEnabled(false);
             send({{"event", m_AwaitContinue ? "connected" : "streaming"}});
         });
         connect(session, &Session::sessionFinished, this, [this](int ports) { send({{"event", "finished"}, {"portTest", ports}}); });
-        connect(session, &Session::readyForDeletion, this, [session] { delete session; QCoreApplication::quit(); });
+        connect(session, &Session::readyForDeletion, this, [this,session] {
+            delete session; m_Streaming = false;
+            if (m_AwaitContinue && nativeConnectionWindow() && nativeConnectionWaiting() && !m_ConnectionCancelled)
+                nativeUpdateConnectionWindow("",3);
+            else QCoreApplication::quit();
+        });
         if (!session->initialize(m_Window.get())) {
             error("The streaming session could not initialize. See the engine log for details.");
-            session->deleteLater(); QCoreApplication::exit(1); return;
+            session->deleteLater();
+            if (m_AwaitContinue && nativeConnectionWindow()) nativeUpdateConnectionWindow("",3); else QCoreApplication::exit(1);
+            return;
         }
         for (const auto& warning : session->property("launchWarnings").toStringList()) send({{"event", "warning"}, {"message", warning}});
         QTimer::singleShot(0, session, &Session::start);
     });
-    m_Launcher->execute(m_Manager.get());
+    QTimer::singleShot(0,this,[this] { if (!m_Stopping && !m_ConnectionCancelled) m_Launcher->execute(m_Manager.get()); });
 }

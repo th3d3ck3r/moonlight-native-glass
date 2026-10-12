@@ -42,6 +42,8 @@ for (x,y) in [(0,0),(bitmap.pixelsWide-1,0),(0,bitmap.pixelsHigh-1),(bitmap.pixe
 print("Native Dock icon corner transparency verified")
 ''', str(app / "Contents/Resources/crimson.icns")], check=True)
 
+assert (app / "Contents/Helpers/MoonlightLGEngine.app/Contents/Frameworks/libMoonlightLGConnection.dylib").is_file(), "Missing stream-window connection view"
+
 checked = 0
 for file in app.rglob("*"):
     if not file.is_file() or file.is_symlink():

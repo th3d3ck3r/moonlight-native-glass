@@ -119,6 +119,7 @@ def main():
     # Build incrementally. Deploy/sign only when the engine or recipe changed.
     fingerprint = hashlib.sha256("\n".join(digest_file(path) for path in (
         binary, raw_app / "Contents/Info.plist", pathlib.Path(__file__),
+        *[ROOT / p for p in ["scripts/build-connection-view.py", "macos-native/ConnectionHost/NativeConnectionHost.swift", "macos-native/Sources/NativeConnectionView.swift", "macos-native/Sources/NativeCrimsonTheme.swift", "macos-native/Sources/EngineProtocol.swift"]],
         ROOT / "macos-native/Resources/moonlight.icns")).encode()).hexdigest()
     helper = products / "MoonlightLGEngine.app"
     marker = products / ".moonlight-engine.sha256"
@@ -131,6 +132,7 @@ def main():
     shutil.copytree(raw_app, helper, symlinks=True)
     run([qmake.parent / "macdeployqt", helper, "-qmldir=" + str(ROOT / "app/gui"),
          "-appstore-compliant", "-no-codesign"])
+    run([python, ROOT / "scripts/build-connection-view.py", helper / "Contents/Frameworks/libMoonlightLGConnection.dylib", *architectures])
     mimer = helper / "Contents/PlugIns/sqldrivers/libqsqlmimer.dylib"
     if mimer.exists():
         mimer.unlink()

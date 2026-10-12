@@ -119,6 +119,7 @@ struct PairingRequest: Identifiable {
     @Published var streamActive = false
     @Published var streamStarted = false
     @Published var connectionJourney: ConnectionJourney?
+    private var retryAfterExit = false
     private var connectionDeadline: Task<Void, Never>?
     @Published var quitRequired: String?
     @Published var warnings: [String] = []
@@ -338,13 +339,19 @@ struct PairingRequest: Identifiable {
         streamWindowToken = token
         menuState = NativeMenuState(token: token, nextMode: [1: 2, 0: 1, 2: 0][(values["windowMode"] as? NSNumber)?.intValue ?? 0] ?? 1)
         streamWindowExists = false
-        let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y), token, "await-continue"])
+        let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y), token, "await-continue", computer.name, game.name])
         helper.onEvent = { [weak self, weak helper] event in
             guard let self, !self.shuttingDown, self.stream === helper, helper?.stopRequested == false else { return }
             switch event["event"] as? String {
             case "stage":
                 self.status = event["message"] as? String ?? "Starting stream…"
                 if self.connectionJourney?.phase == .connecting { self.connectionJourney?.detail = self.status }
+            case "connectionWindowOpened": self.libraryWindow?.orderOut(nil)
+            case "connectionCancelled":
+                self.connectionJourney = nil
+                try? helper?.stopGracefully(["command":"cancelStream"])
+                self.libraryWindow?.makeKeyAndOrderFront(nil)
+            case "connectionRetry": self.retryAfterExit = true
             case "connected":
                 guard self.connectionJourney?.phase == .connecting else { return }
                 self.connectionJourney?.phase = .connected
@@ -399,6 +406,11 @@ struct PairingRequest: Identifiable {
                 self.connectionJourney?.detail = "Connection ended"
             }
             self.status = "Stream ended"
+            if self.retryAfterExit {
+                self.retryAfterExit = false
+                self.send("resume"); self.retryConnection(); return
+            }
+            if self.connectionJourney != nil { self.libraryWindow?.makeKeyAndOrderFront(nil) }
             if !self.shuttingDown { self.send("resume") }
             if !self.shuttingDown && !helper.stopRequested && code != 0 && self.message == nil && self.connectionJourney == nil { self.fail("The streaming engine stopped unexpectedly (\(helper.terminationDescription)). Open Engine Logs from the menu bar and save the stream log and macOS crash report.") }
         }

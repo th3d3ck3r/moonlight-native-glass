@@ -1,5 +1,17 @@
 # MoonlightLG changelog
 
+## 1.1.01U — unreleased — 2026-10-12
+
+- Correct placement: open the actual SDL stream window before starting host/game
+  lookup, show Apollo flight and connection details inside it, and retain its full
+  moon orbit until Continue. Video uses that same window/content view afterward.
+- Remove the production animation from the library. Keep shared Canvas previews.
+- Route window Close to Cancel during connection; keep errors/Retry in the stream
+  window. Add real SDL/SwiftUI owner and handoff identity regression coverage.
+- Internal build 30. U build links remain owner-only.
+
+Validation pending.
+
 ## 1.1.00U — unreleased — 2026-10-12
 
 - Add a procedural Apollo spacecraft connection scene, flight through space,
