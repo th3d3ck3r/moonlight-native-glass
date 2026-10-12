@@ -6,9 +6,9 @@
 
 ### Your games. Your Mac. A native interface.
 
-**🌙 1.0.00U · Unreleased · Crimson Glass · Moonlight Qt 6.2.0 · Intel + Universal · Manual updates**
+**🌙 1.1.00U · Unreleased · Crimson Glass · Moonlight Qt 6.2.0 · Intel + Universal · Manual updates**
 
-[![Version](https://img.shields.io/badge/version-1.0.00U-crimson)](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.00U-crimson)](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/CHANGELOG.md)
 [![Native macOS validation](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml/badge.svg?branch=feature/native-boot-animation)](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-silver)
 ![Manual updates](https://img.shields.io/badge/updates-Manual_only-8A2BE2)
@@ -23,19 +23,20 @@ Liquid Glass navigation and controls on **macOS 26+**, standard native styling o
 
 ## 🌙 MoonlightLG builds
 
-**MoonlightLG 1.0.00U** begins the project's new version scheme. The app, menu names,
+**MoonlightLG 1.1.00U** adds the Apollo connection rendezvous. The app, menu names,
 Xcode project and build products now use MoonlightLG; the GitHub repository URL
-stays unchanged. The startup arrival displays **MoonlightLG** beneath the moon.
+stays unchanged. The startup arrival displays **MoonlightLG** beneath the moon. Connection flight
+meets a full moon and orbits until **Continue to Stream**, with real status details below.
 Existing settings, host pairing and permission identities are preserved.
 
 **U build links are shared directly with the owner only, not posted here.** Public experimental downloads use E;
-stable releases have no suffix. Validation is recorded in the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.0.00U.md).
+stable releases have no suffix. Validation is recorded in the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.00U.md).
 
 | Version | Meaning |
 |---|---|
-| `1.0.00U` | Unreleased development work; no posted download |
-| `1.0.00E` | Experimental build |
-| `1.0.00` | Stable release |
+| `1.1.00U` | Unreleased development work; no posted download |
+| `1.1.00E` | Experimental build |
+| `1.1.00` | Stable release |
 
 The final component uses at least two digits. Fixes advance `00 → 01 → 02`;
 feature releases advance the minor version, and major revisions advance the major
@@ -75,6 +76,7 @@ Experimental 24 contains the exact validated **native UI build 24** binaries wit
 | 🎮 **Library** | Host artwork, search, keyboard/controller navigation, game launch, hide/show and quit |
 | ⚙️ **Settings** | Appearance, Video, Audio, Input, Network, Advanced, Overlay and Shortcuts; changes save automatically |
 | 🚀 **Startup** | Crimson Warp Arrival with a moon and two satellites; Escape to skip; respects Reduce Motion |
+| 🛰️ **Connecting** | Apollo flight and full-moon orbit; real connection details below; enter the stream when you click Continue |
 | 🎬 **Streaming** | Moonlight Qt 6.2.0 Session/SDL window and stock codec, renderer and hardware capability checks |
 | 🎛️ **Stream controls** | Native controls, statistics/status surfaces, customizable buttons and shortcuts; windowed title-bar controls |
 | 📦 **Updates** | One English edition; manual installation and updates |
@@ -106,7 +108,7 @@ Closing the red button in a windowed stream also hides that window. Use the menu
 ## 🖼️ Screenshots
 
 These images show the archived Experimental 24 snapshot. Current MoonlightLG
-startup, About and title-bar captures are linked from the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.0.00U.md).
+startup, About and title-bar captures are linked from the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.00U.md).
 
 **Actual composited app captures from macOS CI using sample hosts and games. They show the interface, not live streaming performance.**
 
@@ -133,7 +135,13 @@ startup, About and title-bar captures are linked from the [current audit](https:
 
 ## 🧪 Testing and known limitations
 
-[Native validation run 38219537762](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537762) and [Xcode validation run 38219537999](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537999) passed at application/test source **`4d8ee8a4`**.
+**Current MoonlightLG 1.1.00U:** Intel/Universal bundles, both 12-test UI suites,
+fullscreen/input checks, sanitizers and 200 engine shutdown cycles passed.
+See the [current audit](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/native-boot-animation/docs/MOONLIGHTLG_1.1.00U.md)
+for validation and the Apollo connection captures. U app download links are shared
+only directly with the owner. Physical Intel/live-host handoff still needs testing.
+
+**Archived Experimental 24 validation:** [Native validation run 38219537762](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537762) and [Xcode validation run 38219537999](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537999) passed at application/test source **`4d8ee8a4`**.
 
 | Check | Result |
 |---|---|
