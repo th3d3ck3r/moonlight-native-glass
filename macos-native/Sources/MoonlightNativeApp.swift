@@ -54,7 +54,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         resource: CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-missing-resource")
             ? nil : CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-invalid-resource")
                 ? Bundle.main.url(forResource: "boot-animation", withExtension: "mp4")
-                : Bundle.main.url(forResource: "moonlight", withExtension: "icns"),
+                : Bundle.main.url(forResource: "boot-moon", withExtension: "png"),
         // An explicit design playback probe must work even on CI machines
         // configured to reduce system animation. Normal launches respect it.
         reduceMotion: CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-preview")

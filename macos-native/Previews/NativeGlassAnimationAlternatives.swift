@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 // Preview-only alternatives. The production app keeps its current choreography.
-// All variants use the original, unchanged logo resource.
+// All variants use the dedicated transparent boot logo resource.
 private enum MoonlightMotion: String, CaseIterable {
     case orbit = "Orbit Reveal"
     case aurora = "Aurora Bloom"

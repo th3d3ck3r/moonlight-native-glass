@@ -29,7 +29,7 @@ import SwiftUI
     }
     var blocksLibrary: Bool { phase != .finished }
 
-    init(enabled: Bool, resource: URL? = Bundle.main.url(forResource: "moonlight", withExtension: "icns"),
+    init(enabled: Bool, resource: URL? = Bundle.main.url(forResource: "boot-moon", withExtension: "png"),
          reduceMotion: Bool = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) {
         logo = resource.flatMap { NSImage(contentsOf: $0) }
         phase = enabled && !reduceMotion && logo != nil ? .playing : .finished
@@ -136,7 +136,7 @@ import SwiftUI
 
 // Time-driven vector drawing scales to the window's actual backing resolution.
 // All elements share one timeline: expansion, particles, construction rings,
-// contraction and the unchanged bundled Moonlight logo.
+// contraction and the transparent boot Moonlight logo.
 struct NativeBootView: View {
     @ObservedObject var presentation: NativeBootPresentation
     var previewTime: Double? = nil

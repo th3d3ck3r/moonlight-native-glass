@@ -52,7 +52,7 @@ jobs:
         if: matrix.architecture == 'universal'
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
-          build/boot-playback-tests "$PWD/macos-native/Resources/moonlight.icns"
+          build/boot-playback-tests "$PWD/macos-native/Resources/boot-moon.png"
       - name: Test native overlays and capture composited previews
         if: matrix.architecture == 'universal'
         run: |
@@ -163,7 +163,7 @@ jobs:
         # Compile the same production coordinator used by the actual app.
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
-          build/boot-playback-tests "$PWD/macos-native/Resources/moonlight.icns"
+          build/boot-playback-tests "$PWD/macos-native/Resources/boot-moon.png"
       - name: Capture native screens with XCTest
         run: |
           xcodebuild -project tests/native/NativeUITests.xcodeproj -scheme NativeUITests -destination 'platform=macOS' -derivedDataPath build/ui-tests -resultBundlePath build/native-ui.xcresult test
