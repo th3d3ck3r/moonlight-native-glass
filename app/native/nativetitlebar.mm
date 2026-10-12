@@ -374,7 +374,7 @@ void nativeTitlebarAttach(void* window) {
     NSView* glass;
     if (@available(macOS 26.0, *)) {
         NSGlassEffectView* effect=[[[NSGlassEffectView alloc] initWithFrame:root.bounds] autorelease];
-        effect.cornerRadius=8; effect.effectIsInteractive=YES;
+        effect.cornerRadius=8;
         effect.contentView=titlebar.row; glass=effect;
     } else {
         NSVisualEffectView* effect=[[[NSVisualEffectView alloc] initWithFrame:root.bounds] autorelease];
