@@ -30,7 +30,7 @@ struct NativeSettingsView: View {
         VStack(spacing: 0) {
             if store.preview { Label("Design preview · Sample settings", systemImage: "photo").font(.caption).foregroundStyle(.secondary).padding(.top, 10) }
             Picker("Settings", selection: $pane) { ForEach(SettingsPane.allCases) { Label($0.rawValue, systemImage: $0.symbol).tag($0) } }
-                .pickerStyle(.segmented).padding(20)
+                .pickerStyle(.segmented).labelsHidden().padding(20)
             if store.fields.isEmpty && pane != .overlay && pane != .shortcuts && pane != .appearance {
                 ContentUnavailableView("Settings Unavailable", systemImage: "gearshape", description: Text("Open the main window and connect to the streaming engine first."))
             } else {

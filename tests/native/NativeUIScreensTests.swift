@@ -8,7 +8,7 @@ import XCTest
         app.launch()
         let window = app.windows["native-settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        let toggle = window.checkBoxes["crimson-glass-toggle"]
+        let toggle = window.descendants(matching: .any)["crimson-glass-toggle"].firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         if toggle.value as? String != "1" { toggle.click() }
         let frame = window.frame

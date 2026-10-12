@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 struct LibraryView: View {
+    @Environment(\.controlActiveState) private var activeState
     @Environment(\.crimsonGlassEnabled) private var crimson
     @ObservedObject var store: EngineStore
     var interactive = true
@@ -30,7 +31,15 @@ struct LibraryView: View {
             List(selection: $store.selectedID) {
                 Section("Computers") {
                     ForEach(store.computers) { computer in
-                        ComputerRow(computer: computer).tag(computer.id)
+                        ComputerRow(computer: computer)
+                            // Paint inside the native selection without replacing
+                            // List's selection binding, focus or keyboard handling.
+                            .padding(.horizontal, 8).padding(.vertical, 2)
+                            .background(crimson && store.selectedID == computer.id
+                                ? (activeState == .inactive ? NativeCrimsonTheme.card : NativeCrimsonTheme.ruby)
+                                : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                            .padding(.horizontal, -8).padding(.vertical, -2)
+                            .tag(computer.id)
                             .contextMenu { computerActions(computer) }
                     }
                 }
