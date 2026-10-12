@@ -46,7 +46,7 @@ int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepoo
     int action=0; nativeSetConnectionCommand([&action](int value) { action=value; });
     check(nativeCreateConnectionWindow("Gaming PC","Desktop",600,420,0),"Connection window must open before any host/Session starts");
     SDL_Window* window=nativeConnectionWindow(); check(window!=nullptr,"Real SDL window created first");
-    Uint32 id=SDL_GetWindowID(window); NSWindow* original=cocoa(window); NSView* content=original.contentView;
+    Uint32 windowID=SDL_GetWindowID(window); NSWindow* original=cocoa(window); NSView* content=original.contentView;
     drain(.3); check([original.effectiveAppearance.name isEqualToString:NSAppearanceNameDarkAqua],"Connecting title bar must match Crimson Glass");
     check(original.visible && host(content)!=nil,"Apollo hosted inside the SDL content view");
     check(!nativeOverlayConfigured(),"Stream controls/input presentation must wait for Continue");
@@ -75,7 +75,7 @@ int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepoo
     click(original,proceed);
     check(action==1,"Mouse click on real Continue must invoke the bridge callback");
     nativeSetConnectionWaiting(false); nativeDetachConnectionWindowView();
-    check(host(content)==nil && original.contentView==content && SDL_GetWindowID(window)==id,"Continue removes only the temporary hosting subview");
+    check(host(content)==nil && original.contentView==content && SDL_GetWindowID(window)==windowID,"Continue removes only the temporary hosting subview");
     nativeAttachStreamWindow(window); drain(.2);
     check(nativeOverlayConfigured() && nativeConnectionWindow()==window,"Same SDL window accepts the normal stream controls after handoff");
     stopNativeStreamWindow(); nativeEndConnectionWindow();
