@@ -118,7 +118,7 @@ Closing the red button in a windowed stream also hides that window. Use the menu
 | Physical host and Intel coverage | CI runs on Apple Silicon and cross-builds Intel. Live-host behavior and physical Intel acceptance still require testing |
 | Streaming performance | CPU/GPU usage, decode latency and frame pacing were **not benchmarked** |
 
-**Reported issues under investigation:** The disconnect confirmation can appear with the library instead of the stream window, and Control–Option–Shift–E has been reported to show error 11. These reports are not resolved by Build 24.
+**Reported issues under investigation:** The disconnect confirmation can appear with the library instead of the stream window, and Control–Option–Shift–E has been reported to crash the streaming helper with signal 11. These reports are not resolved by Build 24.
 
 **Experimental limitations:** Test Control Center's cursor visibility, confinement and immediate remote input after Done on a live host in Windowed, Full Screen and Borderless Full Screen. Also test discovery/pairing, host actions, audio/controllers, reconnects, sleep/wake, display changes and startup smoothness on your Mac. Optional physical exclusive fullscreen (`I_WANT_BUGGY_FULLSCREEN`) retains upstream limitations. Packages are not notarized. Passing CI does not establish real-device streaming correctness.
 
@@ -126,7 +126,7 @@ Report problems through [GitHub Issues](https://github.com/th3d3ck3r/moonlight-n
 
 ## 🛠️ Build
 
-The [`feature/native-boot-animation` branch](https://github.com/th3d3ck3r/moonlight-native-glass/tree/feature/native-boot-animation) contains Experimental 24. [`native-ui`](https://github.com/th3d3ck3r/moonlight-native-glass/tree/native-ui) retains the earlier native UI development line. `master` retains the stock Moonlight Qt 6.2.0 application sources; its README presents this project.
+The [`native-glass-experimental-24` tag](https://github.com/th3d3ck3r/moonlight-native-glass/tree/native-glass-experimental-24) contains the frozen Experimental 24 source. [`feature/native-boot-animation`](https://github.com/th3d3ck3r/moonlight-native-glass/tree/feature/native-boot-animation) contains ongoing fixes after that snapshot. [`native-ui`](https://github.com/th3d3ck3r/moonlight-native-glass/tree/native-ui) retains the earlier native UI development line. `master` retains the stock Moonlight Qt 6.2.0 application sources; its README presents this project.
 
 <details>
 <summary>Build Intel or Universal on a Mac</summary>
@@ -134,7 +134,7 @@ The [`feature/native-boot-animation` branch](https://github.com/th3d3ck3r/moonli
 Use Xcode 26+, Qt 6.11.2 and Python 3 with a recursive checkout:
 
 ```bash
-git clone --recurse-submodules --branch feature/native-boot-animation https://github.com/th3d3ck3r/moonlight-native-glass.git
+git clone --recurse-submodules --branch native-glass-experimental-24 https://github.com/th3d3ck3r/moonlight-native-glass.git
 cd moonlight-native-glass
 bash scripts/build-native-macos.sh universal
 # Intel only:
