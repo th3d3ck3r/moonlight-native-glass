@@ -29,7 +29,7 @@ import SwiftUI
     }
     var blocksLibrary: Bool { phase != .finished }
 
-    init(enabled: Bool, resource: URL? = Bundle.main.url(forResource: "boot-moon", withExtension: "png"),
+    init(enabled: Bool, resource: URL? = NativeCrimsonTheme.bootResource,
          reduceMotion: Bool = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) {
         logo = resource.flatMap { NSImage(contentsOf: $0) }
         phase = enabled && !reduceMotion && logo != nil ? .playing : .finished
@@ -61,7 +61,7 @@ import SwiftUI
                         separator: window.titlebarSeparatorStyle, background: window.backgroundColor, movable: window.isMovableByWindowBackground,
                         toolbar: window.toolbar, toolbarVisible: window.toolbar?.isVisible ?? false)
         let frame = window.frame
-        window.backgroundColor = NSColor(red: 7 / 255, green: 12 / 255, blue: 25 / 255, alpha: 1)
+        window.backgroundColor = NativeCrimsonTheme.enabled ? NativeCrimsonTheme.windowColor : NSColor(red: 7 / 255, green: 12 / 255, blue: 25 / 255, alpha: 1)
         window.styleMask.insert(.fullSizeContentView)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -140,7 +140,7 @@ import SwiftUI
 struct NativeBootView: View {
     @ObservedObject var presentation: NativeBootPresentation
     var previewTime: Double? = nil
-    static let background = Color(red: 7 / 255, green: 12 / 255, blue: 25 / 255)
+    static var background: Color { NativeCrimsonTheme.enabled ? NativeCrimsonTheme.surface : Color(red: 7 / 255, green: 12 / 255, blue: 25 / 255) }
 
     private func ease(_ time: Double, _ start: Double, _ duration: Double) -> Double {
         let p = min(1, max(0, (time - start) / duration))
@@ -165,7 +165,7 @@ struct NativeBootView: View {
                         var backdrop = context
                         backdrop.opacity = 1 - ease(t, 3.05, 0.38)
                         backdrop.fill(Path(ellipseIn: disk), with: .linearGradient(
-                            Gradient(colors: [Color(red: 0.29, green: 0.81, blue: 0.96), Color(red: 0.25, green: 0.39, blue: 0.91)]),
+                            Gradient(colors: NativeCrimsonTheme.enabled ? [NativeCrimsonTheme.accent, NativeCrimsonTheme.ruby] : [Color(red: 0.29, green: 0.81, blue: 0.96), Color(red: 0.25, green: 0.39, blue: 0.91)]),
                             startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: canvasSize.width, y: canvasSize.height)))
 
                         // Four bright dots separate from the initial seed and

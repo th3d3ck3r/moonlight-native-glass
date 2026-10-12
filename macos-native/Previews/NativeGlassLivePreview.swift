@@ -23,7 +23,7 @@ import SwiftUI
         ZStack(alignment: .topLeading) {
             NativeBootView.background
             if boot.blocksLibrary {
-                NativeBootView(presentation: boot)
+                NativeWarpBootView(presentation: boot)
                 // Canvas has no native NSWindow chrome. Represent the three
                 // buttons visually; the running app uses real AppKit buttons.
                 HStack(spacing: 8) {
@@ -35,6 +35,7 @@ import SwiftUI
                 LibraryView(store: store, sizesPreviewWindow: false).transition(.opacity)
             }
         }
+        .crimsonGlassTheme()
         .animation(.easeInOut(duration: 0.4), value: boot.phase)
         .onDisappear { boot.finishImmediately() }
     }
@@ -72,3 +73,12 @@ import SwiftUI
 #Preview("Native Glass · Existing logo") {
     NativeGlassArtworkPreview(time: 3.55)
 }
+
+@MainActor private struct NativeCrimsonWarpFramePreview: View {
+    @StateObject private var boot = NativeBootPresentation(enabled: true, reduceMotion: false)
+    var body: some View {
+        NativeWarpBootView(presentation: boot, previewTime: 3.3)
+            .frame(width: 960, height: 640).crimsonGlassTheme()
+    }
+}
+#Preview("Crimson Glass · Warp arrival frame") { NativeCrimsonWarpFramePreview() }

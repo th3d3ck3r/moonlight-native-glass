@@ -33,7 +33,11 @@ private enum MoonlightMotion: String, CaseIterable {
         ZStack(alignment: .topLeading) {
             NativeBootView.background
             if boot.blocksLibrary {
-                MoonlightAlternativeArtwork(motion: motion, boot: boot)
+                if motion == .warp {
+                    NativeWarpBootView(presentation: boot)
+                } else {
+                    MoonlightAlternativeArtwork(motion: motion, boot: boot)
+                }
                 // Xcode Canvas has no real window chrome. The running app's
                 // unchanged startup setup uses the genuine AppKit buttons.
                 HStack(spacing: 8) {
@@ -45,6 +49,7 @@ private enum MoonlightMotion: String, CaseIterable {
                 LibraryView(store: store, sizesPreviewWindow: false).transition(.opacity)
             }
         }
+        .crimsonGlassTheme()
         .animation(.easeInOut(duration: 0.4), value: boot.phase)
         .onAppear { boot.start() }
         .onDisappear { boot.finishImmediately() }
@@ -54,8 +59,8 @@ private enum MoonlightMotion: String, CaseIterable {
 @MainActor private struct MoonlightAlternativeArtwork: View {
     let motion: MoonlightMotion
     @ObservedObject var boot: NativeBootPresentation
-    private let cyan = Color(red: 0.36, green: 0.87, blue: 1)
-    private let blue = Color(red: 0.36, green: 0.47, blue: 1)
+    private var cyan: Color { NativeCrimsonTheme.enabled ? NativeCrimsonTheme.highlight : Color(red: 0.36, green: 0.87, blue: 1) }
+    private var blue: Color { NativeCrimsonTheme.enabled ? NativeCrimsonTheme.ruby : Color(red: 0.36, green: 0.47, blue: 1) }
 
     private func ease(_ time: Double, _ start: Double, _ length: Double) -> Double {
         let p = min(1, max(0, (time - start) / length))
@@ -81,7 +86,7 @@ private enum MoonlightMotion: String, CaseIterable {
                         case .starlight: drawStarlight(context, center, scale, t)
                         case .eclipse: drawEclipse(context, center, scale, t)
                         case .prism: drawPrism(context, size, center, scale, t)
-                        case .warp: drawWarp(context, size, center, scale, t)
+                        case .warp: break
                         }
                     }
                     if let logo = boot.logo {
@@ -201,59 +206,6 @@ private enum MoonlightMotion: String, CaseIterable {
             startPoint: CGPoint(x: center.x - 70 * scale, y: center.y - 70 * scale),
             endPoint: CGPoint(x: center.x + 70 * scale, y: center.y + 70 * scale)),
             style: StrokeStyle(lineWidth: 1.25 * scale, lineCap: .round))
-    }
-
-    // Deterministic perspective field: accelerate, brake smoothly, then hold
-    // the destination. No random regeneration, timers, or external media.
-    private func drawWarp(_ context: GraphicsContext, _ size: CGSize, _ center: CGPoint, _ scale: Double, _ t: Double) {
-        let speed = ease(t, 0, 0.6) * (1 - ease(t, 1.35, 1.05))
-        let travel = 2.8 * ease(t, 0, 2.4)
-        let arrival = ease(t, 1.8, 0.85)
-        for i in 0..<150 {
-            let angle = Double(i) * 2.399963
-            let lane = 45 + Double((i * 47) % 210)
-            let depth = Double((i * 73) % 151) / 151 - travel
-            let z = 0.15 + (depth - floor(depth)) * 0.85
-            let radius = lane * scale / z
-            let point = CGPoint(x: center.x + cos(angle) * radius,
-                                y: center.y + sin(angle) * radius)
-            let tailRadius = max(0, radius - (12 + 115 * (1 - z)) * scale * speed)
-            let tail = CGPoint(x: center.x + cos(angle) * tailRadius,
-                               y: center.y + sin(angle) * tailRadius)
-            let edge = max(0, min(1, (z - 0.15) / 0.12))
-            var c = context
-            c.opacity = edge * (0.3 + (1 - z) * 0.65) * (0.65 + speed * 0.35)
-            var streak = Path(); streak.move(to: tail); streak.addLine(to: point)
-            c.stroke(streak, with: .linearGradient(Gradient(colors: [.clear, cyan, .white]),
-                startPoint: tail, endPoint: point),
-                style: StrokeStyle(lineWidth: (0.6 + (1 - z) * 1.2) * scale, lineCap: .round))
-            let dot = (0.6 + (1 - z) * 0.8) * scale
-            c.fill(Path(ellipseIn: CGRect(x: point.x - dot, y: point.y - dot,
-                width: dot * 2, height: dot * 2)), with: .color(.white))
-        }
-        glow(context, center, 120 * scale, arrival * 0.3)
-        for i in 0..<2 {
-            let angle = Double(i) * .pi + t * 0.5
-            let radius = (83 + Double(i) * 21) * scale
-            let point = CGPoint(x: center.x + cos(angle) * radius,
-                                y: center.y + sin(angle) * radius * 0.65)
-            var c = context; c.opacity = arrival
-            c.translateBy(x: point.x, y: point.y)
-            c.rotate(by: .radians(sin(t * 0.4 + Double(i)) * 0.25))
-            // Two solar panels, connecting boom, metallic body and dish.
-            for side in [-1.0, 1.0] {
-                let panel = CGRect(x: side < 0 ? -15 * scale : 6 * scale,
-                    y: -5 * scale, width: 9 * scale, height: 10 * scale)
-                c.fill(Path(roundedRect: panel, cornerRadius: scale), with: .color(blue.opacity(0.85)))
-                c.stroke(Path(roundedRect: panel, cornerRadius: scale), with: .color(cyan.opacity(0.7)), lineWidth: 0.6 * scale)
-            }
-            var boom = Path(); boom.move(to: CGPoint(x: -6 * scale, y: 0)); boom.addLine(to: CGPoint(x: 6 * scale, y: 0))
-            c.stroke(boom, with: .color(.white.opacity(0.8)), lineWidth: scale)
-            c.fill(Path(roundedRect: CGRect(x: -3 * scale, y: -4 * scale, width: 6 * scale, height: 8 * scale), cornerRadius: scale),
-                with: .linearGradient(Gradient(colors: [.white, cyan.opacity(0.65)]),
-                    startPoint: CGPoint(x: -3 * scale, y: -4 * scale), endPoint: CGPoint(x: 3 * scale, y: 4 * scale)))
-            c.fill(Path(ellipseIn: CGRect(x: -2 * scale, y: -8 * scale, width: 4 * scale, height: 3 * scale)), with: .color(.white.opacity(0.85)))
-        }
     }
 
     private func drawPrism(_ context: GraphicsContext, _ size: CGSize, _ center: CGPoint, _ scale: Double, _ t: Double) {

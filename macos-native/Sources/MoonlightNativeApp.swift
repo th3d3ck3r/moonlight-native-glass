@@ -54,7 +54,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         resource: CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-missing-resource")
             ? nil : CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-invalid-resource")
                 ? Bundle.main.url(forResource: "boot-animation", withExtension: "mp4")
-                : Bundle.main.url(forResource: "boot-moon", withExtension: "png"),
+                : NativeCrimsonTheme.bootResource,
         // An explicit design playback probe must work even on CI machines
         // configured to reduce system animation. Normal launches respect it.
         reduceMotion: CommandLine.arguments.contains("--design-preview") && CommandLine.arguments.contains("--boot-preview")
@@ -65,7 +65,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             ZStack {
                 NativeBootView.background.ignoresSafeArea()
                 if boot.blocksLibrary {
-                    NativeBootView(presentation: boot, previewTime: store.preview ? Double(nativeArgument("--boot-frame") ?? "") : nil)
+                    NativeWarpBootView(presentation: boot, previewTime: store.preview ? Double(nativeArgument("--boot-frame") ?? "") : nil)
                         .toolbarBackground(.hidden, for: .windowToolbar)
                         .background(NativeWindowAccessor { window in
                             store.libraryWindow = window
@@ -79,6 +79,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             .containerBackground(boot.blocksLibrary ? NativeBootView.background : Color(nsColor: .windowBackgroundColor), for: .window)
+            .crimsonGlassTheme()
             .frame(minWidth: 680, minHeight: 460)
             .animation(.easeInOut(duration: 0.4), value: boot.phase)
             .background(NativeStatusActions(store: store, delegate: delegate))
@@ -153,6 +154,7 @@ private struct NativeStatusActions: View {
 // Keep these credits fixed across builds. AppKit reads the build number from
 // CFBundleVersion for the preview number; release notes belong on GitHub.
 func showNativeAboutPanel() {
+    NativeCrimsonTheme.apply(NativeCrimsonTheme.enabled)
     let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "22"
     let engineBundle = Bundle(url: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightEngine.app"))
     let engineVersion = engineBundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String

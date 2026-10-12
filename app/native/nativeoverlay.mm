@@ -9,6 +9,11 @@
 #include <cstring>
 
 static NSString* const suite = @"com.moonlight-stream.NativeGlass.Overlay";
+static BOOL crimsonEnabled() {
+    NSUserDefaults* d = [[[NSUserDefaults alloc] initWithSuiteName:suite] autorelease];
+    return [d objectForKey:@"crimsonGlass"] ? [d boolForKey:@"crimsonGlass"] : YES;
+}
+static NSColor* crimsonAccent() { return [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1]; }
 static NSString* const changed = @"com.moonlight-stream.NativeGlass.overlaySettingsChanged";
 static NSString* const toggle = @"com.moonlight-stream.NativeGlass.toggleStreamControls";
 static std::atomic<bool> configured(false);
@@ -81,6 +86,7 @@ static MLOverlayController* controller;
     panel.hasShadow = YES; panel.hidesOnDeactivate = NO; panel.ignoresMouseEvents = field != nullptr;
     panel.collectionBehavior = NSWindowCollectionBehaviorFullScreenAuxiliary | NSWindowCollectionBehaviorIgnoresCycle;
     panel.becomesKeyOnlyIfNeeded = YES;
+    panel.appearance = crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
     NSVisualEffectView* material = [[[NSVisualEffectView alloc] initWithFrame:panel.contentView.bounds] autorelease];
     material.material = NSVisualEffectMaterialHUDWindow; material.blendingMode = NSVisualEffectBlendingModeBehindWindow; material.state = NSVisualEffectStateActive;
     material.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable; material.wantsLayer = YES; material.layer.cornerRadius = 12; material.layer.masksToBounds = YES;
@@ -90,6 +96,7 @@ static MLOverlayController* controller;
         if (!field && ![NSWorkspace sharedWorkspace].accessibilityDisplayShouldReduceTransparency) {
             NSGlassEffectView* glass = [[[NSGlassEffectView alloc] initWithFrame:material.frame] autorelease];
             glass.cornerRadius = 12;
+            glass.tintColor = crimsonEnabled() ? [crimsonAccent() colorWithAlphaComponent:0.16] : nil;
             glass.contentView = [[[NSView alloc] initWithFrame:material.frame] autorelease];
             glass.contentView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
             panel.contentView = glass; container = glass.contentView;
@@ -115,6 +122,10 @@ static MLOverlayController* controller;
 - (void)dismiss:(id)sender { pushAction(101); }
 - (void)refresh {
     [self.defaults synchronize];
+    for (NSPanel* panel in @[self.stats ?: (id)[NSNull null], self.status ?: (id)[NSNull null]]) {
+        if (![panel isKindOfClass:NSPanel.class]) continue;
+        panel.appearance = crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
+    }
     NSDictionary* custom = [self.defaults dictionaryForKey:@"shortcuts"];
     { std::lock_guard<std::mutex> lock(bindingMutex);
       for (int i=0;i<13;i++) {
@@ -147,12 +158,12 @@ static MLOverlayController* controller;
             // Reserve overflow, the always-visible Disconnect button and Done.
             if (x + 40 + 154 > available) { NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:names[i] action:@selector(action:) keyEquivalent:@""] autorelease]; item.target=self; item.tag=i; [overflow addItem:item]; continue; }
             NSButton* button = [NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:names[i]] target:self action:@selector(action:)];
-            button.bezelStyle=NSBezelStyleRounded; button.tag=i; button.toolTip=names[i]; [button setAccessibilityLabel:names[i]];
+            button.bezelStyle=NSBezelStyleRounded; button.contentTintColor=crimsonEnabled() ? crimsonAccent() : nil; button.tag=i; button.toolTip=names[i]; [button setAccessibilityLabel:names[i]];
             button.frame=NSMakeRect(x,8,34,30); [content addSubview:button]; x+=40;
         }
         if (overflow.numberOfItems) { NSPopUpButton* more = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(x,8,40,30) pullsDown:YES] autorelease]; [more addItemWithTitle:@"…"]; for (NSMenuItem* item in overflow.itemArray) [more.menu addItem:[[item copy] autorelease]]; [more setAccessibilityLabel:@"More Stream Controls"]; [content addSubview:more]; x+=46; }
         NSButton* disconnect = [NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"power" accessibilityDescription:@"Disconnect"] target:self action:@selector(action:)];
-        disconnect.bezelStyle=NSBezelStyleRounded; disconnect.tag=12;
+        disconnect.bezelStyle=NSBezelStyleRounded; disconnect.contentTintColor=crimsonEnabled() ? crimsonAccent() : nil; disconnect.tag=12;
         disconnect.toolTip=@"Disconnect from this stream"; [disconnect setAccessibilityLabel:@"Disconnect"];
         disconnect.frame=NSMakeRect(x,8,34,30); [content addSubview:disconnect]; x+=40;
         NSButton* close = [NSButton buttonWithTitle:@"Done" target:self action:@selector(dismiss:)]; close.frame=NSMakeRect(x,8,58,30); [content addSubview:close];

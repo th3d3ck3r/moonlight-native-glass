@@ -39,6 +39,9 @@ else
     cp "$build_root/bin/MoonlightNative-x86_64" "$app/Contents/MacOS/MoonlightNative"
 fi
 cp macos-native/Resources/moonlight.icns "$app/Contents/Resources/moonlight.icns"
+cp macos-native/Resources/crimson-moon.png "$app/Contents/Resources/crimson-moon.png"
+cp macos-native/Resources/crimson-full-moon.png "$app/Contents/Resources/crimson-full-moon.png"
+cp macos-native/Resources/crimson.icns "$app/Contents/Resources/crimson.icns"
 cp macos-native/Resources/boot-moon.png "$app/Contents/Resources/boot-moon.png"
 cp macos-native/Resources/full-moon.png "$app/Contents/Resources/full-moon.png"
 cp macos-native/Resources/boot-animation.mp4 "$app/Contents/Resources/boot-animation.mp4"

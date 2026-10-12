@@ -19,6 +19,10 @@ import Combine
     private let crescent: NSImage?
     private let fullMoon: NSImage?
     private var windowObservation: AnyCancellable?
+    private let crimsonCrescent: NSImage?
+    private let crimsonFullMoon: NSImage?
+    private var themeObservation: AnyCancellable?
+    private var windowExists = false
 
     init(resourceURL: URL? = Bundle.main.resourceURL) {
         func load(_ name: String) -> NSImage? {
@@ -36,8 +40,14 @@ import Combine
         }
         crescent = load("moonlight.icns")
         fullMoon = load("full-moon.png")
+        crimsonCrescent = load("crimson-moon.png")
+        crimsonFullMoon = load("crimson-full-moon.png")
         super.init()
         updateWindowState(false)
+        themeObservation = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main).sink { [weak self] _ in
+                guard let self else { return }; self.updateWindowState(self.windowExists)
+            }
         item.button?.setAccessibilityIdentifier("native-status-item")
         item.button?.target = self
         item.button?.action = #selector(clicked)
@@ -50,7 +60,10 @@ import Combine
         }
     }
     private func updateWindowState(_ exists: Bool) {
-        item.button?.image = exists ? (fullMoon ?? crescent) : crescent
+        windowExists = exists
+        let idle = NativeCrimsonTheme.enabled ? (crimsonCrescent ?? crescent) : crescent
+        let active = NativeCrimsonTheme.enabled ? (crimsonFullMoon ?? fullMoon ?? idle) : (fullMoon ?? idle)
+        item.button?.image = exists ? active : idle
         let state = exists ? "stream window open" : "no stream window"
         item.button?.setAccessibilityLabel("Moonlight Native Glass — " + state)
         item.button?.toolTip = nil

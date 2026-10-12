@@ -8,6 +8,12 @@ import Combine
 @main struct StatusIconTests {
     @MainActor static func main() {
         _ = NSApplication.shared
+        let savedTheme = UserDefaults.standard.object(forKey: NativeCrimsonTheme.key)
+        UserDefaults.standard.set(false, forKey: NativeCrimsonTheme.key)
+        defer {
+            if let savedTheme { UserDefaults.standard.set(savedTheme, forKey: NativeCrimsonTheme.key) }
+            else { UserDefaults.standard.removeObject(forKey: NativeCrimsonTheme.key) }
+        }
         let state = WindowState()
         let menu = NativeStatusMenu(resourceURL: URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true))
         menu.bind(to: state.$exists)
@@ -115,6 +121,30 @@ import Combine
         }
         precondition(finalMenu.items.first { $0.title == "Settings…" }?.isEnabled == true)
         precondition(finalMenu.items.first { $0.title == "Open Engine Logs" }?.isEnabled == true)
+        // Both crimson states must preserve transparent empty space and full color.
+        UserDefaults.standard.set(true, forKey: NativeCrimsonTheme.key)
+        flush()
+        for exists in [false, true] {
+            state.exists = exists; flush()
+            let image = button.image!
+            precondition(image !== crescent && image !== fullMoon)
+            let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 36, pixelsHigh: 36,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+            image.draw(in: NSRect(x: 0, y: 0, width: 36, height: 36))
+            NSGraphicsContext.restoreGraphicsState()
+            precondition(bitmap.colorAt(x: 0, y: 0)!.alphaComponent < 0.05)
+            var redPixels = 0
+            for y in 0..<36 { for x in 0..<36 {
+                let color = bitmap.colorAt(x: x, y: y)!.usingColorSpace(.sRGB)!
+                if color.alphaComponent > 0.5 && color.redComponent > color.blueComponent + 0.1 { redPixels += 1 }
+            } }
+            precondition(redPixels > 50, "Crimson artwork must retain visible red pixels")
+        }
+        UserDefaults.standard.set(false, forKey: NativeCrimsonTheme.key); flush()
+        precondition(button.image === fullMoon, "Turning off Crimson Glass must restore the original cached icon")
         print("Status icon states, menu confirmations/input handoff, click/hidden restore and hover removal checks passed")
     }
 }

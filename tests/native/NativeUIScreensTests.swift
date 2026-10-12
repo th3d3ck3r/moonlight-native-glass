@@ -1,10 +1,35 @@
 import XCTest
 
 @MainActor final class NativeUIScreensTests: XCTestCase {
+    func testCrimsonGlassAppearanceSwitch() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--design-preview", "--preview-screen=settings-appearance", "--dark"]
+        app.launch()
+        let window = app.windows["native-settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        let toggle = window.checkBoxes["crimson-glass-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        if toggle.value as? String != "1" { toggle.click() }
+        let frame = window.frame
+        let crimson = XCTAttachment(screenshot: window.screenshot())
+        crimson.name = "crimson-settings-titlebar"; crimson.lifetime = .keepAlways; add(crimson)
+        toggle.click()
+        XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertEqual(window.frame, frame, "Appearance switching must not change window geometry")
+        toggle.click()
+        XCTAssertEqual(toggle.value as? String, "1")
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        XCTAssertEqual(toggle.value as? String, "1", "Crimson preference must persist across launches")
+        app.terminate()
+    }
+
     func testNativeStartupArtworkStages() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        for (name, time) in [("seed", 0.12), ("expansion", 0.65), ("construction-rings", 2.3), ("existing-logo", 3.55)] {
+        for (name, time) in [("starfield", 0.12), ("warp", 0.65), ("arrival", 2.3), ("moon-and-satellites", 3.55)] {
             app.launchArguments = ["--design-preview", "--boot-preview", "--boot-frame=\(time)", "--dark"]
             app.launch()
             let window = app.windows["native-library"]

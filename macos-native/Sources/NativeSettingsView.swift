@@ -3,10 +3,10 @@ import SwiftUI
 import IOKit
 
 private enum SettingsPane: String, CaseIterable, Identifiable {
-    case video = "Video", audio = "Audio", input = "Input", network = "Network", advanced = "Advanced", overlay = "Overlay", shortcuts = "Shortcuts"
+    case appearance = "Appearance", video = "Video", audio = "Audio", input = "Input", network = "Network", advanced = "Advanced", overlay = "Overlay", shortcuts = "Shortcuts"
     var id: String { rawValue }
     var symbol: String {
-        switch self { case .video: "display"; case .audio: "speaker.wave.2"; case .input: "gamecontroller"; case .network: "network"; case .advanced: "slider.horizontal.3"; case .overlay: "rectangle.on.rectangle"; case .shortcuts: "keyboard" }
+        switch self { case .appearance: "paintpalette"; case .video: "display"; case .audio: "speaker.wave.2"; case .input: "gamecontroller"; case .network: "network"; case .advanced: "slider.horizontal.3"; case .overlay: "rectangle.on.rectangle"; case .shortcuts: "keyboard" }
     }
     var keys: [String] {
         switch self {
@@ -14,7 +14,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         case .audio: ["audioConfig", "playAudioOnHost", "muteOnFocusLoss"]
         case .input: ["multiController", "gamepadMouse", "backgroundGamepad", "swapFaceButtons", "absoluteMouseMode", "absoluteTouchMode", "swapMouseButtons", "reverseScrollDirection", "captureSysKeysMode"]
         case .network: ["enableMdns", "detectNetworkBlocking", "connectionWarnings"]
-        case .overlay, .shortcuts: []
+        case .appearance, .overlay, .shortcuts: []
         case .advanced: ["gameOptimizations", "quitAppAfter", "configurationWarnings", "showPerformanceOverlay", "keepAwake", "unlockBitrate", "richPresence"]
         }
     }
@@ -22,6 +22,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 
 struct NativeSettingsView: View {
     @ObservedObject var store: EngineStore
+    @AppStorage(NativeCrimsonTheme.key) private var crimson = true
     @State private var pane = SettingsPane.video
     @State private var nativeSize: VideoResolution?
     @State private var choseNative = false
@@ -30,16 +31,22 @@ struct NativeSettingsView: View {
             if store.preview { Label("Design preview · Sample settings", systemImage: "photo").font(.caption).foregroundStyle(.secondary).padding(.top, 10) }
             Picker("Settings", selection: $pane) { ForEach(SettingsPane.allCases) { Label($0.rawValue, systemImage: $0.symbol).tag($0) } }
                 .pickerStyle(.segmented).padding(20)
-            if store.fields.isEmpty && pane != .overlay && pane != .shortcuts {
+            if store.fields.isEmpty && pane != .overlay && pane != .shortcuts && pane != .appearance {
                 ContentUnavailableView("Settings Unavailable", systemImage: "gearshape", description: Text("Open the main window and connect to the streaming engine first."))
             } else {
                 Form {
-                    if pane != .overlay && pane != .shortcuts {
+                    if pane != .overlay && pane != .shortcuts && pane != .appearance {
                         Section(pane.rawValue) {
                             if pane == .video { resolutionPicker }
                             ForEach(pane.keys.compactMap { key in store.fields.first { $0.id == key } }) { field in preference(field) }
                         }
                         .disabled(!store.ready || store.streamActive || store.pairing != nil)
+                    }
+                    if pane == .appearance {
+                        Section("Appearance") {
+                            Toggle("Crimson Glass", isOn: $crimson).accessibilityIdentifier("crimson-glass-toggle")
+                            Text("Near-black surfaces, crimson accents and matching moon artwork. Native Liquid Glass remains active on supported macOS versions. Turn off to use the original appearance.").foregroundStyle(.secondary)
+                        }
                     }
                     if pane == .overlay { OverlaySettings() }
                     if pane == .shortcuts { ShortcutSettings() }
@@ -63,11 +70,13 @@ struct NativeSettingsView: View {
                         .disabled(!store.ready || store.streamActive || store.pairing != nil)
                     }
                 }.formStyle(.grouped)
+                    .scrollContentBackground(crimson ? .hidden : .automatic)
             }
             Divider()
             Text(store.streamActive ? "Stream settings are locked while streaming. Overlay controls remain available." : "Changes save automatically. App updates are manual.")
                 .font(.caption).foregroundStyle(.secondary).padding(12)
         }
+        .crimsonGlassTheme()
         .background(NativeWindowAccessor { store.settingsWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-settings"); $0?.setAccessibilityIdentifier("native-settings")
             if store.preview, let window = $0 { DispatchQueue.main.async { window.makeKeyAndOrderFront(nil) } } }.frame(width: 0, height: 0))
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification)) { notification in

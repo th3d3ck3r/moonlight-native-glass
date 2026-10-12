@@ -17,10 +17,14 @@ for bundle, identity in [(app, "com.moonlight-stream.NativeGlass"),
     assert (bundle / "Contents/MacOS" / info["CFBundleExecutable"]).is_file()
     icon_name = info["CFBundleIconFile"]
     icon = bundle / "Contents/Resources" / (icon_name if icon_name.endswith(".icns") else icon_name + ".icns")
-    assert icon.read_bytes() == (app / "Contents/Resources/moonlight.icns").read_bytes(), f"{bundle}: mismatched Dock icon"
+    expected_icon = pathlib.Path("macos-native/Resources") / ("crimson.icns" if bundle == app else "moonlight.icns")
+    assert icon.read_bytes() == expected_icon.read_bytes(), f"{bundle}: mismatched Dock icon"
 
 assert (app / "Contents/Resources/boot-animation.mp4").read_bytes() == pathlib.Path("macos-native/Resources/boot-animation.mp4").read_bytes(), "Boot animation resource differs"
 assert (app / "Contents/Resources/full-moon.png").read_bytes() == pathlib.Path("macos-native/Resources/full-moon.png").read_bytes(), "Menu bar full moon resource differs"
+
+for name in ["boot-moon.png", "crimson-moon.png", "crimson-full-moon.png", "crimson.icns"]:
+    assert (app / "Contents/Resources" / name).read_bytes() == (pathlib.Path("macos-native/Resources") / name).read_bytes(), f"Missing or mismatched artwork: {name}"
 
 checked = 0
 for file in app.rglob("*"):

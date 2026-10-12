@@ -51,7 +51,7 @@ jobs:
       - name: Test native startup animation and window chrome recovery
         if: matrix.architecture == 'universal'
         run: |
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
           build/boot-playback-tests "$PWD/macos-native/Resources/boot-moon.png"
       - name: Test native overlays and capture composited previews
         if: matrix.architecture == 'universal'
@@ -117,7 +117,7 @@ jobs:
       - name: Test actual menu bar icon state
         if: matrix.architecture == 'universal'
         run: |
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
           build/status-icon-tests macos-native/Resources build/status-icon-previews
       - uses: actions/upload-artifact@v6
         if: matrix.architecture == 'universal'
@@ -151,7 +151,7 @@ jobs:
         run: |
           mkdir -p build
           xcrun swift -e 'import AppKit; print("Runner Reduce Motion:", NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)'
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
           build/status-icon-tests macos-native/Resources
       - name: Test frontend lifecycle during UI probes
         if: contains(github.event.head_commit.message, '[ui probe]')
@@ -162,7 +162,7 @@ jobs:
         # Startup lifetime checks also run in UI-only probes, before screenshots.
         # Compile the same production coordinator used by the actual app.
         run: |
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
           build/boot-playback-tests "$PWD/macos-native/Resources/boot-moon.png"
       - name: Capture native screens with XCTest
         run: |

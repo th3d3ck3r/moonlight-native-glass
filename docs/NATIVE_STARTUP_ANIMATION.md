@@ -115,3 +115,13 @@ Startup and all five Xcode animation alternatives use `macos-native/Resources/bo
 ## Warp Arrival alternative
 
 The sixth Canvas preview, `Moonlight · Warp Arrival`, accelerates through 150 perspective star trails, eases to a stop, approaches the transparent moon logo, and reveals two gently orbiting satellites with solar panels. It uses the same finite startup timeline and library fade as the other alternatives; production startup selection is unchanged.
+
+## Crimson Glass appearance
+
+Crimson Glass is enabled by default. Settings → Appearance switches it off to restore the original appearance. The shared native presentation palette uses near-black surfaces, readable native labels, ruby accents and pale rose animation highlights. The main title bar shares the window background beneath its native controls. Settings, sheets, menus, About, game-card focus/hover borders, native stream controls and stream title-bar buttons follow the appearance. Native Liquid Glass and the existing reduced-transparency fallbacks remain in use.
+
+All six animation previews use the theme, including Warp Arrival and its satellites; the user's star-lane change to 45 is retained. Animation timing is unchanged. The user-selected Warp Arrival is now the production startup and shares its renderer with the Xcode alternative. The original five alternatives remain available in Canvas.
+
+Assets: `crimson-moon.png` and `crimson-full-moon.png` are genuinely transparent menu/boot assets. `crimson.icns` is the dark-backed Dock variant. Existing original assets are preserved. The built-in image editor recolored the supplied crescent/full-moon artwork to ruby/crimson and rose highlights, preserving the moon-and-two-dots design; the Dock prompt added a flat near-black background. Both projects and native packaging include the artwork.
+
+Only native presentation files change in the engine. Streaming, pairing, input handlers, codecs and helper integrations are untouched. The optional AWDL helper branch remains separate.

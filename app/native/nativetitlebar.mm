@@ -4,6 +4,11 @@
 #include "nativetitlebar.h"
 #include "nativeoverlay.h"
 
+static BOOL crimsonEnabled() {
+    NSUserDefaults* defaults = [[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
+    return [defaults objectForKey:@"crimsonGlass"] ? [defaults boolForKey:@"crimsonGlass"] : YES;
+}
+
 static NSString* const captureID = @"NativeCapture";
 static NSString* const hostID = @"NativeHost";
 static NSString* const statisticsID = @"NativeStatistics";
@@ -85,6 +90,7 @@ static MLStreamTitlebar* titlebar;
 - (instancetype)init {
     if ((self=[super init])) {
         self.buttons=[NSMutableDictionary dictionary];
+        [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(themeChanged:) name:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil];
         self.batteryDetails=@"No controller connected";
         for (NSString* name in @[NSWindowDidResizeNotification, NSWindowDidMiniaturizeNotification, NSWindowWillEnterFullScreenNotification, NSWindowWillExitFullScreenNotification, NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification, NSWindowDidChangeOcclusionStateNotification, @"NSWindowDidFailToEnterFullScreenNotification", @"NSWindowDidFailToExitFullScreenNotification"])
             [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:name object:nil];
@@ -138,8 +144,11 @@ static MLStreamTitlebar* titlebar;
         [self updateWindowToolbar];
     });
 }
+- (void)themeChanged:(NSNotification*)notification { [self updateWindowToolbar]; }
 - (void)updateWindowToolbar {
     if (!self.window) return;
+    self.window.appearance = crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
+    for (NSButton* button in self.buttons.allValues) button.contentTintColor = crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : nil;
     NSWindowStyleMask style=self.window.styleMask;
     BOOL fullscreen=self.windowTransition || self.fullscreenTransition || (style & NSWindowStyleMaskFullScreen) || !(style & NSWindowStyleMaskTitled);
     // Attaching a toolbar changes the Cocoa content geometry. In particular,
@@ -165,6 +174,7 @@ static MLStreamTitlebar* titlebar;
     if (self.details.shown && [self.detailsID isEqual:identifier]) { [self closeDetails]; return; }
     [self closeDetails]; self.detailsID=identifier;
     self.details=[[[NSPopover alloc] init] autorelease]; self.details.delegate=self;
+    self.details.appearance=crimsonEnabled() ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : nil;
     self.details.behavior=NSPopoverBehaviorTransient; self.details.animates=NO;
     NSViewController* content=[[[NSViewController alloc] init] autorelease];
     NSView* view=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,280,120)] autorelease];
@@ -257,6 +267,7 @@ static MLStreamTitlebar* titlebar;
     if (notification.object==self.details) self.detailsID=nil;
 }
 - (void)invalidate {
+    [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
     [[NSNotificationCenter defaultCenter] removeObserver:self]; [self closeDetails]; self.details.delegate=nil;
     if (self.presentationInstalled && self.window && (self.window.toolbar==self.toolbar || !self.window.toolbar)) {
         self.window.toolbar=self.previousToolbar; self.window.titleVisibility=self.previousTitleVisibility;

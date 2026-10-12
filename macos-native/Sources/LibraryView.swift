@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 struct LibraryView: View {
+    @Environment(\.crimsonGlassEnabled) private var crimson
     @ObservedObject var store: EngineStore
     var interactive = true
     var sizesPreviewWindow = true
@@ -47,6 +48,7 @@ struct LibraryView: View {
                 else { computersOverview }
                 statusBar
             }
+            .background(crimson ? NativeCrimsonTheme.surface : Color(nsColor: .windowBackgroundColor))
             .navigationTitle(store.selected?.name ?? "Moonlight Native Glass")
             .searchable(text: $search, prompt: "Search games")
             .toolbar {
@@ -67,10 +69,11 @@ struct LibraryView: View {
                 }
             }
         }
-        .sheet(isPresented: $addPresented) { AddComputerSheet(store: store) }
-        .sheet(item: $store.pairing) { request in PairingSheet(request: request).interactiveDismissDisabled() }
-        .sheet(item: $details) { ComputerDetailsSheet(computer: $0) }
-        .sheet(item: $rename) { RenameComputerSheet(store: store, computer: $0) }
+        .crimsonGlassTheme()
+        .sheet(isPresented: $addPresented) { AddComputerSheet(store: store).crimsonGlassTheme() }
+        .sheet(item: $store.pairing) { request in PairingSheet(request: request).crimsonGlassTheme().interactiveDismissDisabled() }
+        .sheet(item: $details) { ComputerDetailsSheet(computer: $0).crimsonGlassTheme() }
+        .sheet(item: $rename) { RenameComputerSheet(store: store, computer: $0).crimsonGlassTheme() }
         .background(NativeWindowAccessor { store.libraryWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-library"); $0?.setAccessibilityIdentifier("native-library")
             reportWindow?($0)
             if store.preview && sizesPreviewWindow { let compact = CommandLine.arguments.contains("--compact"); $0?.setContentSize(NSSize(width: compact ? 680 : 1080, height: compact ? 460 : 720)) } }.frame(width: 0, height: 0))
@@ -141,7 +144,7 @@ struct LibraryView: View {
                                 Button { store.startStream(computer, game: game) } label: {
                                     GameCard(game: game, running: computer.runningApp == game.id)
                                         .padding(4)
-                                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(focusedGame == game.id ? Color.accentColor : .clear, lineWidth: 2))
+                                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(focusedGame == game.id ? (crimson ? NativeCrimsonTheme.accent : Color.accentColor) : .clear, lineWidth: 2))
                                 }
                                 .buttonStyle(.plain)
                                 .focused($focusedGame, equals: game.id)
@@ -183,7 +186,7 @@ struct LibraryView: View {
                                     Text(computer.name).font(.headline)
                                     Text(computer.status).font(.callout).foregroundStyle(.secondary)
                                 }.frame(maxWidth: .infinity).padding(28)
-                                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
+                                    .background(crimson ? NativeCrimsonTheme.card : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
                             }.buttonStyle(.plain)
                         }
                     }.padding(24)
@@ -278,18 +281,19 @@ struct NativePrimaryButton: View {
 struct GameCard: View {
     let game: Game
     let running: Bool
+    @Environment(\.crimsonGlassEnabled) private var crimson
     @State private var artwork: NSImage?
     @State private var hover = false
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor))
+                RoundedRectangle(cornerRadius: 12).fill(crimson ? NativeCrimsonTheme.card : Color(nsColor: .controlBackgroundColor))
                 if let artwork { Image(nsImage: artwork).resizable().scaledToFill().clipped() }
                 else { Image(systemName: game.name == "Desktop" ? "desktopcomputer" : "gamecontroller").font(.system(size: 38)).foregroundStyle(.secondary) }
             }
             .aspectRatio(2.0 / 3.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(hover ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: hover ? 2 : 0.5))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(hover ? (crimson ? NativeCrimsonTheme.accent : Color.accentColor) : (crimson ? NativeCrimsonTheme.ruby.opacity(0.5) : Color(nsColor: .separatorColor)), lineWidth: hover ? 2 : 0.5))
             Text(game.name).font(.headline).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
             if running { Label("Running", systemImage: "play.fill").font(.caption).foregroundStyle(.secondary) }
             else if game.hidden { Label("Hidden", systemImage: "eye.slash").font(.caption).foregroundStyle(.secondary) }
