@@ -75,6 +75,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(titlebarRoot(window)!=nil && window.toolbar==nil && window.titleVisibility==NSWindowTitleHidden,"Slim native title row installed without a tall toolbar");
     CGFloat slimChrome=window.frame.size.height-window.contentLayoutRect.size.height;
     fprintf(stderr,"Titlebar chrome: original=%.1f slim=%.1f points\n",stockChrome,slimChrome);
+    fprintf(stderr,"OVERLAY FRAME: before=%s after=%s style=0x%lx content=%s\n",NSStringFromRect(originalFrame).UTF8String,NSStringFromRect(window.frame).UTF8String,(unsigned long)window.styleMask,NSStringFromRect(window.contentView.frame).UTF8String);
     check(slimChrome<=32 && slimChrome<=stockChrome+1,"Slim controls must stay in the original title row and preserve drawable geometry");
     check((window.styleMask & NSWindowStyleMaskFullSizeContentView) && NSEqualRects(originalFrame,window.frame),"Video must extend under the title overlay without moving the window");
     NSView* backdrop=titlebarBackground(window);

@@ -260,12 +260,14 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     // content is permanent while installed; capture toggles never change layout.
     if (self.window.visible) {
         self.presentationInstalled=YES;
+        NSRect originalFrame=self.window.frame;
+        BOOL extendContent=!(style & NSWindowStyleMaskFullSizeContentView);
         if (self.titleHeight<=0)
             self.titleHeight=MIN(32,MAX(24,self.window.frame.size.height-self.window.contentLayoutRect.size.height));
         // Install full-size content once, never in response to capture changes.
         // Video fills the title area; showing chrome only overlays that picture.
         // Keep SDL's original content view and native window/frame identity.
-        if (!(style & NSWindowStyleMaskFullSizeContentView))
+        if (extendContent)
             self.window.styleMask=style | NSWindowStyleMaskFullSizeContentView;
         self.window.titleVisibility=NSWindowTitleHidden;
         self.window.titlebarAppearsTransparent=YES;
@@ -281,10 +283,23 @@ static void requestTitlebarInputRepair(NSWindow* window) {
             if (self.background.superview!=frame)
                 [frame addSubview:self.background positioned:NSWindowAbove relativeTo:self.window.contentView];
         }
-        if ([self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory]==NSNotFound) {
+        NSUInteger accessoryIndex=[self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory];
+        // SDL's borderless style change can retain the controller while AppKit
+        // removes its native title parent. Reparenting the view for fullscreen
+        // must not leave that stale registration on the return to windowed.
+        if (accessoryIndex!=NSNotFound && self.accessory.view.superview==frame) {
+            [self.window removeTitlebarAccessoryViewControllerAtIndex:accessoryIndex];
+            accessoryIndex=NSNotFound;
+        }
+        if (accessoryIndex==NSNotFound) {
             [self.accessory.view removeFromSuperview];
             [self.window addTitlebarAccessoryViewController:self.accessory];
         }
+        // AppKit may preserve the former content size when changing style or
+        // installing an accessory. Preserve the outer frame instead, allowing
+        // the video view to fill the existing title area without a window jump.
+        if (extendContent && !NSEqualRects(originalFrame,self.window.frame))
+            [self.window setFrame:originalFrame display:NO];
         self.accessory.view.frame=NSMakeRect(0,0,MAX(40,self.window.frame.size.width-88),self.accessory.view.frame.size.height);
         [self layoutControls];
         // Find the title-only ancestor using the public view hierarchy. Never

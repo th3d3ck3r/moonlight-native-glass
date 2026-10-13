@@ -301,6 +301,12 @@ int main(int argc, char** argv) {
         // Unlike performClick:, these events exercise AppKit's button tracking
         // loop and SDL's title-bar focus-click bookkeeping.
         NSPoint click=[hostButton convertPoint:NSMakePoint(NSMidX(hostButton.bounds),NSMidY(hostButton.bounds)) toView:nil];
+        NSView* hostHit=[nativeWindow.contentView.superview hitTest:click];
+        std::fprintf(stderr,"TITLE HIT: button=%s point=%s hit=%s hidden=%d frame=%s root=%s\n",
+            NSStringFromClass(hostButton.class).UTF8String,NSStringFromPoint(click).UTF8String,
+            NSStringFromClass(hostHit.class).UTF8String,hostButton.hiddenOrHasHiddenAncestor,
+            NSStringFromRect(nativeWindow.contentView.frame).UTF8String,NSStringFromRect(titlebarRoot(nativeWindow).frame).UTF8String);
+        check(!hostButton.hiddenOrHasHiddenAncestor && (hostHit==hostButton || [hostHit isDescendantOf:hostButton]),"Released computer-name control must own its actual AppKit hit target after fullscreen");
         for (NSEventType type : {NSEventTypeLeftMouseDown,NSEventTypeLeftMouseUp}) {
             NSEvent* event=[NSEvent mouseEventWithType:type location:click modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:nativeWindow.windowNumber context:nil eventNumber:1 clickCount:1 pressure:0];
             [NSApp postEvent:event atStart:NO];
