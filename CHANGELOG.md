@@ -4,7 +4,9 @@
 
 - Accept large fragmented source-quality keyframes instead of falsely reporting queue overload at 129 fragments. Keep 32 MB ingress bounds and use reusable, bounded fragment metadata; recorder ABI 4.
 - Distinguish fragment/frame input limits, queue byte/item congestion, invalid frames and allocation failures.
-- Internal build 36. Mouse fixes are owner-confirmed and unchanged. Checkpoint: `checkpoints/moonlightlg-1.2.0.1U-before-recorder-fragments`. Validation pending.
+- Internal build 36. Mouse fixes are owner-confirmed and unchanged. Checkpoint: `checkpoints/moonlightlg-1.2.0.1U-before-recorder-fragments`.
+
+- Fragmented-keyframe functional and sanitizer checks, both complete macOS packages, full Xcode, both 12-test UI suites and stock platform builds passed. Downloaded package versions/architectures/checksums verified. Physical source-quality recording acceptance remains.
 
 ## 1.2.0.1U — unreleased — 2026-10-13
 
