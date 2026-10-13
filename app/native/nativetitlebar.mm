@@ -89,6 +89,7 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic, retain) NSColor* previousBackgroundColor;
 @property(nonatomic, retain) NSView* background;
 @property(nonatomic, retain) NSTitlebarAccessoryViewController* accessory;
+@property(nonatomic, retain) NSView* fullscreenRoot;
 @property(nonatomic, retain) NSView* row;
 @property(nonatomic, retain) NSButton* overflow;
 @property(nonatomic, assign) BOOL presentationInstalled;
@@ -231,7 +232,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
         NSUInteger index=[self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory];
         if (index!=NSNotFound) [self.window removeTitlebarAccessoryViewControllerAtIndex:index];
     }
-    [self.accessory.view removeFromSuperview];
+    [self.fullscreenRoot removeFromSuperview];
 }
 - (void)updateWindowToolbar {
     if (!self.window) return;
@@ -250,8 +251,9 @@ static void requestTitlebarInputRepair(NSWindow* window) {
             self.background.frame=NSMakeRect(0,NSMaxY(frame.bounds)-28,frame.bounds.size.width,28);
             self.background.subviews.firstObject.frame=self.background.bounds;
             [frame addSubview:self.background positioned:NSWindowAbove relativeTo:self.window.contentView];
-            self.accessory.view.frame=NSMakeRect(6,NSMaxY(frame.bounds)-26,MAX(40,frame.bounds.size.width-12),24);
-            [frame addSubview:self.accessory.view positioned:NSWindowAbove relativeTo:self.background];
+            self.fullscreenRoot.frame=NSMakeRect(6,NSMaxY(frame.bounds)-26,MAX(40,frame.bounds.size.width-12),24);
+            [self.fullscreenRoot.subviews.firstObject addSubview:self.row];
+            [frame addSubview:self.fullscreenRoot positioned:NSWindowAbove relativeTo:self.background];
             [self layoutControls]; [self updateVisibility];
         }
         return;
@@ -283,16 +285,10 @@ static void requestTitlebarInputRepair(NSWindow* window) {
             if (self.background.superview!=frame)
                 [frame addSubview:self.background positioned:NSWindowAbove relativeTo:self.window.contentView];
         }
+        [self.fullscreenRoot removeFromSuperview];
+        [self.accessory.view.subviews.firstObject addSubview:self.row];
         NSUInteger accessoryIndex=[self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory];
-        // SDL's borderless style change can retain the controller while AppKit
-        // removes its native title parent. Reparenting the view for fullscreen
-        // must not leave that stale registration on the return to windowed.
-        if (accessoryIndex!=NSNotFound && self.accessory.view.superview==frame) {
-            [self.window removeTitlebarAccessoryViewControllerAtIndex:accessoryIndex];
-            accessoryIndex=NSNotFound;
-        }
         if (accessoryIndex==NSNotFound) {
-            [self.accessory.view removeFromSuperview];
             [self.window addTitlebarAccessoryViewController:self.accessory];
         }
         // AppKit may preserve the former content size when changing style or
@@ -323,6 +319,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     // receiving motion/keys in the same view, with all command routes intact.
     self.window.movable=show && !fullscreen ? self.previousMovable : NO;
     self.accessory.view.hidden=!show;
+    self.fullscreenRoot.hidden=!show;
     self.nativeChrome.hidden=!show;
     for (NSNumber* type in @[@(NSWindowCloseButton),@(NSWindowMiniaturizeButton),@(NSWindowZoomButton)])
         [self.window standardWindowButton:(NSWindowButton)type.integerValue].hidden=!show || fullscreen;
@@ -344,9 +341,10 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     }
 }
 - (void)layoutControls {
-    CGFloat width=self.accessory.view.bounds.size.width;
-    CGFloat height=self.accessory.view.bounds.size.height;
-    NSView* glass=self.accessory.view.subviews.firstObject;
+    NSView* root=self.fullscreenRoot.superview ? self.fullscreenRoot : self.accessory.view;
+    CGFloat width=root.bounds.size.width;
+    CGFloat height=root.bounds.size.height;
+    NSView* glass=root.subviews.firstObject;
     glass.frame=NSMakeRect(0,1,MAX(0,width-4),MAX(0,height-2));
     self.row.frame=glass.bounds;
     CGFloat w=self.row.bounds.size.width, h=self.row.bounds.size.height;
@@ -534,7 +532,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     self.toolbar.delegate=nil; self.window=nil;
 }
 - (void)dealloc {
-    [self invalidate]; [_nativeChrome release]; [_background release]; [_previousBackgroundColor release]; [_accessory release]; [_row release]; [_overflow release]; [_toolbar release]; [_previousToolbar release]; [_buttons release]; [_details release]; [_detailsID release]; [_batteryDetails release]; [super dealloc];
+    [self invalidate]; [_fullscreenRoot release]; [_nativeChrome release]; [_background release]; [_previousBackgroundColor release]; [_accessory release]; [_row release]; [_overflow release]; [_toolbar release]; [_previousToolbar release]; [_buttons release]; [_details release]; [_detailsID release]; [_batteryDetails release]; [super dealloc];
 }
 @end
 
@@ -598,6 +596,11 @@ void nativeTitlebarAttach(void* window) {
     // entire bar so its lower-left corner includes the traffic-light region.
     NSView* controls=[[[NSView alloc] initWithFrame:root.bounds] autorelease];
     controls.identifier=@"NativeStreamTitlebarControls"; [controls addSubview:titlebar.row]; [root addSubview:controls];
+    // An accessory controller owns its view's origin even when detached.
+    // Fullscreen needs a separate container; only the command row is shared.
+    titlebar.fullscreenRoot=[[[NSView alloc] initWithFrame:root.bounds] autorelease];
+    titlebar.fullscreenRoot.identifier=@"NativeStreamFullscreenTitlebar";
+    [titlebar.fullscreenRoot addSubview:[[[NSView alloc] initWithFrame:root.bounds] autorelease]];
     titlebar.background=[[[MLTitlebarBackground alloc] initWithFrame:NSZeroRect] autorelease];
     titlebar.background.identifier=@"NativeStreamTitlebarBackground";
     NSView* glass;

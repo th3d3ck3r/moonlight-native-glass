@@ -6,6 +6,7 @@ static NSView* titlebarFindView(NSView* view, NSString* identifier) {
     return nil;
 }
 static NSView* titlebarRoot(NSWindow* window) {
+    if (NSView* root=titlebarFindView(window.contentView.superview,@"NativeStreamFullscreenTitlebar")) return root;
     if (NSView* root=titlebarFindView(window.contentView.superview,@"NativeStreamTitlebar")) return root;
     if (!(window.styleMask & NSWindowStyleMaskTitled)) {
         NSView* root=titlebarFindView(window.contentView.superview,@"NativeStreamTitlebar");
