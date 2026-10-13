@@ -1,7 +1,7 @@
 name: MoonlightLG macOS Validation
 on:
   push:
-    branches: [native-ui, feature/native-boot-animation]
+    branches: [native-ui, feature/native-boot-animation, feature/recording-plugin]
     paths-ignore: [README.md, "docs/**", "readme-assets/**", .github/workflows/publish-native-preview.yml]
   workflow_dispatch:
 permissions:
@@ -66,6 +66,17 @@ jobs:
           mkdir -p build/connection-window-qt
           (cd build/connection-window-qt && qmake ../../tests/native/ConnectionWindowTests.pro QMAKE_APPLE_DEVICE_ARCHS=arm64 && make -j4)
           MOONLIGHT_NATIVE_CONNECTION_LIBRARY="$PWD/build/libMoonlightLGConnection.dylib" build/connection-window-qt/connection-window-tests build/connection-window-previews
+      - name: Test recording plugin and decode recorded files
+        if: matrix.architecture == 'universal'
+        run: |
+          python3 scripts/build-recorder-plugin.py build/libMoonlightLGRecorder.dylib arm64
+          xcrun clang++ -std=c++17 -pthread tests/native/RecorderCoreTests.cpp -o build/recorder-core-tests
+          build/recorder-core-tests
+          xcrun clang++ -std=c++17 -fobjc-arc -I libs/mac/include tests/native/RecorderTests.mm \
+            -L libs/mac/lib -lopus.0 -framework Foundation -framework AVFoundation \
+            -framework VideoToolbox -framework CoreMedia -framework CoreVideo -framework AudioToolbox \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/recorder-tests
+          DYLD_LIBRARY_PATH="$PWD/libs/mac/lib" build/recorder-tests "$PWD/build/libMoonlightLGRecorder.dylib" "$PWD/build/recording-fixtures"
       - name: Test native overlays and capture composited previews
         if: matrix.architecture == 'universal'
         run: |

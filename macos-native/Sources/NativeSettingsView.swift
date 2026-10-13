@@ -3,10 +3,10 @@ import SwiftUI
 import IOKit
 
 private enum SettingsPane: String, CaseIterable, Identifiable {
-    case appearance = "Appearance", video = "Video", audio = "Audio", input = "Input", network = "Network", advanced = "Advanced", overlay = "Overlay", shortcuts = "Shortcuts"
+    case appearance = "Appearance", video = "Video", audio = "Audio", recording = "Recording", input = "Input", network = "Network", advanced = "Advanced", overlay = "Overlay", shortcuts = "Shortcuts"
     var id: String { rawValue }
     var symbol: String {
-        switch self { case .appearance: "paintpalette"; case .video: "display"; case .audio: "speaker.wave.2"; case .input: "gamecontroller"; case .network: "network"; case .advanced: "slider.horizontal.3"; case .overlay: "rectangle.on.rectangle"; case .shortcuts: "keyboard" }
+        switch self { case .appearance: "paintpalette"; case .video: "display"; case .audio: "speaker.wave.2"; case .recording: "record.circle"; case .input: "gamecontroller"; case .network: "network"; case .advanced: "slider.horizontal.3"; case .overlay: "rectangle.on.rectangle"; case .shortcuts: "keyboard" }
     }
     var keys: [String] {
         switch self {
@@ -14,7 +14,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         case .audio: ["audioConfig", "playAudioOnHost", "muteOnFocusLoss"]
         case .input: ["multiController", "gamepadMouse", "backgroundGamepad", "swapFaceButtons", "absoluteMouseMode", "absoluteTouchMode", "swapMouseButtons", "reverseScrollDirection", "captureSysKeysMode"]
         case .network: ["enableMdns", "detectNetworkBlocking", "connectionWarnings"]
-        case .appearance, .overlay, .shortcuts: []
+        case .appearance, .overlay, .shortcuts, .recording: []
         case .advanced: ["gameOptimizations", "quitAppAfter", "configurationWarnings", "showPerformanceOverlay", "keepAwake", "unlockBitrate", "richPresence"]
         }
     }
@@ -31,11 +31,11 @@ struct NativeSettingsView: View {
             if store.preview { Label("Design preview · Sample settings", systemImage: "photo").font(.caption).foregroundStyle(.secondary).padding(.top, 10) }
             Picker("Settings", selection: $pane) { ForEach(SettingsPane.allCases) { Label($0.rawValue, systemImage: $0.symbol).tag($0) } }
                 .pickerStyle(.segmented).labelsHidden().padding(20)
-            if store.fields.isEmpty && pane != .overlay && pane != .shortcuts && pane != .appearance {
+            if store.fields.isEmpty && pane != .overlay && pane != .shortcuts && pane != .appearance && pane != .recording {
                 ContentUnavailableView("Settings Unavailable", systemImage: "gearshape", description: Text("Open the main window and connect to the streaming engine first."))
             } else {
                 Form {
-                    if pane != .overlay && pane != .shortcuts && pane != .appearance {
+                    if pane != .overlay && pane != .shortcuts && pane != .appearance && pane != .recording {
                         Section(pane.rawValue) {
                             if pane == .video { resolutionPicker }
                             ForEach(pane.keys.compactMap { key in store.fields.first { $0.id == key } }) { field in preference(field) }
@@ -48,6 +48,7 @@ struct NativeSettingsView: View {
                             Text("Near-black surfaces, crimson accents and matching moon artwork. Native Liquid Glass remains active on supported macOS versions. Turn off to use the original appearance.").foregroundStyle(.secondary)
                         }
                     }
+                    if pane == .recording { RecordingSettings().disabled(store.streamActive) }
                     if pane == .overlay { OverlaySettings() }
                     if pane == .shortcuts { ShortcutSettings() }
                     if pane == .video {
@@ -273,5 +274,59 @@ private struct ShortcutSettings: View {
     private func notify() {
         Self.defaults.synchronize()
         DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.moonlight-stream.NativeGlass.overlaySettingsChanged"), object: nil, userInfo: nil, deliverImmediately: true)
+    }
+}
+
+private struct RecordingSettings: View {
+    private static let defaults = UserDefaults(suiteName: "com.moonlight-stream.NativeGlass.Recording")!
+    @AppStorage("enabled", store: defaults) private var enabled = false
+    @AppStorage("mode", store: defaults) private var mode = 0
+    @AppStorage("codec", store: defaults) private var codec = 1
+    @AppStorage("resolution", store: defaults) private var resolution = 0
+    @AppStorage("fps", store: defaults) private var fps = 0
+    @AppStorage("bitrate", store: defaults) private var bitrate = 30
+    @AppStorage("replay", store: defaults) private var replay = false
+    @AppStorage("replaySeconds", store: defaults) private var seconds = 60
+    @AppStorage("directory", store: defaults) private var directory = ""
+    var body: some View {
+        Section("Recording") {
+            Toggle("Enable Recording Controls", isOn: $enabled)
+            Text("Use Record / Stop and Save Instant Replay in the stream title bar. Changes apply to the next stream.").foregroundStyle(.secondary)
+        }
+        Section("Video Encoding") {
+            Picker("Mode", selection: $mode) {
+                Text("Original Stream Quality").tag(0)
+                Text("Custom Hardware Encoding").tag(1)
+            }
+            if mode == 0 {
+                Text("Copies H.264 or HEVC video without a second video encode. Resolution, frame rate and bitrate follow the host stream. Recording and replay wait for a usable keyframe; no extra host keyframes are requested.").foregroundStyle(.secondary)
+            } else {
+                Picker("Codec", selection: $codec) { Text("H.264").tag(1); Text("HEVC").tag(2) }
+                Picker("Resolution", selection: $resolution) {
+                    Text("Stream Resolution").tag(0); Text("720p").tag(720); Text("1080p").tag(1080); Text("1440p").tag(1440); Text("4K").tag(2160)
+                }
+                Picker("Frame Rate", selection: $fps) { Text("Stream Frame Rate").tag(0); Text("30 fps").tag(30); Text("60 fps").tag(60); Text("120 fps").tag(120) }
+                Stepper("Bitrate: \(bitrate) Mbps", value: $bitrate, in: 5...150, step: 5)
+                Text("Requires the VideoToolbox decoder and an available hardware encoder. Support is checked when recording starts. SDR only in this U build; use Original Stream Quality for HDR. The app reports unsupported settings and does not fall back to software encoding.").foregroundStyle(.secondary)
+            }
+        }.disabled(!enabled)
+        Section("Instant Replay") {
+            Toggle("Buffer Instant Replay", isOn: $replay)
+            Picker("Replay Length", selection: $seconds) { Text("30 seconds").tag(30); Text("60 seconds").tag(60); Text("5 minutes").tag(300) }
+                .disabled(!replay)
+            Text("30/60 seconds use up to 256 MB of memory. Five minutes uses a disk cache capped at 2 GB. A save can temporarily retain another buffer. Clips begin at a complete keyframe, so the available duration can be shorter than requested.").foregroundStyle(.secondary)
+        }.disabled(!enabled)
+        Section("Save Location") {
+            LabeledContent("Folder", value: directory.isEmpty ? "Movies/MoonlightLG" : directory)
+            Button("Choose Folder…") {
+                let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.canCreateDirectories = true
+                if panel.runModal() == .OK, let url = panel.url { directory = url.path }
+            }
+            Button("Show Recordings") {
+                let url = directory.isEmpty ? FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask)[0].appendingPathComponent("MoonlightLG") : URL(fileURLWithPath: directory)
+                NSWorkspace.shared.open(url)
+            }
+            Text("Audio is captured independently of local mute. Movies are written in fragments so a partial file may remain playable after an interruption. Disk limits and writer errors stop recording while the stream continues.").foregroundStyle(.secondary)
+        }
     }
 }

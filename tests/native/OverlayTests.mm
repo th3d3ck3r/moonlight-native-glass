@@ -87,6 +87,14 @@ int main(int argc,char** argv) { @autoreleasepool {
     NSButton* statisticsButton=titlebarButton(window,@"NativeStatistics");
     check(statisticsButton.image!=nil,"Native line-graph symbol must be available");
     [statisticsButton performClick:nil]; check(takeAction(3),"Title statistics uses original SDL action");
+    nativeTitlebarSetRecording(true,true,true,true,false,false,65,"Recording"); pump();
+    NSButton* recordButton=titlebarButton(window,@"NativeRecord"); NSButton* replayButton=titlebarButton(window,@"NativeReplay");
+    check(recordButton.enabled && [recordButton.toolTip containsString:@"1:05"],"Recording button and elapsed tooltip");
+    check(replayButton.enabled,"Ready replay action");
+    nativeTitlebarSetRecording(true,false,true,false,true,false,0,"Saving"); pump();
+    check(!replayButton.enabled && [replayButton.toolTip containsString:@"Saving"],"Replay save prevents duplicate exports");
+    nativeTitlebarSetRecording(false,false,false,false,false,false,0,"Disabled"); pump();
+    check(!recordButton.enabled && !replayButton.enabled,"Disabled recorder controls");
     nativeTitlebarSetCapture(true); pump(); check([captureButton.toolTip containsString:@"captured by host"],"Capture state refresh");
     nativeTitlebarSetCapture(false); pump(); check([captureButton.toolTip containsString:@"released to Mac"],"Capture release refresh");
     NSButton* connectionButton=titlebarButton(window,@"NativeConnection");

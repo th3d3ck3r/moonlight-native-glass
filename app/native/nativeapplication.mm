@@ -36,7 +36,7 @@ static std::atomic<bool> menuReaderStopping(true);
 static bool supportedMenuAction(int action) {
     return action == 100 || action == 200 || action == 201 || action == 202 ||
            action == 203 || action == 207 || action == 208 || action == 209 ||
-           action == 210 || action == 212 || action == 213 || action == 214 || action == 215 || action == 216;
+           action == 210 || action == 212 || action == 213 || action == 214 || action == 215 || action == 216 || action == 217 || action == 218 || action == 219;
 }
 void nativeAcknowledgeMenuAction(int action, Uint32 requestID) {
     if (!requestID) return;
@@ -323,7 +323,7 @@ bool nativeStartStreamMenuCommands(int fd) {
                     if (![actionValue isKindOfClass:NSNumber.class] || ![identifier isKindOfClass:NSNumber.class] ||
                         CFGetTypeID((CFTypeRef)actionValue)==CFBooleanGetTypeID() || CFGetTypeID((CFTypeRef)identifier)==CFBooleanGetTypeID()) continue;
                     const double actionNumber=[actionValue doubleValue], idNumber=[identifier doubleValue];
-                    if (actionNumber < 0 || actionNumber > 216 || actionNumber != int(actionNumber) ||
+                    if (actionNumber < 0 || actionNumber > 219 || actionNumber != int(actionNumber) ||
                         idNumber < 1 || idNumber > UINT32_MAX || idNumber != Uint32(idNumber)) continue;
                     const int action=int(actionNumber);
                     if (!supportedMenuAction(action)) continue;

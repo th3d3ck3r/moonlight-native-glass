@@ -2,6 +2,7 @@
 #import <QuartzCore/QuartzCore.h>
 #include <SDL.h>
 #include <mutex>
+#include <string>
 #include "nativetitlebar.h"
 #include "nativeoverlay.h"
 
@@ -14,8 +15,10 @@ static NSString* const captureID = @"NativeCapture";
 static NSString* const hostID = @"NativeHost";
 static NSString* const statisticsID = @"NativeStatistics";
 static NSString* const batteryID = @"NativeControllerBattery";
+static NSString* const recordID = @"NativeRecord";
+static NSString* const replayID = @"NativeReplay";
 static NSString* const connectionID = @"NativeConnection";
-struct TitleState { bool captured=false; bool statistics=false; NativeConnectionState connection=NativeConnectionState::Connecting; };
+struct TitleState { bool recorder=false,recording=false,buffering=false,replayReady=false,saving=false,recorderFailed=false; uint64_t seconds=0; std::string recordingMessage="Recording disabled"; bool captured=false; bool statistics=false; NativeConnectionState connection=NativeConnectionState::Connecting; };
 static TitleState state;
 static std::mutex stateMutex;
 static unsigned epoch=0;
@@ -114,14 +117,14 @@ static MLStreamTitlebar* titlebar;
     return self;
 }
 - (NSArray*)toolbarAllowedItemIdentifiers:(NSToolbar*)toolbar {
-    return @[captureID,hostID,NSToolbarFlexibleSpaceItemIdentifier,statisticsID,batteryID,connectionID];
+    return @[captureID,hostID,NSToolbarFlexibleSpaceItemIdentifier,statisticsID,recordID,replayID,batteryID,connectionID];
 }
 - (NSArray*)toolbarDefaultItemIdentifiers:(NSToolbar*)toolbar {
-    return @[captureID,NSToolbarFlexibleSpaceItemIdentifier,hostID,NSToolbarFlexibleSpaceItemIdentifier,statisticsID,connectionID];
+    return @[captureID,NSToolbarFlexibleSpaceItemIdentifier,hostID,NSToolbarFlexibleSpaceItemIdentifier,statisticsID,recordID,replayID,connectionID];
 }
 - (NSToolbarItem*)toolbar:(NSToolbar*)toolbar itemForItemIdentifier:(NSString*)identifier willBeInsertedIntoToolbar:(BOOL)inserted {
     NSToolbarItem* item=[[[NSToolbarItem alloc] initWithItemIdentifier:identifier] autorelease];
-    NSDictionary* labels=@{captureID:@"Release / Capture Input",hostID:@"Control Center",statisticsID:@"Show / Hide Statistics",batteryID:@"Controller Battery",connectionID:@"Connection Status"};
+    NSDictionary* labels=@{captureID:@"Release / Capture Input",hostID:@"Control Center",statisticsID:@"Show / Hide Statistics",batteryID:@"Controller Battery",connectionID:@"Connection Status",recordID:@"Record / Stop",replayID:@"Save Instant Replay"};
     NSButton* button=[MLStreamToolbarButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"circle" accessibilityDescription:labels[identifier]] target:self action:@selector(clicked:)];
     button.bordered=NO; button.bezelStyle=NSBezelStyleTexturedRounded;
     button.frame=NSMakeRect(0,0,[identifier isEqual:hostID] ? 180 : ([identifier isEqual:batteryID] ? 38 : 24),22);
@@ -209,7 +212,7 @@ static MLStreamTitlebar* titlebar;
     glass.frame=NSMakeRect(0,1,MAX(0,width-4),MAX(0,height-2));
     self.row.frame=glass.bounds;
     CGFloat w=self.row.bounds.size.width, h=self.row.bounds.size.height;
-    BOOL compact=w<280;
+    BOOL compact=w<360;
     CGFloat right=MAX(0,w-3);
     NSButton* connection=self.buttons[connectionID];
     connection.frame=NSMakeRect(MAX(0,right-24),0,24,h); right-=28;
@@ -217,7 +220,7 @@ static MLStreamTitlebar* titlebar;
     self.overflow.frame=NSMakeRect(MAX(0,right-24),0,24,h);
     if (compact) right-=28;
     BOOL battery=NO; for (NSToolbarItem* item in self.toolbar.items) if ([item.itemIdentifier isEqual:batteryID]) battery=YES;
-    for (NSString* identifier in @[batteryID,statisticsID]) {
+    for (NSString* identifier in @[batteryID,replayID,recordID,statisticsID]) {
         NSButton* button=self.buttons[identifier];
         BOOL show=!compact && (![identifier isEqual:batteryID] || battery);
         button.hidden=!show;
@@ -249,6 +252,8 @@ static MLStreamTitlebar* titlebar;
     for (NSString* identifier in self.buttons) if (self.buttons[identifier]==sender) { [self perform:identifier anchor:sender]; break; }
 }
 - (void)perform:(NSString*)identifier anchor:(NSView*)anchor {
+    if ([identifier isEqual:recordID]) { nativeOverlayPerformAction(217); return; }
+    if ([identifier isEqual:replayID]) { nativeOverlayPerformAction(219); return; }
     if ([identifier isEqual:captureID]) { nativeOverlayPerformAction(1); return; }
     if ([identifier isEqual:statisticsID]) { nativeOverlayPerformAction(3); return; }
     if ([identifier isEqual:hostID]) { [self closeDetails]; nativeOverlayPerformAction(102); return; }
@@ -287,6 +292,19 @@ static MLStreamTitlebar* titlebar;
     NSButton* stats=self.buttons[statisticsID]; stats.image=[NSImage imageWithSystemSymbolName:@"chart.xyaxis.line" accessibilityDescription:nil];
     stats.contentTintColor=copy.statistics ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
     stats.toolTip=copy.statistics ? @"Hide Statistics" : @"Show Statistics"; [stats setAccessibilityLabel:stats.toolTip]; [stats setAccessibilityValue:copy.statistics ? @"Shown" : @"Hidden"];
+    NSButton* record=self.buttons[recordID];
+    record.image=[NSImage imageWithSystemSymbolName:copy.recording ? @"stop.circle.fill" : (copy.recorderFailed ? @"exclamationmark.circle" : @"record.circle") accessibilityDescription:nil];
+    record.enabled=copy.recorder;
+    record.contentTintColor=copy.recording || copy.recorderFailed ? NSColor.systemRedColor : NSColor.labelColor;
+    NSString* recordingMessage=[NSString stringWithUTF8String:copy.recordingMessage.c_str()];
+    record.toolTip=copy.recording ? [NSString stringWithFormat:@"Stop Recording · %llu:%02llu · %@",(unsigned long long)(copy.seconds/60),(unsigned long long)(copy.seconds%60),recordingMessage] : [@"Record · " stringByAppendingString:recordingMessage];
+    [record setAccessibilityLabel:record.toolTip];
+    NSButton* replay=self.buttons[replayID];
+    replay.image=[NSImage imageWithSystemSymbolName:copy.saving ? @"hourglass" : @"arrow.counterclockwise.circle" accessibilityDescription:nil];
+    replay.enabled=copy.recorder && copy.replayReady && !copy.saving;
+    replay.contentTintColor=copy.buffering ? NSColor.systemBlueColor : NSColor.secondaryLabelColor;
+    replay.toolTip=copy.saving ? @"Saving Replay" : (copy.replayReady ? @"Save Instant Replay" : (copy.buffering ? @"Replay buffering · Waiting for a usable keyframe" : @"Enable Instant Replay in Recording settings"));
+    [replay setAccessibilityLabel:replay.toolTip];
     NSButton* connection=self.buttons[connectionID];
     NSString* symbol=@"circle.fill"; NSColor* tint=NSColor.secondaryLabelColor;
     switch (copy.connection) {
@@ -373,6 +391,11 @@ static void scheduleRefresh() {
         [titlebar refresh];
     });
 }
+void nativeTitlebarSetRecording(bool available,bool recording,bool buffering,bool ready,bool saving,bool failed,uint64_t seconds,const char* message) {
+    std::lock_guard<std::mutex> lock(stateMutex);
+    state.recorder=available;state.recording=recording;state.buffering=buffering;state.replayReady=ready;state.saving=saving;state.recorderFailed=failed;state.seconds=seconds;state.recordingMessage=message ? message : "";
+    scheduleRefresh();
+}
 void nativeTitlebarSetCapture(bool captured) { std::lock_guard<std::mutex> lock(stateMutex); if (state.captured!=captured) { state.captured=captured; scheduleRefresh(); } }
 void nativeTitlebarSetStatistics(bool visible) { std::lock_guard<std::mutex> lock(stateMutex); if (state.statistics!=visible) { state.statistics=visible; scheduleRefresh(); } }
 void nativeTitlebarSetConnection(NativeConnectionState value) { std::lock_guard<std::mutex> lock(stateMutex); if (state.connection!=value) { state.connection=value; scheduleRefresh(); } }
@@ -393,7 +416,7 @@ void nativeTitlebarAttach(void* window) {
     titlebar.toolbar.allowsUserCustomization=NO; titlebar.toolbar.autosavesConfiguration=NO;
     // Keep command metadata for narrow-window overflow, without installing a
     // taller NSToolbar on the stream window.
-    for (NSString* identifier in @[captureID,hostID,statisticsID,connectionID])
+    for (NSString* identifier in @[captureID,hostID,statisticsID,recordID,replayID,connectionID])
         [titlebar.toolbar insertItemWithItemIdentifier:identifier atIndex:titlebar.toolbar.items.count];
     titlebar.accessory=[[[NSTitlebarAccessoryViewController alloc] init] autorelease];
     titlebar.accessory.layoutAttribute=NSLayoutAttributeRight;

@@ -1,3 +1,4 @@
+#include "native/nativerecorder.h"
 #include "session.h"
 #ifdef Q_OS_MACOS
 #include "native/nativeoverlay.h"
@@ -359,6 +360,9 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
 
 int Session::drSetup(int videoFormat, int width, int height, int frameRate, void *, int)
 {
+#ifdef Q_OS_MACOS
+    nativeRecorderVideoConfig(videoFormat, width, height, frameRate);
+#endif
     s_ActiveSession->m_ActiveVideoFormat = videoFormat;
     s_ActiveSession->m_ActiveVideoWidth = width;
     s_ActiveSession->m_ActiveVideoHeight = height;
@@ -1307,6 +1311,9 @@ private:
 
         // Finish cleanup of the connection state
         LiStopConnection();
+#ifdef Q_OS_MACOS
+        nativeRecorderStop();
+#endif
 
         // Perform a best-effort app quit
         if (shouldQuit) {
@@ -2059,6 +2066,7 @@ void Session::exec()
     // because we want to suspend all Qt processing until the stream is over.
 #ifdef Q_OS_MACOS
     // Native menu state and explicit mute are session-local presentation controls.
+    nativeRecorderStart();
     bool nativeUserMuted = false;
     auto publishNativeMenu = [&] {
         nativePublishMenuState(m_Window, m_InputHandler->nativeMenuCaptureIntent(),
@@ -2123,7 +2131,8 @@ void Session::exec()
               (event.user.code == 209 || event.user.code == 212)))) {
             const int action = event.user.code;
             nativeAcknowledgeMenuAction(action, Uint32(reinterpret_cast<uintptr_t>(event.user.data1)));
-            if (action == 200) nativeHideStreamWindow(m_Window);
+            if (action == 217 || action == 218 || action == 219) nativeRecorderCommand(action);
+            else if (action == 200) nativeHideStreamWindow(m_Window);
             else if (action == 207) {
                 nativeUserMuted = !nativeUserMuted;
                 m_AudioMuted = nativeUserMuted || (m_Preferences->muteOnFocusLoss && !(SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS));
@@ -2480,6 +2489,7 @@ void Session::exec()
 
 DispatchDeferredCleanup:
 #ifdef Q_OS_MACOS
+    nativeRecorderQuiesce();
     if (nativeStreamMenuCommandsEnabled()) stopNativeStreamWindow();
 #endif
     // Switch back to synchronous logging mode

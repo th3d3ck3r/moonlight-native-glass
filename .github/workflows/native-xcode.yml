@@ -1,10 +1,12 @@
 name: MoonlightLG Xcode Project Validation
 on:
   push:
-    branches: [native-ui, feature/native-boot-animation]
+    branches: [native-ui, feature/native-boot-animation, feature/recording-plugin]
     paths:
       - 'MoonlightLG.xcodeproj/**'
       - 'macos-native/**'
+      - 'recording/**'
+      - 'scripts/build-recorder-plugin.py'
       - 'app/native/**'
       - 'app/streaming/input/**'
       - 'tests/native/OverlayTests.mm'

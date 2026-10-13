@@ -9,3 +9,6 @@ void nativeTitlebarSetStatistics(bool visible);
 void nativeTitlebarSetConnection(NativeConnectionState state);
 void nativeTitlebarConnectionStarted();
 void nativeTitlebarControllersChanged();
+
+#include <stdint.h>
+void nativeTitlebarSetRecording(bool available, bool recording, bool buffering, bool ready, bool saving, bool failed, uint64_t seconds, const char* message);

@@ -1,5 +1,13 @@
 # MoonlightLG changelog
 
+## 1.2.00U — unreleased — 2026-10-13
+
+- Isolated recording/replay plugin, original-stream copy, optional hardware H.264/HEVC encoding and titlebar controls.
+- Recording settings, independent audio capture, bounded queues and RAM/disk buffers.
+- Disabled by default. Rollback checkpoint: `checkpoints/moonlightlg-1.1.03U-before-recording`. Mouse work remains deferred.
+- Internal build 33. U links remain owner-only.
+- [Design and validation](docs/RECORDING_PLUGIN.md); macOS validation pending.
+
 ## 1.1.03U — unreleased — 2026-10-12
 
 - Use the boot animation's golden-angle star layout in the Apollo scene, with

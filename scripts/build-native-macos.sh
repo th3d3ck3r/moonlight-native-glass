@@ -25,6 +25,7 @@ macdeployqt "$engine_app" -qmldir="$source_root/app/gui" -appstore-compliant -no
 # library. Moonlight does not use Mimer; ship no broken optional driver.
 rm -f "$engine_app/Contents/PlugIns/sqldrivers/libqsqlmimer.dylib"
 python3 scripts/build-connection-view.py "$engine_app/Contents/Frameworks/libMoonlightLGConnection.dylib" "${native_archs[@]}"
+python3 scripts/build-recorder-plugin.py "$engine_app/Contents/Frameworks/libMoonlightLGRecorder.dylib" "${native_archs[@]}"
 sdk=$(xcrun --sdk macosx --show-sdk-path)
 for cpu in "${native_archs[@]}"; do
     xcrun swiftc -swift-version 5 -parse-as-library -O -sdk "$sdk" \

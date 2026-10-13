@@ -1,3 +1,4 @@
+#include "native/nativerecorder.h"
 #include <Limelight.h>
 #include "ffmpeg.h"
 #include "utils.h"
@@ -2036,6 +2037,9 @@ void FFmpegVideoDecoder::decoderThreadProc()
                         frame->pts = (int64_t)du.rtpTimestamp;
                     }
 
+#ifdef Q_OS_MACOS
+                    nativeRecorderPixel(frame);
+#endif
                     m_ActiveWndVideoStats.decodedFrames++;
 
                     // Queue the frame for rendering (or render now if pacer is disabled)
@@ -2095,6 +2099,9 @@ void FFmpegVideoDecoder::decoderThreadProc()
 
 int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
 {
+#ifdef Q_OS_MACOS
+    nativeRecorderVideo(du);
+#endif
     PLENTRY entry = du->bufferList;
     int err;
 

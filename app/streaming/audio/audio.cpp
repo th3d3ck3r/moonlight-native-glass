@@ -1,3 +1,4 @@
+#include "native/nativerecorder.h"
 #include "../session.h"
 #include "renderers/renderer.h"
 
@@ -133,6 +134,9 @@ int Session::arInit(int /* audioConfiguration */,
                     const POPUS_MULTISTREAM_CONFIGURATION opusConfig,
                     void* /* arContext */, int /* arFlags */)
 {
+#ifdef Q_OS_MACOS
+    nativeRecorderAudioConfig(opusConfig);
+#endif
     SDL_memcpy(&s_ActiveSession->m_OriginalAudioConfig, opusConfig, sizeof(*opusConfig));
     s_ActiveSession->initializeAudioRenderer();
     return 0;
@@ -149,6 +153,9 @@ void Session::arCleanup()
 
 void Session::arDecodeAndPlaySample(char* sampleData, int sampleLength)
 {
+#ifdef Q_OS_MACOS
+    nativeRecorderAudio(sampleData, sampleLength);
+#endif
     int samplesDecoded;
 
 #ifndef STEAM_LINK
