@@ -181,6 +181,7 @@ struct NativeSettingsView: View {
 
 private struct OverlaySettings: View {
     private static let defaults = UserDefaults(suiteName: "com.moonlight-stream.NativeGlass.Overlay")!
+    @AppStorage("streamStatsGraphs", store: Self.defaults) private var streamStatsGraphs = true
     @AppStorage("scale", store: Self.defaults) private var scale = 1.0
     @AppStorage("position", store: Self.defaults) private var position = "topLeft"
     @State private var buttons = Self.savedButtons()
@@ -193,12 +194,13 @@ private struct OverlaySettings: View {
     private let names = ["Close Stream Window", "Release / Capture Input", "Full Screen", "Statistics", "Mouse Mode", "Cursor Visibility", "Minimize", "Paste Clipboard", "Pointer Region Lock", "Disconnect and Exit", "Keyboard Capture", "Show / Hide Controls"]
     var body: some View {
         Section("Statistics Overlay") {
+            Toggle("Show Graphs", isOn: $streamStatsGraphs).accessibilityIdentifier("stream-statistics-graphs")
             HStack { Text("Size"); Slider(value: $scale, in: 0.8...1.5, step: 0.05); Text("\(Int(scale * 100))%").monospacedDigit().frame(width: 46) }
             Picker("Position", selection: $position) {
                 Text("Top Left").tag("topLeft"); Text("Top Right").tag("topRight")
                 Text("Bottom Left").tag("bottomLeft"); Text("Bottom Right").tag("bottomRight")
             }
-            Text("Statistics resize with the stream window and remain click-through.").font(.caption).foregroundStyle(.secondary)
+            Text("Statistics use Crimson Glass cards. Graphs show the last minute. During captured gameplay the panel passes clicks through; release input to use its Graphs toggle or scroll.").font(.caption).foregroundStyle(.secondary)
         }
         Section("Stream Controls") {
             Text("Set its show/hide binding in Shortcuts, or use the Moonlight menu bar menu. The visible pointer stays inside the stream window while controls are open. Done restores input; Disconnect ends the stream.").font(.caption).foregroundStyle(.secondary)
@@ -215,10 +217,11 @@ private struct OverlaySettings: View {
             }
             .accessibilityIdentifier("overlay-button-customization")
             Button("Restore Overlay Defaults") {
-                scale = 1; position = "topLeft"; buttons = [2,3,1,6,7]
+                scale = 1; position = "topLeft"; streamStatsGraphs = true; buttons = [2,3,1,6,7]
                 saveButtons(); notify()
             }
         }
+        .onChange(of: streamStatsGraphs) { _, _ in notify() }
         .onChange(of: scale) { _, _ in notify() }
         .onChange(of: position) { _, _ in notify() }
     }

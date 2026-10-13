@@ -443,6 +443,24 @@ int main(int argc, char** argv) {
         check(titleInput.m_NativeControlsVisible && SDL_GetWindowMouseGrab(window) && !SDL_GetRelativeMouseMode(),"Title repair must preserve working Control Center local confinement");
         titleInput.handleNativeOverlayAction(101); pump();
         check(SDL_GetRelativeMouseMode(),"Computer-name Done restoration must remain unchanged");
+        // A child statistics panel is interactive only after intentional release.
+        nativeOverlayPresent(0,true,"Incoming frame rate from network: 60 FPS\nAverage network latency: 8 ms\nAverage decoding time: 1.2 ms");
+        nativeTitlebarSetCapture(false); titleInput.setCaptureActive(false); pump();
+        NSView* streamStats=nil;
+        for (NSWindow* panel in cocoa(window).childWindows) if (NSView* view=titlebarFindView(panel.contentView,@"NativeStreamStatistics")) streamStats=view;
+        check(streamStats!=nil,"Missing styled stream statistics");
+        NSButton* graphButton=(NSButton*)titlebarFindView(streamStats,@"StreamStatisticsGraphs");
+        titleInput.m_NativeCaptureBeforeFocusLoss=true; SDL_FlushEvent(nativeOverlayEventType());
+        NSPoint graphPoint=[graphButton convertPoint:NSMakePoint(NSMidX(graphButton.bounds),NSMidY(graphButton.bounds)) toView:nil];
+        for (NSEventType type : {NSEventTypeLeftMouseDown,NSEventTypeLeftMouseUp}) {
+            NSEvent* event=[NSEvent mouseEventWithType:type location:graphPoint modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:graphButton.window.windowNumber context:nil eventNumber:7 clickCount:1 pressure:0];
+            [NSApp postEvent:event atStart:NO];
+        }
+        pump(); check(repairQueuedInput(titleInput),"Actual graph toggle must repair input for its parent stream window");
+        check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Graph toggle must restore previous host capture and confinement");
+        nativeTitlebarSetCapture(true); pump(); check(streamStats.window.ignoresMouseEvents,"Captured stats panel must ignore mouse events");
+        titleInput.setCaptureActive(false); nativeTitlebarSetCapture(false); pump();
+        nativeOverlayPresent(0,false,""); pump();
         // Reproduce SDL's real drag state after temporary focus release.
         titleInput.setCaptureActive(false); pump(); titleInput.m_NativeCaptureBeforeFocusLoss=true;
         // This uses the actual moving state, not merely a programmatic move.

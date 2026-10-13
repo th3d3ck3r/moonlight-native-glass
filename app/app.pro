@@ -583,5 +583,5 @@ DEFINES += VERSION_STR=\\\"$$cat(version.txt)\\\"
 
 macx {
     SOURCES += native/nativebridge.cpp native/nativeapplication.mm native/nativeoverlay.mm native/nativetitlebar.mm native/nativerecorder.mm
-    HEADERS += native/nativebridge.h native/nativeapplication.h native/nativeoverlay.h native/nativetitlebar.h native/nativeplaybackvolume.h native/nativehardware.inc native/nativerecorder.h
+    HEADERS += native/nativebridge.h native/nativeapplication.h native/nativeoverlay.h native/nativetitlebar.h native/nativeplaybackvolume.h native/nativehardware.inc native/nativestreamstats.h native/nativestreamstats.inc native/nativerecorder.h
 }

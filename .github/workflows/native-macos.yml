@@ -46,6 +46,8 @@ jobs:
           python3 tests/native/extract_native_audio_callback.py
           c++ -std=c++17 -Ibuild tests/native/AudioMuteTests.cpp -o build/audio-mute-tests
           build/audio-mute-tests
+          c++ -std=c++17 tests/native/StreamStatsTests.cpp -o build/stream-stats-tests
+          build/stream-stats-tests
       - name: Test native event framing
         run: |
           mkdir -p build

@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.3.1.0U — unreleased — 2026-10-13
+
+- Stream statistics now match the hardware monitor: Crimson Glass, uppercase labels, bold values and rolling one-minute sparklines. All source readings and metadata are retained.
+- Persistent Graphs toggle in the panel and Overlay settings; Off gives compact value cards. Controls are click-through during host capture and share existing mouse repair when released.
+- Internal build 40. Validation in progress.
+
 ## 1.3.0.0U — unreleased — 2026-10-13
 
 - Adjustable local CPU, RAM, GPU (where supported), network graphs and thermal status in a Crimson Glass overlay. Position, size, opacity, visible metrics, refresh cadence and history are remembered. Captured gameplay passes clicks through; releasing input enables adjustment.

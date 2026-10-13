@@ -2,7 +2,7 @@ name: MoonlightLG presentation shutdown regression
 on:
   push:
     branches: [feature/native-boot-animation, feature/recording-plugin]
-    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, tests/native/StreamWindowTests.mm, tests/native/OverlayTests.mm, tests/native/AudioMuteTests.cpp, tests/native/extract_native_audio_callback.py, tests/native/FullscreenWindowTests.mm, tests/native/extract_native_focus_methods.py, tests/native/extract_native_exit_shortcut.py, app/native/nativeapplication.mm, app/native/nativetitlebar.mm, app/native/nativehardware.inc, app/native/nativeplaybackvolume.h, app/streaming/audio/audio.cpp, tests/native/TitlebarFixture.h, app/native/nativeoverlay.mm, app/native/nativeoverlay.h, app/streaming/input/keyboard.cpp, app/streaming/session.cpp]
+    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, tests/native/StreamWindowTests.mm, tests/native/OverlayTests.mm, tests/native/AudioMuteTests.cpp, tests/native/extract_native_audio_callback.py, tests/native/FullscreenWindowTests.mm, tests/native/extract_native_focus_methods.py, tests/native/extract_native_exit_shortcut.py, app/native/nativeapplication.mm, app/native/nativetitlebar.mm, app/native/nativehardware.inc, app/native/nativestreamstats.h, app/native/nativestreamstats.inc, tests/native/StreamStatsTests.cpp, app/native/nativeplaybackvolume.h, app/streaming/audio/audio.cpp, tests/native/TitlebarFixture.h, app/native/nativeoverlay.mm, app/native/nativeoverlay.h, app/streaming/input/keyboard.cpp, app/streaming/session.cpp]
 permissions:
   contents: read
 jobs:
@@ -24,6 +24,8 @@ jobs:
           python3 tests/native/extract_native_audio_callback.py
           c++ -std=c++17 -Ibuild tests/native/AudioMuteTests.cpp -o build/audio-mute-tests
           build/audio-mute-tests
+          c++ -std=c++17 tests/native/StreamStatsTests.cpp -o build/stream-stats-tests
+          build/stream-stats-tests
           xcrun clang++ -std=c++17 -fno-objc-arc -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all \
             -I libs/mac/include/SDL2 -I app/native -I build \
             app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/NativeShutdownTests.mm \

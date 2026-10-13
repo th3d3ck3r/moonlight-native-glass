@@ -1,0 +1,13 @@
+# Stream statistics cards and graphs
+
+Development version **1.3.1.0U**, internal build **40**. Validation in progress.
+
+The existing native stream statistics surface now uses the hardware monitor's Crimson Glass palette, rounded material, uppercase field labels, bold values and crimson sparklines. Video resolution/codec metadata and every diagnostic value remain present. Labels are shortened for readability; accessibility labels retain the original field names and values. Unknown fields remain textual and wrap rather than being misread as numeric metrics.
+
+Measured FPS, bitrate, network/jitter drops, network RTT, host processing, decode, queue and rendering time can be charted. Host latency charts use the reported average (the third min/max/average value), while the original three values remain displayed. RTT variance and bitrate peaks remain in the text. Missing/nonfinite/negative values are graph gaps, never invented zeroes. History is bounded to 60 seconds and 120 samples per metric, keyed by field identity. Disappeared fields are removed. Closing statistics clears history. Resize/theme/graph toggles do not generate samples; snapshot revisions ensure each production update is consumed once.
+
+Graphs default On. A persistent Graphs button in the panel and Show Graphs toggle in Overlay settings switch to compact value cards when Off. Existing overlay size/position settings remain effective. Wide panels use two columns; narrow/tall content scrolls after input release. A 32-point top reservation keeps the new header below title controls. Notifications/status messages retain their existing text and material treatment.
+
+While host capture is active, the entire statistics panel and its content pass clicks through. On intentional release, Graphs and scrolling become accessible without taking keyboard/main focus. Graphs uses MLStreamToolbarButton, the same tracked release and parent-window/session-scoped repair as the title row. No new engine action, streaming/decoder timing, audio gain, recording tap, permission, or pairing change is introduced.
+
+The parser/history fixture covers original metadata, bitrate/peak preservation, host average selection, RTT/variance, unavailable/invalid readings, bounded histories and disappeared fields. Local ordinary and ASan/UBSan parser tests passed. Native overlay tests cover graph persistence, compact height, unchanged video geometry, unchanged sample count on toggles and captured pass-through. Actual SDL/AppKit input tests exercise the graph button and prior capture restoration. Full native/Xcode and bundle validation are required before distributing builds.

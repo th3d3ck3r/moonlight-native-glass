@@ -224,11 +224,31 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(nativeOverlayPresent(0,true,sample),"Native statistics ownership"); check(nativeOverlayPresent(1,true,"Design preview · Sample values"),"Status ownership"); pump();
     fprintf(stderr,"Overlay children=%lu visible=%d configured=%d\n",(unsigned long)window.childWindows.count,window.visible,nativeOverlayConfigured());
     check(window.childWindows.count==2,"Passive surfaces only; controls hidden by default");
+    nativeTitlebarSetCapture(true); pump();
     for (NSWindow* panel in window.childWindows) {
         check(panel.ignoresMouseEvents,"Statistics/status must pass through input");
         check(!panel.canBecomeKeyWindow && !panel.canBecomeMainWindow,"Passive panels must reject keyboard/main focus");
     }
     check(NSApp.keyWindow==window,"Passive overlay must not steal focus");
+    NSWindow* statisticsPanel=nil; NSView* statisticsView=nil;
+    for (NSWindow* panel in window.childWindows) if (NSView* view=titlebarFindView(panel.contentView,@"NativeStreamStatistics")) { statisticsPanel=panel; statisticsView=view; }
+    check(statisticsView && statisticsPanel,"Stream statistics must use the new cards surface");
+    nativeTitlebarSetCapture(false); pump();
+    NSButton* graphs=(NSButton*)titlebarFindView(statisticsView,@"StreamStatisticsGraphs");
+    check(graphs && [NSStringFromClass(graphs.class) isEqualToString:@"MLStreamToolbarButton"],"Graphs toggle must share title-button tracking repair");
+    check(!statisticsPanel.ignoresMouseEvents && NSApp.keyWindow==window,"Released graph controls must preserve stream keyboard focus");
+    NSUInteger count=[[statisticsView valueForKey:@"sampleCount"] unsignedIntegerValue];
+    NSRect videoBefore=window.contentView.frame, panelBefore=statisticsPanel.frame;
+    [graphs performClick:nil]; pump();
+    check([defaults objectForKey:@"streamStatsGraphs"] && ![defaults boolForKey:@"streamStatsGraphs"],"Graphs Off must persist");
+    check(statisticsPanel.frame.size.height<panelBefore.size.height && NSEqualRects(videoBefore,window.contentView.frame),"Values-only cards must compact without changing video geometry");
+    check([[statisticsView valueForKey:@"sampleCount"] unsignedIntegerValue]==count,"Graph toggling must not fabricate measurements");
+    [graphs performClick:nil]; pump(); check([defaults boolForKey:@"streamStatsGraphs"],"Graphs On must persist");
+    capture([titlebarOut stringByAppendingPathComponent:@"stream-statistics-graphs.png"]);
+    [graphs performClick:nil]; pump(); capture([titlebarOut stringByAppendingPathComponent:@"stream-statistics-values.png"]);
+    [graphs performClick:nil]; pump();
+    nativeTitlebarSetCapture(true); pump(); check(statisticsPanel.ignoresMouseEvents && [statisticsView hitTest:NSMakePoint(12,12)]==nil,"Captured statistics must pass clicks through");
+    nativeTitlebarSetCapture(false); pump();
     NSArray* passive=[window.childWindows copy];
     for (NSWindow* panel in passive) checkCrimson(panel,true);
     [defaults setBool:NO forKey:@"crimsonGlass"]; [defaults synchronize];
@@ -258,7 +278,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]]; pump(); capture([out stringByAppendingPathComponent:@"overlay-dark.png"]);
     nativeOverlaySetControlsVisible(true); pump(); check(window.childWindows.count==3,"Separate controls surface");
     NSWindow* controls=nil;
-    for (NSWindow* panel in window.childWindows) if (!panel.ignoresMouseEvents) controls=panel;
+    for (NSWindow* panel in window.childWindows) if (buttonWithTag(panel.contentView,12)) controls=panel;
     NSButton* disconnect=buttonWithTag(controls.contentView,12);
     check(disconnect!=nil && [disconnect.accessibilityLabel isEqual:@"Disconnect"],"Default controls must expose Disconnect");
     [disconnect performClick:nil]; check(takeAction(12),"Disconnect must use plain disconnect, not close/hide or quit host game");
@@ -297,7 +317,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     [window setContentSize:NSMakeSize(320,300)]; pump();
     bounds=[window convertRectToScreen:window.contentView.bounds];
     for (NSWindow* panel in window.childWindows) check(NSContainsRect(bounds,panel.frame),"Every panel must fit after controls shrink with all actions selected");
-    controls=nil; for (NSWindow* panel in window.childWindows) if (!panel.ignoresMouseEvents) controls=panel;
+    controls=nil; for (NSWindow* panel in window.childWindows) if (buttonWithTag(panel.contentView,12)) controls=panel;
     check(buttonWithTag(controls.contentView,12)!=nil,"Disconnect must remain directly visible in compact controls");
     nativeOverlayDetach(); check((window.styleMask & NSWindowStyleMaskFullSizeContentView)==(originalStyle & NSWindowStyleMaskFullSizeContentView),"Detach restores original full-size content style"); check(window.toolbar==nil && !titlebarRoot(window) && window.titleVisibility==NSWindowTitleVisible && window.titlebarAppearsTransparent==originalTransparency && !titlebarBackground(window) && [window.backgroundColor isEqual:originalBackground] && window.titlebarSeparatorStyle==originalSeparator,"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
     nativeOverlayAttach(window,"next-session"); check(nativeOverlayConfigured(),"Repeated session attachment"); nativeOverlayDetach();

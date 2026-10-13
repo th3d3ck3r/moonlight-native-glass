@@ -187,6 +187,9 @@ import XCTest
         // As in the other Settings captures, activate the window before the
         // first control click; AppKit otherwise uses that click for activation.
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.025)).click()
+        let graphs = window.descendants(matching: .any)["stream-statistics-graphs"].firstMatch
+        XCTAssertTrue(graphs.exists, "Stream graphs setting missing")
+        graphs.click(); graphs.click()
         let customization = window.disclosureTriangles["overlay-button-customization"]
         for _ in 0..<8 { if customization.isHittable { break }; window.scrollViews.firstMatch.swipeUp() }
         XCTAssertTrue(customization.exists, "Control bar customization missing")
@@ -208,7 +211,7 @@ import XCTest
         let about = app.descendants(matching: .any)["native-about"].firstMatch
         XCTAssertTrue(about.waitForExistence(timeout: 10))
         XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", "MoonlightLG", "MoonlightLG")).firstMatch.exists)
-        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "1.3.0.0U", "1.3.0.0U")).firstMatch.exists)
+        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "1.3.1.0U", "1.3.1.0U")).firstMatch.exists)
         XCTAssertTrue(about.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Moonlight Qt 6.2.0")).firstMatch.exists)
         let shot = XCTAttachment(screenshot: about.screenshot())
         shot.name = "moonlightlg-about-version"; shot.lifetime = .keepAlways; add(shot)

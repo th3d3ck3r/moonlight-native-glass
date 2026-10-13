@@ -20,3 +20,6 @@ bool nativeOverlayConsumeKeyRelease(bool& consumed, Uint8 state);
 
 // Queue an existing action on SDL's main event loop; never call input from AppKit.
 bool nativeOverlayPerformAction(int action, Uint32 requestID = 0);
+
+// Main-thread presentation: passive during host capture; local graph toggle on release.
+void nativeOverlaySetCaptureState(bool captured);

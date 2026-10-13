@@ -18,7 +18,7 @@ static NSString* const changed = @"com.moonlight-stream.NativeGlass.overlaySetti
 static NSString* const toggle = @"com.moonlight-stream.NativeGlass.toggleStreamControls";
 static std::atomic<bool> configured(false);
 static Uint32 actionEvent = (Uint32)-1;
-struct Snapshot { bool enabled = false; char text[1024] = {}; };
+struct Snapshot { bool enabled = false; char text[1024] = {}; uint64_t revision=0; };
 static std::mutex snapshotMutex;
 static Snapshot snapshots[2];
 static bool updatePending = false;
@@ -92,12 +92,15 @@ static void applyPanelTheme(NSPanel* panel) {
     wash.layer.borderWidth = 1;
 }
 
+#include "nativestreamstats.inc"
+
 @interface MLOverlayController : NSObject
 @property(nonatomic, assign) NSWindow* parent;
 @property(nonatomic, retain) NSPanel* stats;
 @property(nonatomic, retain) NSPanel* status;
 @property(nonatomic, retain) NSPanel* controls;
-@property(nonatomic, retain) NSTextField* statsText;
+@property(nonatomic, retain) MLStreamStatsView* statsView;
+@property(nonatomic, assign) BOOL captured;
 @property(nonatomic, retain) NSTextField* statusText;
 @property(nonatomic, retain) NSUserDefaults* defaults;
 @property(nonatomic, copy) NSString* token;
@@ -182,7 +185,15 @@ static MLOverlayController* controller;
           bindings[i] = {code, (SDL_Keymod)(((mods & 1) ? KMOD_CTRL : 0) | ((mods & 2) ? KMOD_ALT : 0) | ((mods & 4) ? KMOD_SHIFT : 0) | ((mods & 8) ? KMOD_GUI : 0))};
       }
     }
-    if (!self.stats) { NSTextField* label = nil; self.stats = [self panelWithText:&label]; self.statsText = label; }
+    if (!self.stats) {
+        self.stats=[self panelWithText:nullptr]; self.stats.ignoresMouseEvents=self.captured;
+        NSView* content=self.stats.contentView;
+        if (@available(macOS 26.0,*)) if ([content isKindOfClass:NSGlassEffectView.class]) content=((NSGlassEffectView*)content).contentView;
+        self.statsView=[[[MLStreamStatsView alloc] initWithFrame:content.bounds] autorelease];
+        self.statsView.autoresizingMask=NSViewWidthSizable | NSViewHeightSizable;
+        [content addSubview:self.statsView];
+    }
+    [self.statsView refresh];
     if (!self.status) { NSTextField* label = nil; self.status = [self panelWithText:&label]; self.statusText = label; }
     if (self.controls) { [self.parent removeChildWindow:self.controls]; [self.controls orderOut:nil]; self.controls = nil; }
     if (self.showingControls) {
@@ -241,7 +252,24 @@ static MLOverlayController* controller;
     }
     for (int i=0;i<2;i++) {
         CGFloat availableHeight = MAX(0,bounds.size.height-24-(i==0 ? reservedBottom : 0));
-        NSPanel* panel = i==0 ? self.stats : self.status; NSTextField* label=i==0?self.statsText:self.statusText;
+        NSPanel* panel = i==0 ? self.stats : self.status;
+        if (i==0) {
+            self.statsView.scale=scale; self.statsView.captured=self.captured;
+            self.stats.ignoresMouseEvents=self.captured;
+            if (copy[0].enabled && copy[0].text[0]) [self.statsView present:[NSString stringWithUTF8String:copy[0].text] ?: @"" revision:copy[0].revision];
+            else [self.statsView reset];
+            CGFloat available=MAX(0,availableHeight-32);
+            CGFloat height=MIN([self.statsView preferredHeightForWidth:width],available);
+            NSString* position=[self.defaults stringForKey:@"position"] ?: @"topLeft";
+            CGFloat x=[position containsString:@"Right"] ? NSMaxX(bounds)-width-12 : NSMinX(bounds)+12;
+            CGFloat y=[position hasPrefix:@"bottom"] ? NSMinY(bounds)+12+reservedBottom : NSMaxY(bounds)-height-44;
+            NSRect frame=NSMakeRect(x,y,width,height);
+            if (!NSEqualRects(panel.frame,frame)) [panel setFrame:frame display:NO];
+            self.statsView.frame=panel.contentView.bounds; [self.statsView refresh];
+            [self setPanel:panel visible:copy[0].enabled && copy[0].text[0] && self.parent.visible && !self.parent.miniaturized];
+            applyPanelTheme(panel); panel.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]; continue;
+        }
+        NSTextField* label=self.statusText;
         label.stringValue=[NSString stringWithUTF8String:copy[i].text] ?: @"";
         label.font=i==0 ? [NSFont monospacedDigitSystemFontOfSize:12*scale weight:NSFontWeightRegular] : [NSFont systemFontOfSize:13*scale weight:NSFontWeightMedium];
         CGFloat padding=12*scale;
@@ -275,7 +303,7 @@ static MLOverlayController* controller;
 }
 - (void)dealloc {
     [self invalidate];
-    [_stats release]; [_status release]; [_controls release]; [_statsText release]; [_statusText release]; [_defaults release]; [_token release]; [super dealloc];
+    [_stats release]; [_status release]; [_controls release]; [_statsView release]; [_statusText release]; [_defaults release]; [_token release]; [super dealloc];
 }
 @end
 
@@ -308,7 +336,7 @@ bool nativeOverlayPerformAction(int action, Uint32 requestID) { return pushActio
 bool nativeOverlayPresent(int type, bool enabled, const char* text) {
     if (!configured || type<0 || type>1) return false;
     if (type==0) nativeTitlebarSetStatistics(enabled);
-    std::lock_guard<std::mutex> lock(snapshotMutex); snapshots[type].enabled=enabled; SDL_strlcpy(snapshots[type].text,text ?: "",sizeof(snapshots[type].text));
+    std::lock_guard<std::mutex> lock(snapshotMutex); snapshots[type].enabled=enabled; ++snapshots[type].revision; SDL_strlcpy(snapshots[type].text,text ?: "",sizeof(snapshots[type].text));
     if (!updatePending) { updatePending=true; unsigned current=generation; dispatch_async(dispatch_get_main_queue(), ^{ { std::lock_guard<std::mutex> guard(snapshotMutex); if (generation!=current) return; updatePending=false; } [controller layoutPanels]; }); }
     return true;
 }
@@ -328,6 +356,10 @@ void nativeOverlayDetach() {
     // AppKit can retain notification targets until its current event drains.
     // Detach now rather than relying on eventual object destruction.
     [controller invalidate]; [controller release]; controller=nil;
+}
+void nativeOverlaySetCaptureState(bool captured) {
+    if (controller.captured==captured) return;
+    controller.captured=captured; controller.stats.ignoresMouseEvents=captured; controller.statsView.captured=captured;
 }
 bool nativeOverlayControlsVisible() { return controller.showingControls; }
 void nativeOverlaySetControlsVisible(bool visible) { controller.showingControls=visible; [controller refresh]; }

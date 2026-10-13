@@ -55,8 +55,6 @@ static void finishNativeTracking(NSEvent* event,NSWindow* window) {
 // button's tracking loop. AppKit consumes the matching mouse-up inside that
 // loop, so return a title-bar release to SDL's normal event pump afterwards.
 // Otherwise SDL keeps its focus-click-pending flag and disables confinement.
-@interface MLStreamToolbarButton : NSButton
-@end
 @implementation MLStreamToolbarButton
 - (void)mouseDown:(NSEvent*)event {
     // A close action may remove its containing view during tracking.
@@ -169,7 +167,7 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 static MLStreamTitlebar* titlebar;
 
 static void requestTitlebarInputRepair(NSWindow* window) {
-    if (window && (titlebar.window==window || titlebar.details.contentViewController.view.window==window)) [titlebar requestInputRepair];
+    if (window && (titlebar.window==window || (window.parentWindow && window.parentWindow==titlebar.window) || titlebar.details.contentViewController.view.window==window)) [titlebar requestInputRepair];
 }
 
 @implementation MLStreamTitlebar
@@ -554,6 +552,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     hardware.contentTintColor=self.hardware ? NSColor.systemRedColor : NSColor.labelColor;
     hardware.toolTip=self.hardware ? @"Hide Hardware Monitor" : @"Show Hardware Monitor";
     [hardware setAccessibilityLabel:hardware.toolTip]; [hardware setAccessibilityValue:self.hardware ? @"Shown" : @"Hidden"];
+    nativeOverlaySetCaptureState(copy.captured);
     self.hardware.captured=copy.captured; [self.hardware fit]; self.hardware.needsDisplay=YES;
     NSButton* stats=self.buttons[statisticsID]; stats.image=[NSImage imageWithSystemSymbolName:@"chart.xyaxis.line" accessibilityDescription:nil];
     stats.contentTintColor=copy.statistics ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
