@@ -32,7 +32,7 @@ Production audio callback fixture checks original packets, float/int16 gain at 1
 - Actual native overlay checks passed: monitor hit testing, persistent cadence/opacity/dimensions, local resize without video resize, bounded async close/reopen and volume/mute state. Actual SDL/AppKit button/slider tracking, deferred popover recapture and intentional release passed in ordinary and ASan/UBSan input suites. Fullscreen/borderless/green-button hover and Metal geometry checks passed.
 - Recorded media mux/decode, packaged Apollo/window identity, real engine bridge/persistence and 200 shutdown cycles passed.
 - Previews inspected: `hardware-monitor.png` and `playback-volume.png` from the current source. Graphs show actual CI-machine readings; histories were just starting at capture time. GPU was unavailable on that runner and was labeled accordingly.
-- Additional quick regression run `38425187450`, attempt 2, remains queued. The first attempt reported a canceled job with no test steps or logs. The full native ordinary and ASan/UBSan input suites already passed in run `38425187310`; no application failure was observed in the canceled quick attempt.
+- Additional quick regression run `38425187450`, attempt 2, job `115404801469`, passed teardown/E fallback, overlay, fullscreen/Metal and actual title/volume/monitor tracking with sanitizer input checks. The first attempt reported a canceled job with no test steps or logs; its retry completed successfully.
 
 Downloaded app ZIP SHA-256 checksums were independently verified against CI checksum files:
 
