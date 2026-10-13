@@ -442,7 +442,7 @@ int main(int argc, char** argv) {
             check(!menuInput.isCaptureActive(),"Confirmation must release capture in every window mode");
             menuInput.handleNativeOverlayAction(214); pump();
             check(menuInput.isCaptureActive(),"Cancel must restore capture in every window mode");
-            menuInput.setCaptureActive(false);
+            menuInput.setCaptureActive(false); pump();
             for (NSModalResponse reply : {NSAlertFirstButtonReturn, NSAlertSecondButtonReturn}) {
                 SDL_FlushEvent(nativeOverlayEventType());
                 nativeOverlayRestoreStreamFocus(window);
@@ -461,7 +461,7 @@ int main(int argc, char** argv) {
                 check(response.user.code==(reply==NSAlertSecondButtonReturn ? 209 : 214),"Cancel must restore input; confirm must retain host-exit intent");
                 menuInput.handleNativeOverlayAction(214); pump();
                 check(menuInput.isCaptureActive(),"Cancel path must restore previous capture after the sheet closes");
-                menuInput.setCaptureActive(false);
+                menuInput.setCaptureActive(false); pump();
             }
             check(titlebarRoot(cocoa(window)) && !titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor,"Released controls must appear in every window mode");
             const NSRect releasedFrame=cocoa(window).frame, releasedVideo=cocoa(window).contentView.bounds;
