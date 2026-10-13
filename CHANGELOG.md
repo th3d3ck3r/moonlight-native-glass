@@ -1,5 +1,12 @@
 # MoonlightLG changelog
 
+## 1.3.0.0U — unreleased — 2026-10-13
+
+- Adjustable local CPU, RAM, GPU (where supported), network graphs and thermal status in a Crimson Glass overlay. Position, size, opacity, visible metrics, refresh cadence and history are remembered. Captured gameplay passes clicks through; releasing input enables adjustment.
+- Speaker button opens playback volume and mute controls. PCM gain is applied only to local playback after original encoded audio reaches the recorder.
+- Title actions grouped as input/control, monitoring, playback/recording, then controller/connection status. New controls use the existing mouse-up/capture restoration boundary.
+- Internal build 39. Validation in progress; no distributed package yet.
+
 ## 1.2.2.0U — unreleased — 2026-10-13
 
 - Suppress native macOS title chrome behind the released command overlay after green-button fullscreen, retaining one visible stream title row.

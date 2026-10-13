@@ -4,8 +4,10 @@
 #import <SDL_syswm.h>
 #include "nativeoverlay.h"
 #include "nativetitlebar.h"
+#include "nativeplaybackvolume.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 static void check(bool okay,const char* message) { if (!okay) { fprintf(stderr,"FAIL: %s\n",message); exit(1); } }
 static void pump(double seconds=.2) { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:seconds]; while (end.timeIntervalSinceNow>0) { SDL_PumpEvents(); [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; } }
 #include "TitlebarFixture.h"
@@ -91,11 +93,42 @@ int main(int argc,char** argv) { @autoreleasepool {
     NSButton* statisticsButton=titlebarButton(window,@"NativeStatistics");
     NSButton* muteButton=titlebarButton(window,@"NativeMute");
     check(muteButton && [NSStringFromClass(muteButton.class) isEqualToString:@"MLStreamToolbarButton"],"Mute must share the title-button mouse tracking boundary");
-    [muteButton performClick:nil]; check(takeAction(207),"Title mute must queue existing local playback action");
+    [muteButton performClick:nil]; pump();
+    check(!takeAction(207),"Speaker must open volume controls without toggling mute");
+    NSPopover* volume=[muteButton.target valueForKey:@"details"];
+    check(volume.shown,"Playback volume popover must open");
+    NSSlider* slider=(NSSlider*)titlebarFindView(volume.contentViewController.view,@"PlaybackVolumeSlider");
+    NSButton* popupMute=(NSButton*)titlebarFindView(volume.contentViewController.view,@"PlaybackMute");
+    check(slider && [NSStringFromClass(slider.class) isEqualToString:@"MLStreamVolumeSlider"] && popupMute && [NSStringFromClass(popupMute.class) isEqualToString:@"MLStreamToolbarButton"],"Volume slider and mute share tracking repair");
+    slider.doubleValue=.45; [slider.target performSelector:slider.action withObject:slider];
+    check(std::fabs(nativePlaybackVolume()-.45f)<.0001f,"Slider must update playback gain");
+    [popupMute performClick:nil]; check(takeAction(207),"Popover mute queues existing playback action");
     nativeTitlebarSetMuted(true); pump();
-    check([muteButton.toolTip containsString:@"Unmute Playback"] && [muteButton.toolTip containsString:@"Recording audio is unchanged"],"Muted title button must explain the recording boundary");
+    check([popupMute.toolTip containsString:@"Unmute Playback"] && [muteButton.toolTip containsString:@"Recording audio is unchanged"],"Muted volume controls synchronize with menu state");
+    check(std::fabs(nativePlaybackVolume()-.45f)<.0001f,"Mute must retain prior slider level");
     nativeTitlebarSetMuted(false); pump();
-    check([muteButton.toolTip containsString:@"Mute Playback"],"Unmuted title state must refresh");
+    check([popupMute.toolTip containsString:@"Mute Playback"],"Unmuted popover state must refresh");
+    [muteButton.target performSelector:@selector(closeDetails)]; pump();
+    NSButton* hardwareButton=titlebarButton(window,@"NativeHardware");
+    check(hardwareButton && [NSStringFromClass(hardwareButton.class) isEqualToString:@"MLStreamToolbarButton"],"Hardware toggle uses shared tracking");
+    [hardwareButton performClick:nil]; pump(1.2);
+    NSView* monitor=titlebarFindView(window.contentView,@"NativeHardwareOverlay");
+    check(monitor && !monitor.hiddenOrHasHiddenAncestor,"Hardware monitor attaches inside the existing stream content");
+    check(!NSEqualRects(monitor.frame,NSZeroRect) && NSContainsRect(window.contentView.bounds,monitor.frame),"Hardware monitor stays inside stream bounds");
+    check([monitor valueForKey:@"sampler"]!=nil,"Visible monitor must sample");
+    nativeTitlebarSetCapture(true); pump();
+    check([monitor hitTest:NSMakePoint(12,12)]==nil,"Captured hardware overlay passes gameplay clicks through");
+    nativeTitlebarSetCapture(false); pump();
+    check([monitor hitTest:NSMakePoint(12,12)]!=nil,"Released hardware overlay permits local adjustment");
+    NSButton* adjust=(NSButton*)titlebarFindView(monitor,@"HardwareAdjust");
+    [adjust performClick:nil]; pump();
+    NSView* adjustments=[monitor valueForKey:@"adjustments"];
+    check(adjustments && !adjustments.hidden,"Monitor adjustment controls open locally");
+    [adjust performClick:nil]; pump();
+    [monitor retain]; [hardwareButton performClick:nil]; pump();
+    check(!monitor.superview && [monitor valueForKey:@"sampler"]==nil,"Closed hardware monitor removes view and stops sampling");
+    [monitor release];
+    check(NSMinX(statisticsButton.frame)<NSMinX(hardwareButton.frame) && NSMinX(hardwareButton.frame)<NSMinX(muteButton.frame),"Monitoring controls precede playback in title order");
     check(statisticsButton.image!=nil,"Native line-graph symbol must be available");
     [statisticsButton performClick:nil]; check(takeAction(3),"Title statistics uses original SDL action");
     nativeTitlebarSetRecording(true,true,true,true,false,false,65,"Recording"); pump();
@@ -151,6 +184,10 @@ int main(int argc,char** argv) { @autoreleasepool {
     capture([titlebarOut stringByAppendingPathComponent:@"titlebar-slim-dark.png"]);
     nativeTitlebarSetCapture(true); pump(); capture([titlebarOut stringByAppendingPathComponent:@"titlebar-captured-hidden.png"]);
     nativeTitlebarSetCapture(false); pump(); capture([titlebarOut stringByAppendingPathComponent:@"titlebar-released-overlay.png"]);
+    [hardwareButton performClick:nil]; pump(2.2);
+    capture([titlebarOut stringByAppendingPathComponent:@"hardware-monitor.png"]);
+    [muteButton performClick:nil]; pump(); capture([titlebarOut stringByAppendingPathComponent:@"playback-volume.png"]);
+    [muteButton.target performSelector:@selector(closeDetails)]; [hardwareButton performClick:nil]; pump();
     [window setContentSize:NSMakeSize(300,360)]; pump();
     NSButton* overflow=titlebarButton(window,@"NativeOverflow");
     check(overflow && !overflow.hidden && statisticsButton.hidden,"Narrow title row must expose overflow rather than overlapping controls");

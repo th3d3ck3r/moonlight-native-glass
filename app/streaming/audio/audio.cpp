@@ -1,5 +1,8 @@
 #include "native/nativerecorder.h"
 #include "../session.h"
+#ifdef Q_OS_MACOS
+#include "native/nativeplaybackvolume.h"
+#endif
 #include "renderers/renderer.h"
 
 #ifdef HAVE_SLAUDIO
@@ -229,6 +232,10 @@ void Session::arDecodeAndPlaySample(char* sampleData, int sampleLength)
             desiredBufferSize = 0;
         }
 
+#ifdef Q_OS_MACOS
+        nativePlaybackScale(buffer,desiredBufferSize,
+            s_ActiveSession->m_AudioRenderer->getAudioBufferFormat() == IAudioRenderer::AudioFormat::Float32NE);
+#endif
         if (!s_ActiveSession->m_AudioRenderer->submitAudio(desiredBufferSize)) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Reinitializing audio renderer after failure");

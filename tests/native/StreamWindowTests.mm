@@ -359,11 +359,33 @@ int main(int argc, char** argv) {
             pump(); return repaired;
         };
         SdlInputHandler titleInput(window);
-        for (NSString* identifier in @[@"NativeStatistics",@"NativeMute",@"NativeRecord",@"NativeReplay"]) {
+        for (NSString* identifier in @[@"NativeStatistics",@"NativeHardware",@"NativeMute",@"NativeRecord",@"NativeReplay"]) {
             SDL_FlushEvent(nativeOverlayEventType());
             nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(false); pump();
             titleInput.m_NativeCaptureBeforeFocusLoss=true;
             clickTitleButton(identifier);
+            if ([identifier isEqual:@"NativeMute"]) {
+                check(!repairQueuedInput(titleInput),"Playback popover must defer recapture while adjusting volume");
+                NSButton* speaker=titlebarButton(cocoa(window),identifier);
+                NSPopover* popup=[speaker.target valueForKey:@"details"];
+                check(popup.shown,"Actual speaker click must open playback controls");
+                for (NSString* control in @[@"PlaybackVolumeSlider",@"PlaybackMute"]) {
+                    NSView* view=titlebarFindView(popup.contentViewController.view,control);
+                    check(view!=nil,"Missing playback control");
+                    NSPoint point=[view convertPoint:NSMakePoint(NSMidX(view.bounds),NSMidY(view.bounds)) toView:nil];
+                    for (NSEventType type : {NSEventTypeLeftMouseDown,NSEventTypeLeftMouseUp}) {
+                        NSEvent* event=[NSEvent mouseEventWithType:type location:point modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:view.window.windowNumber context:nil eventNumber:3 clickCount:1 pressure:0];
+                        [NSApp postEvent:event atStart:NO];
+                    }
+                    pump();
+                    check(!repairQueuedInput(titleInput),"Slider and mute must defer recapture until popover dismissal");
+                }
+                [speaker.target performSelector:@selector(closeDetails)]; pump();
+            }
+            if ([identifier isEqual:@"NativeHardware"]) {
+                NSButton* hardware=titlebarButton(cocoa(window),identifier);
+                [hardware performClick:nil]; pump();
+            }
             check(repairQueuedInput(titleInput),"Actual title-bar tracking must request capture repair");
             check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Direct title-bar control must restore relative mouse routing");
             checkRelativeMotion(window);

@@ -2,7 +2,7 @@ name: MoonlightLG presentation shutdown regression
 on:
   push:
     branches: [feature/native-boot-animation, feature/recording-plugin]
-    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, tests/native/StreamWindowTests.mm, tests/native/OverlayTests.mm, tests/native/AudioMuteTests.cpp, tests/native/extract_native_audio_callback.py, tests/native/FullscreenWindowTests.mm, tests/native/extract_native_focus_methods.py, tests/native/extract_native_exit_shortcut.py, app/native/nativeapplication.mm, app/native/nativetitlebar.mm, tests/native/TitlebarFixture.h, app/native/nativeoverlay.mm, app/native/nativeoverlay.h, app/streaming/input/keyboard.cpp, app/streaming/session.cpp]
+    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, tests/native/StreamWindowTests.mm, tests/native/OverlayTests.mm, tests/native/AudioMuteTests.cpp, tests/native/extract_native_audio_callback.py, tests/native/FullscreenWindowTests.mm, tests/native/extract_native_focus_methods.py, tests/native/extract_native_exit_shortcut.py, app/native/nativeapplication.mm, app/native/nativetitlebar.mm, app/native/nativehardware.inc, app/native/nativeplaybackvolume.h, app/streaming/audio/audio.cpp, tests/native/TitlebarFixture.h, app/native/nativeoverlay.mm, app/native/nativeoverlay.h, app/streaming/input/keyboard.cpp, app/streaming/session.cpp]
 permissions:
   contents: read
 jobs:
@@ -27,19 +27,19 @@ jobs:
           xcrun clang++ -std=c++17 -fno-objc-arc -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all \
             -I libs/mac/include/SDL2 -I app/native -I build \
             app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/NativeShutdownTests.mm \
-            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/native-shutdown-tests
           ASAN_OPTIONS=detect_leaks=0 build/native-shutdown-tests
       - name: Test capture-driven chrome and invariant Metal geometry
         run: |
           xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
             app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/OverlayTests.mm \
-            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/overlay-tests
           build/overlay-tests build/overlay-previews
           xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
             app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/FullscreenWindowTests.mm \
-            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore -framework Metal \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore -framework Metal \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/fullscreen-window-tests
           build/fullscreen-window-tests 0 build/fullscreen-previews/fullscreen
           build/fullscreen-window-tests 1 build/fullscreen-previews/borderless
@@ -49,7 +49,7 @@ jobs:
           xcrun clang++ -std=c++17 -fno-objc-arc -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all \
             -I libs/mac/include/SDL2 -I app/native -I build \
             app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
-            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/titlebar-input-sanitizer-tests
           ASAN_OPTIONS=detect_leaks=0 build/titlebar-input-sanitizer-tests
       - uses: actions/upload-artifact@v6

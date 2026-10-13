@@ -6,9 +6,9 @@
 
 ### Your games. Your Mac. A native interface.
 
-**🌙 1.2.2.0U · Unreleased · Crimson Glass · Moonlight Qt 6.2.0 · Intel + Universal · Manual updates**
+**🌙 1.3.0.0U · Unreleased · Crimson Glass · Moonlight Qt 6.2.0 · Intel + Universal · Manual updates**
 
-[![Version](https://img.shields.io/badge/version-1.2.2.0U-crimson)](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/recording-plugin/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0.0U-crimson)](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/recording-plugin/CHANGELOG.md)
 [![Native macOS validation](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml/badge.svg?branch=feature/recording-plugin)](https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-silver)
 ![Manual updates](https://img.shields.io/badge/updates-Manual_only-8A2BE2)
@@ -23,7 +23,7 @@ Liquid Glass navigation and controls on **macOS 26+**, standard native styling o
 
 ## 🌙 MoonlightLG builds
 
-**MoonlightLG 1.2.2.0U** corrects overlapping native chrome after green-button fullscreen, speeds up the Apollo warp stars, and adds a playback-only mute button using the same mouse-restoration handling as the other title controls. Recording audio is unchanged. Full Intel/Universal, Xcode, UI, native-fullscreen/Metal, mouse/sanitizer and recording-mute boundary checks passed; see the [current audit](docs/TITLEBAR_AUDIO_FULLSCREEN.md). The previous capture-driven title bar passed full validation; see its [audit](docs/TITLEBAR_AUTOHIDE.md). Its isolated recording/replay plugin is disabled by default. Enable it in Recording settings before starting a stream. The app, menu names,
+**MoonlightLG 1.3.0.0U** adds an adjustable local hardware monitor with scrolling graphs, grouped stream title controls, and a playback volume/mute popover that leaves recording audio unchanged. GPU readings depend on driver support; thermal status is available when numeric temperatures are not. Validation is in progress; see the [current audit](docs/HARDWARE_VOLUME_OVERLAY.md). Its isolated recording/replay plugin is disabled by default. Enable it in Recording settings before starting a stream. The app, menu names,
 Xcode project and build products now use MoonlightLG; the GitHub repository URL
 stays unchanged. The startup arrival displays **MoonlightLG** beneath the moon. Connection flight
 meets a full moon and orbits until **Continue to Stream**, with real status details below.
@@ -34,7 +34,7 @@ stable releases have no suffix. Validation is recorded in the [current audit](ht
 
 | Version | Meaning |
 |---|---|
-| `1.2.2.0U` | Unreleased development work; no posted download |
+| `1.3.0.0U` | Unreleased development work; no posted download |
 | `1.2.0.0E` | Experimental build |
 | `1.2.0.0` | Stable release |
 
@@ -137,7 +137,7 @@ startup, About and title-bar captures are linked from the [current audit](https:
 
 ## 🧪 Testing and known limitations
 
-**Current MoonlightLG 1.2.2.0U:** Title controls hide during captured streaming and reappear on release without changing the video geometry. The previous 1.2.1.0U passed full Intel/Universal, Xcode, UI and mouse/Metal/sanitizer checks; the fullscreen/audio/warp refinements also passed those checks plus the production audio mute boundary fixture. Recording adds Record/Stop and Save Replay controls,
+**Current MoonlightLG 1.3.0.0U:** The hardware monitor stays visible with gameplay clicks passing through while captured. Release input to move, resize or adjust it. Title controls keep the capture-driven hide behavior; playback volume is independent from source recording audio. Validation is in progress. Recording adds Record/Stop and Save Replay controls,
 Original Stream Quality and optional hardware encoding. The previous 1.1.03U checkpoint
 is retained for rollback. Recording build 33 passed both complete packages, recorder/sanitizer checks, full Xcode and UI suites. The previous 1.2.0.1U mouse/keyframe/centering hotfix passed full macOS/Xcode, UI and sanitizer validation; the current fragmented-frame fix also passed those checks. Source-quality recording requests missing keyframes with bounded retries.
 Live-host performance, HDR and surround still need physical-host acceptance before promotion; see the [recording audit](docs/RECORDING_PLUGIN.md).

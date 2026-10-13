@@ -161,7 +161,7 @@ macx {
         CONFIG += discord-rpc libplacebo
     }
 
-    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework Metal -framework QuartzCore
+    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework IOKit -framework Metal -framework QuartzCore
     CONFIG += ffmpeg
 }
 
@@ -583,5 +583,5 @@ DEFINES += VERSION_STR=\\\"$$cat(version.txt)\\\"
 
 macx {
     SOURCES += native/nativebridge.cpp native/nativeapplication.mm native/nativeoverlay.mm native/nativetitlebar.mm native/nativerecorder.mm
-    HEADERS += native/nativebridge.h native/nativeapplication.h native/nativeoverlay.h native/nativetitlebar.h native/nativerecorder.h
+    HEADERS += native/nativebridge.h native/nativeapplication.h native/nativeoverlay.h native/nativetitlebar.h native/nativeplaybackvolume.h native/nativehardware.inc native/nativerecorder.h
 }
