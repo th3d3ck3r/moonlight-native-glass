@@ -43,6 +43,9 @@ jobs:
           python3 tests/native/extract_native_exit_shortcut.py
           c++ -std=c++17 -Ibuild tests/native/ConnectionGateTests.cpp -o build/connection-gate-tests
           build/connection-gate-tests
+          python3 tests/native/extract_native_audio_callback.py
+          c++ -std=c++17 -Ibuild tests/native/AudioMuteTests.cpp -o build/audio-mute-tests
+          build/audio-mute-tests
       - name: Test native event framing
         run: |
           mkdir -p build

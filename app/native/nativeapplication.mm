@@ -464,6 +464,7 @@ void nativePublishMenuState(SDL_Window* window, bool captured, bool statistics, 
 {
     NSWindow* cocoa = nativeSDLWindow(window);
     if (!cocoa || !streamWindowAccess || streamWindowAccess.windowDelegate.windowID != SDL_GetWindowID(window)) return;
+    nativeTitlebarSetMuted(muted);
     Uint32 flags = SDL_GetWindowFlags(window);
     Uint32 fullscreen = flags & SDL_WINDOW_FULLSCREEN_DESKTOP;
     if (flags & SDL_WINDOW_HIDDEN) fullscreen = streamWindowAccess.windowDelegate.hiddenFullscreenFlags;
@@ -484,6 +485,7 @@ void configureNativeStreamWindow(const char* token)
     lastMenuState.clear();
     nativeTitlebarSetCapture(false);
     nativeTitlebarSetStatistics(false);
+    nativeTitlebarSetMuted(false);
     nativeTitlebarSetConnection(NativeConnectionState::Connecting);
     streamWindowAccess = [[MLStreamWindowAccess alloc] init];
     streamWindowAccess.token = [NSString stringWithUTF8String:token];

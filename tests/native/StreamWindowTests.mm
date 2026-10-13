@@ -341,7 +341,7 @@ int main(int argc, char** argv) {
             pump(); return repaired;
         };
         SdlInputHandler titleInput(window);
-        for (NSString* identifier in @[@"NativeStatistics",@"NativeRecord",@"NativeReplay"]) {
+        for (NSString* identifier in @[@"NativeStatistics",@"NativeMute",@"NativeRecord",@"NativeReplay"]) {
             SDL_FlushEvent(nativeOverlayEventType());
             nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(false); pump();
             titleInput.m_NativeCaptureBeforeFocusLoss=true;

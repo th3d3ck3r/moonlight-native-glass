@@ -1,5 +1,13 @@
 # MoonlightLG changelog
 
+## 1.2.2.0U — unreleased — 2026-10-13
+
+- Suppress native macOS title chrome behind the released command overlay after green-button fullscreen, retaining one visible stream title row.
+- Faster scale-aware Apollo warp stars, preserving arrival braking and Reduce Motion.
+- Playback Mute/Unmute in the title row and narrow overflow, synchronized with the existing stream menu; source recording audio stays independent.
+- Mute uses the same tracked mouse-up and session/window-scoped capture restoration as the other title buttons.
+- Internal build 38. Checkpoint: `checkpoints/moonlightlg-1.2.1.0U-before-title-audio`. Validation pending.
+
 ## 1.2.1.0U — unreleased — 2026-10-13
 
 - QuickTime-style title controls overlay the video and hide while host input is captured; releasing input shows them again. Local popups, menus and focus loss keep controls accessible.

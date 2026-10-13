@@ -155,6 +155,29 @@ int main(int argc, char** argv) { @autoreleasepool {
         check(titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor==captured,"Metal window must follow capture state");
         check(NSEqualRects(windowedFrame,cocoa(window).frame) && NSEqualRects(windowedBounds,cocoa(window).contentView.bounds) && CGSizeEqualToSize(drawable,layer.drawableSize),"Autohide must not shift or resize the Metal drawable");
     }
+    if (spaces) {
+        // AppKit's green-button entry is a different path from SDL's fullscreen
+        // startup. Exercise it directly, then move to the top as the owner did.
+        [cocoa(window) toggleFullScreen:nil]; pump(2);
+        check(cocoa(window).styleMask & NSWindowStyleMaskFullScreen,"Green-button native fullscreen entry failed");
+        for (bool captured : {true,false,true,false}) {
+            nativeTitlebarSetCapture(captured); pump();
+            SDL_WarpMouseInWindow(window,320,2); pump(.5);
+            NSView* root=titlebarRoot(cocoa(window));
+            check(root && root.hiddenOrHasHiddenAncestor==captured,"Green-button Space must use the same capture-driven command row");
+            id owner=titlebarButton(cocoa(window),@"NativeHost").target;
+            NSView* nativeChrome=[owner valueForKey:@"nativeChrome"];
+            check(!nativeChrome || nativeChrome.hidden,"Native fullscreen title chrome must not overlap the command row on release/hover");
+            NSButton* close=[cocoa(window) standardWindowButton:NSWindowCloseButton];
+            check(!close || close.hiddenOrHasHiddenAncestor,"Native traffic lights must not create a second fullscreen row");
+            draw(layer,queue);
+        }
+        capture(directory,@"green-button-released.png",true);
+        [cocoa(window) toggleFullScreen:nil]; pump(2);
+        nativeTitlebarSetCapture(false); pump();
+        check(!(cocoa(window).styleMask & NSWindowStyleMaskFullScreen) && !titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor,"Leaving green-button fullscreen must restore one windowed title row");
+        check(![cocoa(window) standardWindowButton:NSWindowCloseButton].hiddenOrHasHiddenAncestor,"Windowed traffic lights must return after native fullscreen");
+    }
     [queue release]; SDL_Metal_DestroyView(view); SDL_DestroyWindow(window); pump();
     nativeSetStreamFullscreenTransition(nullptr);
     stopNativeStreamWindow(); [desktop orderOut:nil]; SDL_Quit();

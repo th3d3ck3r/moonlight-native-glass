@@ -15,17 +15,28 @@ static BOOL crimsonEnabled() {
 static NSString* const captureID = @"NativeCapture";
 static NSString* const hostID = @"NativeHost";
 static NSString* const statisticsID = @"NativeStatistics";
+static NSString* const muteID = @"NativeMute";
 static NSString* const batteryID = @"NativeControllerBattery";
 static NSString* const recordID = @"NativeRecord";
 static NSString* const replayID = @"NativeReplay";
 static NSString* const connectionID = @"NativeConnection";
-struct TitleState { bool recorder=false,recording=false,buffering=false,replayReady=false,saving=false,recorderFailed=false; uint64_t seconds=0; std::string recordingMessage="Recording disabled"; bool captured=false; bool statistics=false; NativeConnectionState connection=NativeConnectionState::Connecting; };
+struct TitleState { bool recorder=false,recording=false,buffering=false,replayReady=false,saving=false,recorderFailed=false; uint64_t seconds=0; std::string recordingMessage="Recording disabled"; bool captured=false; bool statistics=false; bool muted=false; NativeConnectionState connection=NativeConnectionState::Connecting; };
 static TitleState state;
 static std::mutex stateMutex;
 static unsigned epoch=0;
 static bool pending=false;
 
 static void requestTitlebarInputRepair(NSWindow* window);
+// AppKit's green button can retain native title chrome in a fullscreen Space,
+// even after removing our accessory. Select only that chrome, never SDL content.
+static NSView* nativeTitleChrome(NSWindow* window) {
+    NSView* frame=window.contentView.superview;
+    NSView* candidate=nil;
+    for (NSView* view=[window standardWindowButton:NSWindowCloseButton].superview;
+         view && view!=frame && ![window.contentView isDescendantOf:view]; view=view.superview)
+        candidate=view;
+    return candidate;
+}
 
 // SDL's Cocoa backend observes title-bar mouse-down before AppKit starts a
 // button's tracking loop. AppKit consumes the matching mouse-up inside that
@@ -165,14 +176,14 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     return self;
 }
 - (NSArray*)toolbarAllowedItemIdentifiers:(NSToolbar*)toolbar {
-    return @[captureID,hostID,NSToolbarFlexibleSpaceItemIdentifier,statisticsID,recordID,replayID,batteryID,connectionID];
+    return @[captureID,hostID,NSToolbarFlexibleSpaceItemIdentifier,statisticsID,muteID,recordID,replayID,batteryID,connectionID];
 }
 - (NSArray*)toolbarDefaultItemIdentifiers:(NSToolbar*)toolbar {
-    return @[captureID,NSToolbarFlexibleSpaceItemIdentifier,hostID,NSToolbarFlexibleSpaceItemIdentifier,statisticsID,recordID,replayID,connectionID];
+    return @[captureID,NSToolbarFlexibleSpaceItemIdentifier,hostID,NSToolbarFlexibleSpaceItemIdentifier,statisticsID,muteID,recordID,replayID,connectionID];
 }
 - (NSToolbarItem*)toolbar:(NSToolbar*)toolbar itemForItemIdentifier:(NSString*)identifier willBeInsertedIntoToolbar:(BOOL)inserted {
     NSToolbarItem* item=[[[NSToolbarItem alloc] initWithItemIdentifier:identifier] autorelease];
-    NSDictionary* labels=@{captureID:@"Release / Capture Input",hostID:@"Control Center",statisticsID:@"Show / Hide Statistics",batteryID:@"Controller Battery",connectionID:@"Connection Status",recordID:@"Record / Stop",replayID:@"Save Instant Replay"};
+    NSDictionary* labels=@{captureID:@"Release / Capture Input",hostID:@"Control Center",statisticsID:@"Show / Hide Statistics",muteID:@"Mute / Unmute Playback",batteryID:@"Controller Battery",connectionID:@"Connection Status",recordID:@"Record / Stop",replayID:@"Save Instant Replay"};
     NSButton* button=[MLStreamToolbarButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"circle" accessibilityDescription:labels[identifier]] target:self action:@selector(clicked:)];
     button.bordered=NO; button.bezelStyle=NSBezelStyleTexturedRounded;
     button.frame=NSMakeRect(0,0,[identifier isEqual:hostID] ? 180 : ([identifier isEqual:batteryID] ? 38 : 24),22);
@@ -254,6 +265,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
             self.fullscreenRoot.frame=NSMakeRect(6,NSMaxY(frame.bounds)-26,MAX(40,frame.bounds.size.width-12),24);
             [self.fullscreenRoot.subviews.firstObject addSubview:self.row];
             [frame addSubview:self.fullscreenRoot positioned:NSWindowAbove relativeTo:self.background];
+            self.nativeChrome=nativeTitleChrome(self.window);
             [self layoutControls]; [self updateVisibility];
         }
         return;
@@ -320,7 +332,8 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     self.window.movable=show && !fullscreen ? self.previousMovable : NO;
     self.accessory.view.hidden=!show;
     self.fullscreenRoot.hidden=!show;
-    self.nativeChrome.hidden=!show;
+    // Native green-button fullscreen must not reveal a second OS title row.
+    self.nativeChrome.hidden=fullscreen || !show;
     for (NSNumber* type in @[@(NSWindowCloseButton),@(NSWindowMiniaturizeButton),@(NSWindowZoomButton)])
         [self.window standardWindowButton:(NSWindowButton)type.integerValue].hidden=!show || fullscreen;
     if (show==self.chromeVisible) return;
@@ -356,7 +369,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     self.overflow.frame=NSMakeRect(MAX(0,right-24),0,24,h);
     if (compact) right-=28;
     BOOL battery=NO; for (NSToolbarItem* item in self.toolbar.items) if ([item.itemIdentifier isEqual:batteryID]) battery=YES;
-    for (NSString* identifier in @[batteryID,replayID,recordID,statisticsID]) {
+    for (NSString* identifier in @[batteryID,replayID,recordID,muteID,statisticsID]) {
         NSButton* button=self.buttons[identifier];
         BOOL show=!compact && (![identifier isEqual:batteryID] || battery);
         button.hidden=!show;
@@ -393,6 +406,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     for (NSString* identifier in self.buttons) if (self.buttons[identifier]==sender) { [self perform:identifier anchor:sender]; break; }
 }
 - (void)perform:(NSString*)identifier anchor:(NSView*)anchor {
+    if ([identifier isEqual:muteID]) { nativeOverlayPerformAction(207); return; }
     if ([identifier isEqual:recordID]) { nativeOverlayPerformAction(217); return; }
     if ([identifier isEqual:replayID]) { nativeOverlayPerformAction(219); return; }
     if ([identifier isEqual:captureID]) { nativeOverlayPerformAction(1); return; }
@@ -431,6 +445,12 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     capture.contentTintColor=copy.captured ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
     capture.toolTip=copy.captured ? @"Input captured by host · Click to release" : @"Input released to Mac · Click to capture";
     [capture setAccessibilityLabel:capture.toolTip]; [capture setAccessibilityValue:copy.captured ? @"Captured" : @"Released"];
+    NSButton* mute=self.buttons[muteID];
+    mute.image=[NSImage imageWithSystemSymbolName:copy.muted ? @"speaker.slash.fill" : @"speaker.wave.2.fill" accessibilityDescription:nil];
+    mute.contentTintColor=copy.muted ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
+    mute.toolTip=copy.muted ? @"Unmute Playback · Recording audio is unchanged" : @"Mute Playback · Recording audio is unchanged";
+    [mute setAccessibilityLabel:copy.muted ? @"Unmute Playback" : @"Mute Playback"];
+    [mute setAccessibilityValue:copy.muted ? @"Muted" : @"Playing"];
     NSButton* stats=self.buttons[statisticsID]; stats.image=[NSImage imageWithSystemSymbolName:@"chart.xyaxis.line" accessibilityDescription:nil];
     stats.contentTintColor=copy.statistics ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
     stats.toolTip=copy.statistics ? @"Hide Statistics" : @"Show Statistics"; [stats setAccessibilityLabel:stats.toolTip]; [stats setAccessibilityValue:copy.statistics ? @"Shown" : @"Hidden"];
@@ -552,6 +572,7 @@ void nativeTitlebarSetRecording(bool available,bool recording,bool buffering,boo
 }
 void nativeTitlebarSetCapture(bool captured) { std::lock_guard<std::mutex> lock(stateMutex); if (state.captured!=captured) { state.captured=captured; scheduleRefresh(); } }
 void nativeTitlebarSetStatistics(bool visible) { std::lock_guard<std::mutex> lock(stateMutex); if (state.statistics!=visible) { state.statistics=visible; scheduleRefresh(); } }
+void nativeTitlebarSetMuted(bool muted) { std::lock_guard<std::mutex> lock(stateMutex); if (state.muted!=muted) { state.muted=muted; scheduleRefresh(); } }
 void nativeTitlebarSetConnection(NativeConnectionState value) { std::lock_guard<std::mutex> lock(stateMutex); if (state.connection!=value) { state.connection=value; scheduleRefresh(); } }
 void nativeTitlebarConnectionStarted() {
     std::lock_guard<std::mutex> lock(stateMutex);
@@ -584,7 +605,7 @@ void nativeTitlebarAttach(void* window) {
     titlebar.toolbar.allowsUserCustomization=NO; titlebar.toolbar.autosavesConfiguration=NO;
     // Keep command metadata for narrow-window overflow, without installing a
     // taller NSToolbar on the stream window.
-    for (NSString* identifier in @[captureID,hostID,statisticsID,recordID,replayID,connectionID])
+    for (NSString* identifier in @[captureID,hostID,statisticsID,muteID,recordID,replayID,connectionID])
         [titlebar.toolbar insertItemWithItemIdentifier:identifier atIndex:titlebar.toolbar.items.count];
     titlebar.accessory=[[[NSTitlebarAccessoryViewController alloc] init] autorelease];
     titlebar.accessory.layoutAttribute=NSLayoutAttributeRight;

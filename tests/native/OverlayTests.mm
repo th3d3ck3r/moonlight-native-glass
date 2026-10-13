@@ -89,6 +89,13 @@ int main(int argc,char** argv) { @autoreleasepool {
     NSButton* captureButton=titlebarButton(window,@"NativeCapture");
     [captureButton performClick:nil]; check(takeAction(1),"Title capture uses original SDL action");
     NSButton* statisticsButton=titlebarButton(window,@"NativeStatistics");
+    NSButton* muteButton=titlebarButton(window,@"NativeMute");
+    check(muteButton && [NSStringFromClass(muteButton.class) isEqualToString:@"MLStreamToolbarButton"],"Mute must share the title-button mouse tracking boundary");
+    [muteButton performClick:nil]; check(takeAction(207),"Title mute must queue existing local playback action");
+    nativeTitlebarSetMuted(true); pump();
+    check([muteButton.toolTip containsString:@"Unmute Playback"] && [muteButton.toolTip containsString:@"Recording audio is unchanged"],"Muted title button must explain the recording boundary");
+    nativeTitlebarSetMuted(false); pump();
+    check([muteButton.toolTip containsString:@"Mute Playback"],"Unmuted title state must refresh");
     check(statisticsButton.image!=nil,"Native line-graph symbol must be available");
     [statisticsButton performClick:nil]; check(takeAction(3),"Title statistics uses original SDL action");
     nativeTitlebarSetRecording(true,true,true,true,false,false,65,"Recording"); pump();

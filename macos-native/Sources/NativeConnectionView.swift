@@ -92,7 +92,8 @@ struct NativeConnectionView: View {
         let fieldScale = Double(min(size.width, size.height)) / 640
         let fieldCenter = CGPoint(x: size.width / 2, y: size.height / 2)
         let speed = 1 - arrival
-        let travel = time * 28 * (1 - arrival * 0.92)
+        // Fast, scale-aware flight like startup; retain the existing arrival brake.
+        let travel = time * 420 * fieldScale * (1 - arrival * 0.92)
         let width = max(1, size.width + 40)
         for i in 0..<150 {
             let angle = Double(i) * 2.399963

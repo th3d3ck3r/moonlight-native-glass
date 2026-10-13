@@ -6,6 +6,7 @@ void nativeTitlebarDetach();
 void nativeTitlebarSetWindowTransition(bool transitioning);
 void nativeTitlebarSetCapture(bool captured);
 void nativeTitlebarSetStatistics(bool visible);
+void nativeTitlebarSetMuted(bool muted);
 void nativeTitlebarSetConnection(NativeConnectionState state);
 void nativeTitlebarConnectionStarted();
 void nativeTitlebarControllersChanged();
