@@ -24,8 +24,8 @@ static MLHardwareReading readLocalHardware() {
     vm_statistics64_data_t vm{}; count=HOST_VM_INFO64_COUNT;
     vm_size_t page=0;
     if (host_page_size(host,&page)==KERN_SUCCESS && host_statistics64(host,HOST_VM_INFO64,(host_info64_t)&vm,&count)==KERN_SUCCESS) {
-        // Active + wired + compressed physical pages; excludes reclaimable cache.
-        r.memory=(double(vm.active_count)+vm.wire_count+vm.compressor_page_count)*page;
+        // Anonymous resident + wired + compressed pages, excluding purgeable cache.
+        r.memory=(MAX(0.,double(vm.internal_page_count)-vm.purgeable_count)+vm.wire_count+vm.compressor_page_count)*page;
     }
     mach_port_deallocate(mach_task_self(),host);
     ifaddrs* interfaces=nullptr;
@@ -178,7 +178,7 @@ static MLHardwareReading readLocalHardware() {
                 if (current.cpuValid && previous.cpuValid && current.cpuTotal>previous.cpuTotal && current.cpuBusy>=previous.cpuBusy)
                     cpu=MIN(100.,100.*double(current.cpuBusy-previous.cpuBusy)/double(current.cpuTotal-previous.cpuTotal));
                 if (current.networkValid && previous.networkValid && current.received>=previous.received && current.sent>=previous.sent) {
-                    rx=(current.received-previous.received)/elapsed/1048576.; tx=(current.sent-previous.sent)/elapsed/1048576.;
+                    rx=(current.received-previous.received)/elapsed/1000000.; tx=(current.sent-previous.sent)/elapsed/1000000.;
                 }
             }
             previous=current; previousTime=time; havePrevious=true;
@@ -239,7 +239,7 @@ static MLHardwareReading readLocalHardware() {
         NSString* text=value<0 ? @"Unavailable" : [NSString stringWithFormat:@"%.1f%%",value];
         if (i==1 && value>=0) text=[NSString stringWithFormat:@"%.1f / %.1f GB",value/100.*NSProcessInfo.processInfo.physicalMemory/1073741824.,NSProcessInfo.processInfo.physicalMemory/1073741824.];
         if (i==3 && value>=0) text=[NSString stringWithFormat:@"↓ %.2f  ↑ %.2f MB/s",value,history[4].back()];
-        if (i==4) { NSArray* thermal=@[@"Normal",@"Warm",@"High",@"Critical"]; text=[@"°C unavailable · " stringByAppendingString:thermal[MIN(3,MAX(0,int(value)))]]; }
+        if (i==4) { NSArray* thermal=@[@"Normal",@"Warm",@"High",@"Critical"]; text=value<0 ? @"Thermal status unavailable" : [@"°C unavailable · " stringByAppendingString:thermal[MIN(3,MAX(0,int(value)))]]; }
         [labels[i] drawAtPoint:NSMakePoint(12,top) withAttributes:small];
         [text drawAtPoint:NSMakePoint(12,top+16) withAttributes:bold];
         if (i!=4 && rowHeight>42) {

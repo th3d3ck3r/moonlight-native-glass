@@ -117,9 +117,9 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(!NSEqualRects(monitor.frame,NSZeroRect) && NSContainsRect(window.contentView.bounds,monitor.frame),"Hardware monitor stays inside stream bounds");
     check([monitor valueForKey:@"sampler"]!=nil,"Visible monitor must sample");
     nativeTitlebarSetCapture(true); pump();
-    check([monitor hitTest:NSMakePoint(12,12)]==nil,"Captured hardware overlay passes gameplay clicks through");
+    check([monitor hitTest:NSMakePoint(NSMinX(monitor.frame)+12,NSMinY(monitor.frame)+12)]==nil,"Captured hardware overlay passes gameplay clicks through");
     nativeTitlebarSetCapture(false); pump();
-    check([monitor hitTest:NSMakePoint(12,12)]!=nil,"Released hardware overlay permits local adjustment");
+    check([monitor hitTest:NSMakePoint(NSMinX(monitor.frame)+12,NSMinY(monitor.frame)+12)]!=nil,"Released hardware overlay permits local adjustment");
     NSButton* adjust=(NSButton*)titlebarFindView(monitor,@"HardwareAdjust");
     [adjust performClick:nil]; pump();
     NSView* adjustments=[monitor valueForKey:@"adjustments"];

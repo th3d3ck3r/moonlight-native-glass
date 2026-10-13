@@ -4,7 +4,7 @@ Development: **1.3.0.0U**, internal build **39**. Validation in progress.
 
 ## Hardware overlay
 
-A view inside the existing SDL/AppKit stream content displays CPU load, physical memory (active + wired + compressed; excludes reclaimable cache), aggregate Ethernet/Wi-Fi receive/send rates, optional driver GPU utilization and macOS thermal state. It never substitutes stream-host statistics or app render timings for local machine readings. Numeric temperature sensors are unavailable in this build; thermal status is explicitly labeled separately from degrees Celsius. GPU driver percentages are accepted only when present, finite and within 0–100.
+A view inside the existing SDL/AppKit stream content displays CPU load, physical memory (anonymous resident + wired + compressed; excludes purgeable cache), aggregate Ethernet/Wi-Fi receive/send rates, optional driver GPU utilization and macOS thermal state. It never substitutes stream-host statistics or app render timings for local machine readings. Numeric temperature sensors are unavailable in this build; thermal status is explicitly labeled separately from degrees Celsius. GPU driver percentages are accepted only when present, finite and within 0–100.
 
 Mach host ports, ifaddrs lists and IOKit iterator/property objects are released on every sample. Sampling occurs on a utility queue; UI publication returns to the main thread, skips overlapping work and ignores results after detach. History is bounded to the selected time span. Opening/closing does not change stream/video/Metal geometry. Closing or session teardown stops the timer and removes the view.
 
