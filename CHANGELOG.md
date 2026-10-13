@@ -4,7 +4,7 @@
 
 - Stream statistics now match the hardware monitor: Crimson Glass, uppercase labels, bold values and rolling one-minute sparklines. All source readings and metadata are retained.
 - Persistent Graphs toggle in the panel and Overlay settings; Off gives compact value cards. Controls are click-through during host capture and share existing mouse repair when released.
-- Internal build 40. Validation in progress.
+- Internal build 40. Full Intel/Universal bundles, fresh/incremental Xcode, both 12-test UI suites, graph parsing/history, actual mouse/fullscreen/Metal and sanitizer checks passed. Polished On/Off previews reviewed. Intel download inspected independently; Universal passed CI bundle validation.
 
 ## 1.3.0.0U — unreleased — 2026-10-13
 
