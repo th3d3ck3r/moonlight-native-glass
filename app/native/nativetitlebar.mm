@@ -48,6 +48,9 @@ static NSView* nativeTitleChrome(NSWindow* window) {
 @end
 @implementation MLStreamToolbarButton
 - (void)mouseDown:(NSEvent*)event {
+    // A close action may remove its containing view during tracking.
+    [[self retain] autorelease];
+    NSWindow* trackingWindow=[[self.window retain] autorelease];
     [super mouseDown:event];
     if (([NSEvent pressedMouseButtons] & 1) == 0) {
         NSEvent* release=[NSEvent mouseEventWithType:NSEventTypeLeftMouseUp
@@ -56,7 +59,7 @@ static NSView* nativeTitleChrome(NSWindow* window) {
             context:nil eventNumber:event.eventNumber clickCount:event.clickCount pressure:0];
         [NSApp postEvent:release atStart:YES];
     }
-    requestTitlebarInputRepair(self.window);
+    requestTitlebarInputRepair(trackingWindow);
 }
 @end
 
@@ -65,12 +68,15 @@ static NSView* nativeTitleChrome(NSWindow* window) {
 @end
 @implementation MLStreamVolumeSlider
 - (void)mouseDown:(NSEvent*)event {
+    // A close action may remove its containing view during tracking.
+    [[self retain] autorelease];
+    NSWindow* trackingWindow=[[self.window retain] autorelease];
     [super mouseDown:event];
     if (([NSEvent pressedMouseButtons] & 1)==0) {
         NSEvent* release=[NSEvent mouseEventWithType:NSEventTypeLeftMouseUp location:event.locationInWindow modifierFlags:event.modifierFlags timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:event.windowNumber context:nil eventNumber:event.eventNumber clickCount:event.clickCount pressure:0];
         [NSApp postEvent:release atStart:YES];
     }
-    requestTitlebarInputRepair(self.window);
+    requestTitlebarInputRepair(trackingWindow);
 }
 @end
 #include "nativehardware.inc"
@@ -438,7 +444,9 @@ static void requestTitlebarInputRepair(NSWindow* window) {
             NSRect bounds=self.window.contentView.bounds;
             double x=[prefs doubleForKey:@"hardwareX"],y=[prefs objectForKey:@"hardwareY"] ? [prefs doubleForKey:@"hardwareY"] : 1;
             if (!std::isfinite(x)) x=0; if (!std::isfinite(y)) y=1;
-            self.hardware=[[[MLHardwareView alloc] initWithFrame:NSMakeRect(MAX(0,MIN(1.,x))*MAX(0,bounds.size.width-width),MAX(0,MIN(1.,y))*MAX(0,bounds.size.height-height-32),width,height)] autorelease];
+            double savedY=MAX(0,MIN(1.,y)),range=MAX(0,bounds.size.height-height-32);
+            CGFloat originY=self.window.contentView.flipped ? 32+(1-savedY)*range : savedY*range;
+            self.hardware=[[[MLHardwareView alloc] initWithFrame:NSMakeRect(MAX(0,MIN(1.,x))*MAX(0,bounds.size.width-width),originY,width,height)] autorelease];
             [self.window.contentView addSubview:self.hardware]; [self.hardware fit];
         }
         [self refresh]; [self requestInputRepair]; return;
@@ -459,10 +467,14 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     label.font=[NSFont systemFontOfSize:13]; label.selectable=NO; [view addSubview:label]; content.view=view;
     if ([identifier isEqual:muteID]) {
         view.frame=NSMakeRect(0,0,280,122);
+        view.wantsLayer=YES; view.layer.cornerRadius=12; view.layer.masksToBounds=YES;
+        view.layer.backgroundColor=(NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceTransparency ? [NSColor colorWithSRGBRed:.045 green:.025 blue:.035 alpha:1] : [NSColor colorWithSRGBRed:.20 green:.025 blue:.065 alpha:.24]).CGColor;
+        view.layer.borderColor=[[NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:.5] CGColor]; view.layer.borderWidth=crimsonEnabled() ? 1 : 0;
         label.stringValue=@"Playback Volume"; label.frame=NSMakeRect(16,88,200,20);
         label.font=[NSFont systemFontOfSize:13 weight:NSFontWeightSemibold];
         MLStreamVolumeSlider* slider=[[[MLStreamVolumeSlider alloc] initWithFrame:NSMakeRect(16,54,198,24)] autorelease];
         slider.minValue=0; slider.maxValue=1; slider.doubleValue=nativePlaybackVolume();
+        slider.trackFillColor=crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : nil;
         slider.continuous=YES; slider.target=self; slider.action=@selector(volumeChanged:); slider.identifier=@"PlaybackVolumeSlider";
         [slider setAccessibilityLabel:@"Local Playback Volume"]; [view addSubview:slider];
         NSButton* mute=[MLStreamToolbarButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"speaker.slash.fill" accessibilityDescription:@"Mute Playback"] target:self action:@selector(toggleMute:)];
@@ -522,7 +534,6 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     NSButton* mute=self.buttons[muteID];
     mute.image=[NSImage imageWithSystemSymbolName:copy.muted ? @"speaker.slash.fill" : @"speaker.wave.2.fill" accessibilityDescription:nil];
     mute.contentTintColor=copy.muted ? (crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : NSColor.controlAccentColor) : NSColor.labelColor;
-    mute.toolTip=copy.muted ? @"Unmute Playback · Recording audio is unchanged" : @"Mute Playback · Recording audio is unchanged";
     mute.toolTip=@"Playback Volume · Recording audio is unchanged";
     [mute setAccessibilityLabel:@"Playback Volume"];
     [mute setAccessibilityValue:copy.muted ? @"Muted" : @"Playing"];

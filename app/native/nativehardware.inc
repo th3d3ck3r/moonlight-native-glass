@@ -62,7 +62,13 @@ static MLHardwareReading readLocalHardware() {
     return r;
 }
 
-@interface MLHardwareView : NSVisualEffectView {
+// A separate decoration sits below graph drawing and never owns input.
+@interface MLHardwareMaterial : NSView
+@end
+@implementation MLHardwareMaterial
+- (NSView*)hitTest:(NSPoint)point { return nil; }
+@end
+@interface MLHardwareView : NSView {
     std::array<std::vector<double>,6> history;
     MLHardwareReading previous;
     double previousTime;
@@ -72,6 +78,7 @@ static MLHardwareReading readLocalHardware() {
 @property(nonatomic,retain) NSTimer* sampler;
 @property(nonatomic,retain) NSUserDefaults* preferences;
 @property(nonatomic,retain) NSView* adjustments;
+@property(nonatomic,retain) NSView* material;
 @property(nonatomic,assign) BOOL captured;
 @property(nonatomic,assign) BOOL active;
 @property(nonatomic,assign) double interval;
@@ -87,8 +94,20 @@ static MLHardwareReading readLocalHardware() {
 - (instancetype)initWithFrame:(NSRect)frame {
     if ((self=[super initWithFrame:frame])) {
         self.identifier=@"NativeHardwareOverlay";
-        self.material=NSVisualEffectMaterialHUDWindow; self.blendingMode=NSVisualEffectBlendingModeBehindWindow;
-        self.state=NSVisualEffectStateActive; self.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+        self.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+        self.material=[[[MLHardwareMaterial alloc] initWithFrame:frame] autorelease];
+        self.material.wantsLayer=YES; self.material.layer.cornerRadius=12; self.material.layer.masksToBounds=YES;
+        NSView* effect;
+        if (@available(macOS 26.0,*)) {
+            NSGlassEffectView* glass=[[[NSGlassEffectView alloc] initWithFrame:self.bounds] autorelease];
+            glass.cornerRadius=12; glass.contentView=[[[NSView alloc] initWithFrame:self.bounds] autorelease];
+            effect=glass;
+        } else {
+            NSVisualEffectView* blur=[[[NSVisualEffectView alloc] initWithFrame:self.bounds] autorelease];
+            blur.material=NSVisualEffectMaterialHUDWindow; blur.blendingMode=NSVisualEffectBlendingModeWithinWindow;
+            blur.state=NSVisualEffectStateActive; effect=blur;
+        }
+        effect.autoresizingMask=NSViewWidthSizable | NSViewHeightSizable; [self.material addSubview:effect];
         self.preferences=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
         self.interval=[self.preferences doubleForKey:@"hardwareInterval"];
         if (self.interval!=.5 && self.interval!=1 && self.interval!=2) self.interval=1;
@@ -109,6 +128,10 @@ static MLHardwareReading readLocalHardware() {
         [self sample:nil];
     }
     return self;
+}
+- (void)viewDidMoveToSuperview {
+    [super viewDidMoveToSuperview]; [self.material removeFromSuperview];
+    if (self.superview) { [self.superview addSubview:self.material positioned:NSWindowBelow relativeTo:self]; [self fit]; }
 }
 - (void)stop { self.active=NO; [self.sampler invalidate]; self.sampler=nil; }
 - (void)close:(id)sender {
@@ -134,6 +157,7 @@ static MLHardwareReading readLocalHardware() {
             [self.adjustments addSubview:b];
         }
         NSSlider* opacity=[MLStreamVolumeSlider sliderWithValue:self.alphaValue minValue:.35 maxValue:1 target:self action:@selector(opacity:)];
+        opacity.trackFillColor=crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : nil;
         opacity.frame=NSMakeRect(74,100,184,24); [opacity setAccessibilityLabel:@"Hardware Monitor Opacity"];
         [self.adjustments addSubview:opacity];
         NSTextField* label=[NSTextField labelWithString:@"Opacity"]; label.frame=NSMakeRect(10,103,64,20); [self.adjustments addSubview:label];
@@ -194,8 +218,13 @@ static MLHardwareReading readLocalHardware() {
     f.size.width=MIN(MAX(280,f.size.width),bounds.size.width);
     f.size.height=MIN(MAX(self.adjustments && !self.adjustments.hidden ? 450 : 320,f.size.height),MAX(0,bounds.size.height-32));
     f.origin.x=MAX(0,MIN(f.origin.x,NSMaxX(bounds)-f.size.width));
-    f.origin.y=MAX(0,MIN(f.origin.y,NSMaxY(bounds)-f.size.height-32));
-    self.frame=f;
+    CGFloat minY=self.superview.flipped ? 32 : 0;
+    CGFloat maxY=MAX(minY,NSMaxY(bounds)-f.size.height-(self.superview.flipped ? 0 : 32));
+    f.origin.y=MAX(minY,MIN(f.origin.y,maxY));
+    if (!NSEqualRects(self.frame,f)) self.frame=f;
+    self.material.frame=f; self.material.alphaValue=self.alphaValue;
+    NSView* effect=self.material.subviews.firstObject;
+    if (@available(macOS 26.0,*)) if ([effect isKindOfClass:NSGlassEffectView.class]) ((NSGlassEffectView*)effect).tintColor=crimsonEnabled() ? [[NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] colorWithAlphaComponent:.25] : nil;
     NSUInteger i=0; for (NSView* view in self.subviews) if ([view isKindOfClass:NSButton.class]) view.frame=NSMakeRect(f.size.width-60+28*i++,5,24,24);
     self.adjustments.frame=NSMakeRect(4,34,f.size.width-8,132);
 }
@@ -203,19 +232,24 @@ static MLHardwareReading readLocalHardware() {
     NSPoint start=[self convertPoint:event.locationInWindow fromView:nil];
     BOOL resize=start.x>self.bounds.size.width-24 && start.y>self.bounds.size.height-24;
     if (!resize && start.y>34) return;
-    NSRect initial=self.frame; NSPoint screen=self.window.mouseLocationOutsideOfEventStream;
+    NSRect initial=self.frame; NSPoint startInParent=[self.superview convertPoint:event.locationInWindow fromView:nil];
     NSEvent* next;
     while ((next=[self.window nextEventMatchingMask:NSEventMaskLeftMouseDragged | NSEventMaskLeftMouseUp])) {
         if (next.type==NSEventTypeLeftMouseUp) { [NSApp postEvent:next atStart:YES]; break; }
-        NSPoint delta=next.locationInWindow; delta.x-=screen.x; delta.y-=screen.y;
+        NSPoint delta=[self.superview convertPoint:next.locationInWindow fromView:nil]; delta.x-=startInParent.x; delta.y-=startInParent.y;
         NSRect frame=initial;
-        if (resize) { frame.size.width+=delta.x; frame.size.height-=delta.y; frame.origin.y+=delta.y; }
+        if (resize) {
+            frame.size.width+=delta.x;
+            if (self.superview.flipped) frame.size.height+=delta.y;
+            else { frame.size.height-=delta.y; frame.origin.y+=delta.y; }
+        }
         else { frame.origin.x+=delta.x; frame.origin.y+=delta.y; }
         self.frame=frame; [self fit];
     }
     NSRect bounds=self.superview.bounds;
     [self.preferences setDouble:self.frame.origin.x/MAX(1,bounds.size.width-self.frame.size.width) forKey:@"hardwareX"];
-    [self.preferences setDouble:self.frame.origin.y/MAX(1,bounds.size.height-self.frame.size.height-32) forKey:@"hardwareY"];
+    double savedY=self.superview.flipped ? 1-(self.frame.origin.y-32)/MAX(1,bounds.size.height-self.frame.size.height-32) : self.frame.origin.y/MAX(1,bounds.size.height-self.frame.size.height-32);
+    [self.preferences setDouble:savedY forKey:@"hardwareY"];
     [self.preferences setDouble:self.frame.size.width forKey:@"hardwareWidth"];
     [self.preferences setDouble:self.frame.size.height forKey:@"hardwareHeight"];
     requestTitlebarInputRepair(self.window);
@@ -224,7 +258,7 @@ static MLHardwareReading readLocalHardware() {
     [super drawRect:dirty];
     BOOL crimson=crimsonEnabled();
     NSColor* accent=crimson ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : NSColor.controlAccentColor;
-    [[NSColor colorWithSRGBRed:.035 green:.025 blue:.03 alpha:NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceTransparency ? 1 : .72] setFill];
+    [[NSColor colorWithSRGBRed:.035 green:.025 blue:.03 alpha:NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceTransparency ? 1 : .48] setFill];
     [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:12 yRadius:12] fill];
     [[accent colorWithAlphaComponent:.4] setStroke]; [[NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds,.5,.5) xRadius:12 yRadius:12] stroke];
     NSDictionary* small=@{NSFontAttributeName:[NSFont systemFontOfSize:11 weight:NSFontWeightMedium],NSForegroundColorAttributeName:NSColor.secondaryLabelColor};
@@ -263,5 +297,5 @@ static MLHardwareReading readLocalHardware() {
     [@"↘" drawAtPoint:NSMakePoint(self.bounds.size.width-20,self.bounds.size.height-20) withAttributes:small];
     if (!rows) [@"Choose metrics in Adjust" drawAtPoint:NSMakePoint(12,top+12) withAttributes:bold];
 }
-- (void)dealloc { [self stop]; [_preferences release]; [_adjustments release]; [super dealloc]; }
+- (void)dealloc { [self stop]; [_preferences release]; [_adjustments release]; [_material release]; [super dealloc]; }
 @end

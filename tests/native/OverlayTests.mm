@@ -124,10 +124,24 @@ int main(int argc,char** argv) { @autoreleasepool {
     [adjust performClick:nil]; pump();
     NSView* adjustments=[monitor valueForKey:@"adjustments"];
     check(adjustments && !adjustments.hidden,"Monitor adjustment controls open locally");
+    // Exercise resize tracking without changing any stream drawable geometry.
     [adjust performClick:nil]; pump();
+    NSRect beforeMonitor=monitor.frame, beforeVideo=window.contentView.frame;
+    NSPoint grip=[monitor convertPoint:NSMakePoint(monitor.bounds.size.width-10,monitor.bounds.size.height-10) toView:nil];
+    for (NSEventType type : {NSEventTypeLeftMouseDragged,NSEventTypeLeftMouseUp}) {
+        NSEvent* event=[NSEvent mouseEventWithType:type location:NSMakePoint(grip.x+36,grip.y) modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil eventNumber:9 clickCount:1 pressure:0];
+        [NSApp postEvent:event atStart:NO];
+    }
+    NSEvent* down=[NSEvent mouseEventWithType:NSEventTypeLeftMouseDown location:grip modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil eventNumber:9 clickCount:1 pressure:0];
+    [monitor mouseDown:down]; pump();
+    check(monitor.frame.size.width>=beforeMonitor.size.width+35 && NSEqualRects(beforeVideo,window.contentView.frame),"Hardware resize must track locally without resizing video");
+    check([defaults doubleForKey:@"hardwareWidth"]==monitor.frame.size.width,"Hardware dimensions must persist");
     [monitor retain]; [hardwareButton performClick:nil]; pump();
     check(!monitor.superview && [monitor valueForKey:@"sampler"]==nil,"Closed hardware monitor removes view and stops sampling");
     [monitor release];
+    for (int cycle=0;cycle<24;++cycle) { [hardwareButton performClick:nil]; [hardwareButton performClick:nil]; }
+    pump(.5);
+    check(!titlebarFindView(window.contentView,@"NativeHardwareOverlay"),"Late hardware sampling callbacks must not reopen a closed monitor");
     check(NSMinX(statisticsButton.frame)<NSMinX(hardwareButton.frame) && NSMinX(hardwareButton.frame)<NSMinX(muteButton.frame),"Monitoring controls precede playback in title order");
     check(statisticsButton.image!=nil,"Native line-graph symbol must be available");
     [statisticsButton performClick:nil]; check(takeAction(3),"Title statistics uses original SDL action");
