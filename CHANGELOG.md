@@ -6,7 +6,7 @@
 - Request missing host keyframes for source-quality recording/replay startup and empty-buffer recovery, with bounded retries and explicit timeout; recorder ABI 3.
 - Center the final stream window on its current display after resolution changes at Continue/start.
 - Internal build 35. Checkpoint: `checkpoints/moonlightlg-1.2.0.0U-before-mouse-fix`.
-- Validation pending; U packages remain owner-only.
+- Both complete macOS packages, full Xcode, both 12-test UI suites, actual SDL drag/title-bar/Control Center and shutdown sanitizer checks passed. Recorder ABI 3 functional and sanitizer checks passed. Downloaded package metadata, architectures and SHA-256 verified. Live-host keyframe response and physical mouse behavior remain owner acceptance tests; U packages remain owner-only.
 
 ## 1.2.0.0U — unreleased — 2026-10-13
 

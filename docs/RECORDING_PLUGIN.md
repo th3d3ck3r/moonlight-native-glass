@@ -1,6 +1,8 @@
-# MoonlightLG recording plugin — 1.2.00U (build 33)
+# MoonlightLG recording plugin — current 1.2.0.1U (build 35)
 
-Current development version: **1.2.0.1U**, internal build 35, including title-bar mouse restoration and source-copy keyframe recovery (recorder ABI 3). The validation and package checksums below describe the original **1.2.00U/build 33** recording packages; they have not been relabeled. Recording source is unchanged.
+Current validation: [mouse/keyframe/centering hotfix audit](TITLEBAR_MOUSE_FIX.md).
+
+Current development version: **1.2.0.1U**, internal build 35, including title-bar mouse restoration and source-copy keyframe recovery (recorder ABI 3). The validation and package checksums below describe the original **1.2.00U/build 33** recording packages; they have not been relabeled. The ABI 3 keyframe recovery addition is validated in the hotfix audit; historical package evidence below remains unchanged.
 
 Recording work is isolated on `feature/recording-plugin`. The known-good rollback
 checkpoint is `checkpoints/moonlightlg-1.1.03U-before-recording`, commit

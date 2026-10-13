@@ -23,7 +23,7 @@ Liquid Glass navigation and controls on **macOS 26+**, standard native styling o
 
 ## 🌙 MoonlightLG builds
 
-**MoonlightLG 1.2.0.1U** adds an isolated recording/replay plugin, disabled by default. Enable it in Recording settings before starting a stream. The app, menu names,
+**MoonlightLG 1.2.0.1U** includes title-bar/drag mouse restoration, centered stream startup, and recovery from missing recording keyframes. Its isolated recording/replay plugin is disabled by default. Enable it in Recording settings before starting a stream. The app, menu names,
 Xcode project and build products now use MoonlightLG; the GitHub repository URL
 stays unchanged. The startup arrival displays **MoonlightLG** beneath the moon. Connection flight
 meets a full moon and orbits until **Continue to Stream**, with real status details below.
@@ -139,7 +139,7 @@ startup, About and title-bar captures are linked from the [current audit](https:
 
 **Current MoonlightLG 1.2.0.1U:** Recording adds Record/Stop and Save Replay controls,
 Original Stream Quality and optional hardware encoding. The previous 1.1.03U checkpoint
-is retained for rollback. Recording build 33 passed both complete packages, recorder/sanitizer checks, full Xcode and UI suites. The current title-bar mouse hotfix is awaiting validation.
+is retained for rollback. Recording build 33 passed both complete packages, recorder/sanitizer checks, full Xcode and UI suites. The current mouse/keyframe/centering hotfix passed full macOS/Xcode, UI and sanitizer validation. Source-quality recording requests missing keyframes with bounded retries.
 Live-host performance, HDR and surround still need physical-host acceptance before promotion; see the [recording audit](docs/RECORDING_PLUGIN.md).
 
 **Archived Experimental 24 validation:** [Native validation run 38219537762](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537762) and [Xcode validation run 38219537999](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537999) passed at application/test source **`4d8ee8a4`**.
