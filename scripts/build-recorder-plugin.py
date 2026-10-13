@@ -1,4 +1,5 @@
 """Build the isolated, versioned macOS recording plugin against engine libopus."""
+import os
 import pathlib
 import subprocess
 import sys
@@ -6,6 +7,7 @@ import tempfile
 root = pathlib.Path(__file__).resolve().parent.parent
 output = pathlib.Path(sys.argv[1]).resolve()
 arches = sys.argv[2:]
+sanitizer = ['-g', '-fno-omit-frame-pointer', '-fsanitize=address,undefined', '-fno-sanitize-recover=all'] if os.environ.get("MLG_RECORDER_SANITIZE") == "1" else []
 assert arches and set(arches) <= {'arm64', 'x86_64'}
 output.parent.mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory() as temp:
@@ -18,6 +20,6 @@ with tempfile.TemporaryDirectory() as temp:
                         '-framework', 'Foundation', '-framework', 'AVFoundation', '-framework', 'VideoToolbox',
                         '-framework', 'CoreMedia', '-framework', 'CoreVideo', '-framework', 'AudioToolbox',
                         '-Wl,-install_name,@rpath/libMoonlightLGRecorder.dylib',
-                        str(root / 'recording/Recorder.mm'), '-o', str(target)], check=True)
+                        *sanitizer, str(root / 'recording/Recorder.mm'), '-o', str(target)], check=True)
         slices.append(str(target))
     subprocess.run(['lipo', '-create', *slices, '-output', str(output)], check=True)

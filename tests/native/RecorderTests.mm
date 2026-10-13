@@ -124,7 +124,8 @@ int main(int argc,char** argv) {
         assert(state(recorder).failed && !api->interest(recorder));api->destroy(recorder);
         // Failure is isolated: an unwritable destination does not abort callers.
         cfg.directory="/dev/null/MoonlightLG";recorder=api->create(&cfg);pauseMs(100);assert(state(recorder).failed);api->destroy(recorder);
-        dlclose(library);
+        // Match the host: retain the module through process exit so system
+        // completion blocks can safely finish unwinding.
         fprintf(stderr,"Recorder ABI, disabled path, source mux, audio, replay disk cache, hardware gate and disk error verified\n");
     }
 }

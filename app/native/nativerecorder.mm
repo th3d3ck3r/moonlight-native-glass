@@ -45,7 +45,7 @@ void nativeRecorderStart() {
     NSUserDefaults* prefs=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Recording"] autorelease];
     if(![prefs boolForKey:@"enabled"]) {nativeTitlebarSetRecording(false,false,false,false,false,false,0,"Enable recording in Settings before starting a stream");return;}
     NSString* path=[NSBundle.mainBundle.privateFrameworksPath stringByAppendingPathComponent:@"libMoonlightLGRecorder.dylib"];
-    library=dlopen(path.fileSystemRepresentation,RTLD_NOW|RTLD_LOCAL);
+    if(!library) library=dlopen(path.fileSystemRepresentation,RTLD_NOW|RTLD_LOCAL);
     if(library) {
         auto entry=reinterpret_cast<MLGRecorderEntry>(dlsym(library,"MoonlightLGRecorderGetAPI"));
         api=entry ? entry(MLG_RECORDER_ABI) : nullptr;
@@ -82,7 +82,9 @@ void nativeRecorderStop() {
     void* ending=nullptr;
     {std::unique_lock<std::shared_mutex> lock(lifetime);ending=instance;instance=nullptr;}
     if(ending) api->destroy(ending);
-    if(library) {dlclose(library);library=nullptr;}api=nullptr;
+    // Keep the module mapped until helper exit. AVFoundation may still be
+    // unwinding a completion block after its last state access/group leave.
+    api=nullptr;
 }
 void nativeRecorderCommand(unsigned action) {
     if(stopped.load()) return;

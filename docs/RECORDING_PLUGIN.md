@@ -9,7 +9,7 @@ Recording controls default to disabled. Existing preferences retain their identi
 
 `recording/RecorderABI.h` is a versioned C interface with no Qt, FFmpeg or C++ ABI
 objects. `app/native/nativerecorder.mm` loads the signed bundled dylib, checks the
-ABI, supplies session configuration, and owns plugin lifetime. A missing/incompatible
+ABI, supplies session configuration, and owns plugin lifetime. The module stays mapped until helper exit so asynchronous system completion blocks can finish unwinding safely. A missing/incompatible
 plugin leaves streaming available. A future upstream engine update needs these
 small reviewed taps reapplied and the adapter rebuilt; this is not a binary plugin
 mechanism supplied by upstream Moonlight.

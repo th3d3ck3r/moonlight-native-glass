@@ -30,6 +30,14 @@ jobs:
             -framework VideoToolbox -framework CoreMedia -framework CoreVideo -framework AudioToolbox \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/recorder-tests
           DYLD_LIBRARY_PATH="$PWD/libs/mac/lib" build/recorder-tests "$PWD/build/libMoonlightLGRecorder.dylib" "$PWD/build/recording-fixtures"
+      - name: Sanitize recorder buffers and asynchronous writer cleanup
+        run: |
+          MLG_RECORDER_SANITIZE=1 python3 scripts/build-recorder-plugin.py build/libMoonlightLGRecorderSanitized.dylib arm64
+          xcrun clang++ -std=c++17 -fobjc-arc -g -fsanitize=address,undefined -fno-sanitize-recover=all \
+            -I libs/mac/include tests/native/RecorderTests.mm -L libs/mac/lib -lopus.0 \
+            -framework Foundation -framework AVFoundation -framework VideoToolbox -framework CoreMedia \
+            -framework CoreVideo -framework AudioToolbox -Wl,-rpath,"$PWD/libs/mac/lib" -o build/recorder-sanitizer-tests
+          ASAN_OPTIONS=detect_leaks=0 DYLD_LIBRARY_PATH="$PWD/libs/mac/lib" build/recorder-sanitizer-tests "$PWD/build/libMoonlightLGRecorderSanitized.dylib" "$PWD/build/recording-sanitizer-fixtures"
       - uses: actions/upload-artifact@v6
         if: always()
         with:
