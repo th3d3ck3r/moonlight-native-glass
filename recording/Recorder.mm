@@ -210,6 +210,7 @@ struct Recorder {
         std::lock_guard<std::mutex> l(statusMutex);
         current.active=interest.load()!=0; current.recording=recordWanted; current.buffering=replay;
         current.replay_ready=!ring.empty(); current.dropped=drops.load();
+        current.waiting_keyframe=cfg.mode==0 && !current.failed && ((recordWanted && !movie) || (replay && ring.empty()));
         current.elapsed_seconds=movie && lastVideo>=movie->start ? (lastVideo-movie->start)/90000 : 0;
         current.buffered_seconds=ring.empty() || lastVideo<ring.front()->pts ? 0 : (lastVideo-ring.front()->pts)/90000;
         snprintf(current.message,sizeof(current.message),"%s",message);
@@ -315,7 +316,7 @@ struct Recorder {
             while(ringBytes>maxBytes || (!ring.empty() && lastVideo-ring.front()->pts>int64_t(cfg.replay_seconds)*90000)) {
                 auto next=std::find_if(std::next(ring.begin()),ring.end(),[](SamplePtr p){return p->video && p->key;});
                 if(next==ring.end()) {
-                    if(ringBytes>maxBytes || lastVideo-ring.front()->pts>int64_t(cfg.replay_seconds)*90000) { ring.clear(); ringBytes=0; waitKey=true; update("Replay storage limit reached; waiting for next natural keyframe"); }
+                    if(ringBytes>maxBytes || lastVideo-ring.front()->pts>int64_t(cfg.replay_seconds)*90000) { ring.clear(); ringBytes=0; waitKey=true; update("Replay storage limit reached; waiting for requested host keyframe"); }
                     break;
                 }
                 size_t remove=std::distance(ring.begin(),next);
@@ -488,6 +489,7 @@ struct Recorder {
                         {std::lock_guard<std::mutex> l(statusMutex);current.failed=0;}
                         refreshInterest(); update(recordWanted ? "Waiting for next keyframe" : "Recording stopped");
                     } else if(input->kind==12) saveReplay();
+                    else if(input->kind==14) fail("Host did not provide a usable keyframe after three requests. Try Custom Hardware Encoding or reconnect.");
                     else { recordWanted=false; replay=false; interest.store(0); finishMovie(); update("Stopped"); }
                 } else if(interest.load()) {
                     if(input->kind==1) compressed(*input);

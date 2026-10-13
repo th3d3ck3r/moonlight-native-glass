@@ -1,6 +1,6 @@
 # MoonlightLG recording plugin — 1.2.00U (build 33)
 
-Current development version: **1.2.0.0U**, internal build 34, following the four-component version migration. The validation and package checksums below describe the original **1.2.00U/build 33** recording packages; they have not been relabeled. Recording source is unchanged.
+Current development version: **1.2.0.1U**, internal build 35, including title-bar mouse restoration and source-copy keyframe recovery (recorder ABI 3). The validation and package checksums below describe the original **1.2.00U/build 33** recording packages; they have not been relabeled. Recording source is unchanged.
 
 Recording work is isolated on `feature/recording-plugin`. The known-good rollback
 checkpoint is `checkpoints/moonlightlg-1.1.03U-before-recording`, commit
@@ -40,9 +40,13 @@ samples to AVAssetWriter with nil video output settings. No second video encoder
 created. Stream resolution, FPS and bitrate are retained. AV1/4:4:4, changed format
 or reordered source timestamps fail visibly rather than starting an implicit encode.
 
-A manual recording starts on the next usable natural keyframe. Some hosts do not
-provide periodic keyframes, so waiting may be indefinite. The plugin does not ask
-the host for extra IDRs. Use Custom Hardware Encoding for a controlled local GOP.
+A manual recording starts on a usable keyframe. The engine adapter requests a host
+IDR when a source-quality recording has not started or its replay buffer is empty.
+It publishes ingress interest first, so the requested frame is captured. Retries
+are limited to three requests at three-second intervals, then recording fails
+visibly while streaming continues. No periodic IDRs are requested while recording
+has started and the replay buffer has a usable keyframe. A host IDR can cause a
+brief bandwidth/encoding spike. Custom Hardware Encoding provides a local GOP.
 
 Custom Hardware Encoding requires a VideoToolbox decoded pixel buffer and a verified
 hardware H.264/HEVC compression session. One encoder supplies recording and replay.
@@ -120,7 +124,7 @@ the final functional and sanitizer runs passed after correction. Review also add
 exact-duration Opus loss concealment and explicit sync-sample metadata handling.
 
 Enable Recording in Settings before starting a stream. Original Stream Quality
-uses the host's H.264/HEVC packets and waits for natural keyframes. For reliable
+uses the host's H.264/HEVC packets; the current hotfix requests missing startup/recovery keyframes with bounded retries. For reliable
 local keyframe intervals on hosts without periodic IDRs, select Custom Hardware
 Encoding with the VideoToolbox decoder. Custom encoding is SDR-only in this U build.
 No public U release or posted app download links were created.

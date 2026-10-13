@@ -8,4 +8,4 @@ All title-bar tracking now requests a session/window-scoped input repair after A
 
 Tests exercise actual AppKit clicks for Statistics, Record and Replay, relative routing, saved capture intent, intentional release, absolute mode, popup dismissal, window move, and preservation of Control Center. Existing full-screen/disconnect/shutdown and recording tests remain required. Physical host/Intel testing is still required; CI cross-builds Intel on Apple Silicon.
 
-Validation: pending.
+Title-bar/teardown ASan/UBSan passed in run 38342312021 at source 3b07d8c. Full package validation is pending the recording keyframe recovery addition.

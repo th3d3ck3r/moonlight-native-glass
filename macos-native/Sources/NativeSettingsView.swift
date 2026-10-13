@@ -299,7 +299,7 @@ private struct RecordingSettings: View {
                 Text("Custom Hardware Encoding").tag(1)
             }
             if mode == 0 {
-                Text("Copies H.264 or HEVC video without a second video encode. Resolution, frame rate and bitrate follow the host stream. Recording and replay wait for a usable keyframe; no extra host keyframes are requested.").foregroundStyle(.secondary)
+                Text("Copies H.264 or HEVC video without a second video encode. Resolution, frame rate and bitrate follow the host stream. Recording and replay request a host keyframe when needed, with limited retries. A keyframe can briefly increase bandwidth; no second video encode is performed.").foregroundStyle(.secondary)
             } else {
                 Picker("Codec", selection: $codec) { Text("H.264").tag(1); Text("HEVC").tag(2) }
                 Picker("Resolution", selection: $resolution) {

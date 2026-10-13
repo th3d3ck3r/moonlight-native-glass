@@ -7,7 +7,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define MLG_RECORDER_ABI 2u
+#define MLG_RECORDER_ABI 3u
 #define MLG_RECORDER_MAX_CHUNKS 128u
 typedef struct { const void* bytes; size_t size; } MLGRecorderChunk;
 typedef struct {
@@ -18,7 +18,7 @@ typedef struct {
     const char* directory; /* copied by create; local filesystem path */
 } MLGRecorderConfig;
 typedef struct {
-    uint32_t size, active, recording, buffering, replay_ready, saving, failed;
+    uint32_t size, active, recording, buffering, replay_ready, saving, failed, waiting_keyframe;
     uint64_t elapsed_seconds, buffered_seconds, dropped;
     char message[512];
 } MLGRecorderStatus;
@@ -26,7 +26,7 @@ typedef struct {
     uint32_t size, abi;
     void* (*create)(const MLGRecorderConfig*);
     void (*destroy)(void*); /* after ingress stopped; drains/finalizes */
-    void (*command)(void*, uint32_t); /* 1 toggle record, 2 save replay, 3 stop */
+    void (*command)(void*, uint32_t); /* 1 toggle record, 2 save replay, 3 stop, 4 keyframe timeout */
     uint32_t (*interest)(void*); /* bit1 compressed, bit2 decoded, bit4 audio */
     int (*video)(void*, const MLGRecorderChunk*, size_t, uint32_t rtp90k, uint64_t clock_us, int key);
     int (*pixel)(void*, void* cv_pixel_buffer, uint32_t rtp90k, uint64_t clock_us, int hdr);

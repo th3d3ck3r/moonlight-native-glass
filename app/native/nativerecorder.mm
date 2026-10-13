@@ -3,6 +3,7 @@
 #include "nativetitlebar.h"
 #include "nativeoverlay.h"
 #include "../../recording/RecorderABI.h"
+#include "../../recording/KeyframeRecovery.h"
 #include <SDL.h>
 #include <dlfcn.h>
 #include <atomic>
@@ -21,12 +22,23 @@ std::shared_mutex lifetime;
 std::atomic<unsigned> wanted{0};
 SDL_TimerID timer=0, commandPoll=0;
 std::atomic<bool> stopped{true};
+mlg::KeyframeRecovery keyframeRecovery;
 Uint32 tick(Uint32 interval,void*) { nativeOverlayPerformAction(218);return interval; }
 Uint32 pollCommand(Uint32,void*) {nativeOverlayPerformAction(218);return 0;}
 void poll() {
     if(stopped.load() || !instance) return;
     wanted.store(api->interest(instance),std::memory_order_release);
     MLGRecorderStatus status{};status.size=sizeof(status);api->status(instance,&status);
+    // Interest is published before requesting the frame so the recorder can
+    // receive the response even when it missed the initial stream IDR.
+    const bool waiting=config.mode==0 && (wanted.load()&1) && status.waiting_keyframe && !status.failed;
+    const auto recovery=keyframeRecovery.update(waiting,LiGetMicroseconds()/1000);
+    if(recovery==mlg::KeyframeRecovery::Request) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"Recorder requests host keyframe for recording/replay startup or buffer recovery");
+        LiRequestIdrFrame();
+    } else if(recovery==mlg::KeyframeRecovery::Timeout) {
+        api->command(instance,4);
+    }
     nativeTitlebarSetRecording(true,status.recording,status.buffering,status.replay_ready,status.saving,status.failed,status.elapsed_seconds,status.message);
 }
 }
@@ -69,10 +81,11 @@ void nativeRecorderStart() {
     config.directory=directory.fileSystemRepresentation;
     {std::unique_lock<std::shared_mutex> lock(lifetime);instance=api->create(&config);}
     if(!instance) {nativeTitlebarSetRecording(false,false,false,false,false,true,0,"Recording plugin could not start; streaming continues");return;}
-    stopped.store(false);poll();timer=SDL_AddTimer(1000,tick,nullptr);
+    keyframeRecovery.reset();stopped.store(false);poll();timer=SDL_AddTimer(1000,tick,nullptr);
 }
 void nativeRecorderQuiesce() {
     stopped.store(true);
+    keyframeRecovery.reset();
     wanted.store(0,std::memory_order_release);
     if(timer) {SDL_RemoveTimer(timer);timer=0;}
     if(commandPoll) {SDL_RemoveTimer(commandPoll);commandPoll=0;}
@@ -89,6 +102,7 @@ void nativeRecorderStop() {
 void nativeRecorderCommand(unsigned action) {
     if(stopped.load()) return;
     if(instance && action!=218) {
+        if(action==217) keyframeRecovery.reset();
         api->command(instance,action==217?1:2);
         if(commandPoll) SDL_RemoveTimer(commandPoll);
         commandPoll=SDL_AddTimer(20,pollCommand,nullptr);

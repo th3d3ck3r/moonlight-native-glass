@@ -55,14 +55,20 @@ static void verify(NSString* file,bool audio) {
 int main(int argc,char** argv) {
     @autoreleasepool {
         assert(argc==3);void* library=dlopen(argv[1],RTLD_NOW|RTLD_LOCAL);if(!library) {fprintf(stderr,"%s\n",dlerror());return 1;}
-        auto entry=reinterpret_cast<MLGRecorderEntry>(dlsym(library,"MoonlightLGRecorderGetAPI"));assert(entry && !entry(999));api=entry(MLG_RECORDER_ABI);assert(api && api->size==sizeof(*api));
+        auto entry=reinterpret_cast<MLGRecorderEntry>(dlsym(library,"MoonlightLGRecorderGetAPI"));assert(entry && !entry(999) && !entry(2));api=entry(MLG_RECORDER_ABI);assert(api && api->size==sizeof(*api));
         NSString* dir=[NSString stringWithUTF8String:argv[2]];
         [[NSFileManager defaultManager] removeItemAtPath:dir error:nullptr];
         MLGRecorderConfig cfg{};cfg.size=sizeof(cfg);cfg.abi=MLG_RECORDER_ABI;cfg.codec=1;cfg.width=640;cfg.height=360;cfg.fps=60;cfg.memory_megabytes=16;cfg.directory=argv[2];
         // Recorder disabled: input is ignored without inspecting a null buffer.
         void* disabled=api->create(&cfg);assert(disabled && api->interest(disabled)==0);
         auto begin=std::chrono::steady_clock::now();for(unsigned i=0;i<100000;i++) assert(!api->video(disabled,nullptr,0,0,0,0));
+        assert(!state(disabled).waiting_keyframe);
         fprintf(stderr,"Disabled 100000 submissions: %.3f ms\n",std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count());api->destroy(disabled);
+        void* waiting=api->create(&cfg);api->command(waiting,1);pauseMs(100);
+        assert(state(waiting).recording && state(waiting).waiting_keyframe);
+        api->command(waiting,4);pauseMs(100);
+        assert(state(waiting).failed && !state(waiting).waiting_keyframe && !api->interest(waiting));
+        api->destroy(waiting);
         cfg.replay_seconds=300;cfg.audio_rate=48000;cfg.audio_channels=2;cfg.audio_streams=1;cfg.audio_coupled=1;cfg.audio_frame_samples=960;cfg.audio_mapping[1]=1;
         void* recorder=api->create(&cfg);assert(recorder);api->command(recorder,1);pauseMs(100);assert(api->interest(recorder)&1);
         Source source{recorder,{}};VTCompressionSessionRef encoder=nullptr;
@@ -108,7 +114,7 @@ int main(int argc,char** argv) {
         for(unsigned i=0;i<180;i++) {api->pixel(recorder,image,i*1500,1000000+i*16667,0);pauseMs(17);}
         s=state(recorder);fprintf(stderr,"Hardware status: %s\n",s.message);
         bool hardware=!s.failed;
-        if(hardware) {assert(s.replay_ready);api->command(recorder,2);pauseMs(100);}
+        if(hardware) {assert(s.replay_ready && !s.waiting_keyframe);api->command(recorder,2);pauseMs(100);}
         else assert(strstr(s.message,"Hardware") || strstr(s.message,"hardware"));
         CFRelease(image);api->destroy(recorder);
         if(hardware) {
