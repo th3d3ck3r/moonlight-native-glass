@@ -302,6 +302,92 @@ int main(int argc, char** argv) {
         while (SDL_PollEvent(&nativeAction))
             if (nativeAction.type==nativeOverlayEventType() && nativeAction.user.code==102) opened=true;
         check(opened,"Real title-bar click must queue Control Center");
+        // Exercise all direct controls through AppKit tracking, and consume
+        // the same internal repair action as Session (no recording/network).
+        SDL_SetWindowSize(window,1000,560); pump();
+        nativeTitlebarSetRecording(true,false,true,true,false,false,0,"Ready"); pump();
+        auto clickTitleButton=[&](NSString* identifier) {
+            NSButton* button=titlebarButton(cocoa(window),identifier);
+            check(button && !button.hidden && button.enabled,"Title-bar fixture button unavailable");
+            NSPoint point=[button convertPoint:NSMakePoint(NSMidX(button.bounds),NSMidY(button.bounds)) toView:nil];
+            for (NSEventType type : {NSEventTypeLeftMouseDown,NSEventTypeLeftMouseUp}) {
+                NSEvent* event=[NSEvent mouseEventWithType:type location:point modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:cocoa(window).windowNumber context:nil eventNumber:2 clickCount:1 pressure:0];
+                [NSApp postEvent:event atStart:NO];
+            }
+            pump();
+        };
+        auto repairQueuedInput=[&](SdlInputHandler& input) {
+            bool repaired=false; SDL_Event action;
+            while (SDL_PollEvent(&action)) {
+                if (action.type==nativeOverlayEventType() && action.user.code==220) {
+                    check(Uint32(reinterpret_cast<uintptr_t>(action.user.data1))==SDL_GetWindowID(window),"Repair must be scoped to the original SDL window");
+                    input.handleNativeOverlayAction(220); repaired=true;
+                }
+            }
+            pump(); return repaired;
+        };
+        SdlInputHandler titleInput(window);
+        for (NSString* identifier in @[@"NativeStatistics",@"NativeRecord",@"NativeReplay"]) {
+            SDL_FlushEvent(nativeOverlayEventType());
+            nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(true);
+            clickTitleButton(identifier);
+            check(repairQueuedInput(titleInput),"Actual title-bar tracking must request capture repair");
+            check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Direct title-bar control must restore relative mouse routing");
+            checkRelativeMotion(window);
+            // Reproduce focus loss after a title click without a matching SDL
+            // focus-gained callback: the saved capture intent must suffice.
+            titleInput.setCaptureActive(false); titleInput.m_NativeCaptureBeforeFocusLoss=true;
+            titleInput.handleNativeOverlayAction(220); pump();
+            check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Title repair must recover saved capture intent");
+            titleInput.setCaptureActive(false);
+            clickTitleButton(identifier); repairQueuedInput(titleInput);
+            check(!SDL_GetRelativeMouseMode(),"Title-bar interaction must preserve intentional Release Input");
+        }
+        SDL_SetWindowSize(window,320,360); pump();
+        for (bool selectStatistics : {false,true}) {
+            nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(true);
+            SDL_FlushEvent(nativeOverlayEventType());
+            NSButton* overflow=titlebarButton(cocoa(window),@"NativeOverflow");
+            NSTimer* cancel=[NSTimer timerWithTimeInterval:0.1 repeats:NO block:^(NSTimer*) {
+                NSMenu* menu=[overflow.target valueForKey:@"trackingMenu"];
+                check(menu!=nil,"Actual title-bar overflow must enter native menu tracking");
+                if (selectStatistics) {
+                    NSInteger index=0;
+                    for (NSMenuItem* item in menu.itemArray) {
+                        if ([item.representedObject isEqual:@"NativeStatistics"]) { [menu performActionForItemAtIndex:index]; break; }
+                        ++index;
+                    }
+                }
+                [menu cancelTracking];
+            }];
+            [[NSRunLoop mainRunLoop] addTimer:cancel forMode:NSRunLoopCommonModes];
+            clickTitleButton(@"NativeOverflow");
+            check(repairQueuedInput(titleInput),"Overflow cancellation/selection must request capture repair");
+            check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Overflow must restore relative routing");
+        }
+        SDL_SetWindowSize(window,1000,560); pump();
+        titleInput.m_AbsoluteMouseMode=true; titleInput.setCaptureActive(true);
+        clickTitleButton(@"NativeStatistics"); repairQueuedInput(titleInput);
+        check(!SDL_GetRelativeMouseMode() && titleInput.isCaptureActive(),"Desktop absolute mode must not become relative capture");
+        titleInput.setCaptureActive(false); titleInput.m_AbsoluteMouseMode=false;
+        nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(true);
+        SDL_FlushEvent(nativeOverlayEventType());
+        clickTitleButton(@"NativeConnection");
+        check(!repairQueuedInput(titleInput),"Open popover must defer title-bar repair");
+        NSButton* connectionButton=titlebarButton(cocoa(window),@"NativeConnection");
+        [connectionButton.target performSelector:@selector(closeDetails)]; pump();
+        check(repairQueuedInput(titleInput),"Popover dismissal must request capture repair");
+        check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Popover close must restore capture");
+        titleInput.handleNativeOverlayAction(102); pump();
+        titleInput.handleNativeOverlayAction(220); pump();
+        check(titleInput.m_NativeControlsVisible && SDL_GetWindowMouseGrab(window) && !SDL_GetRelativeMouseMode(),"Title repair must preserve working Control Center local confinement");
+        titleInput.handleNativeOverlayAction(101); pump();
+        check(SDL_GetRelativeMouseMode(),"Computer-name Done restoration must remain unchanged");
+        // A drag moves the window and can suppress SDL cursor association.
+        SDL_FlushEvent(nativeOverlayEventType());
+        SDL_SetWindowPosition(window,140,140); pump();
+        check(repairQueuedInput(titleInput),"Window drag/move completion must request repair");
+        titleInput.setCaptureActive(false);
         for (Uint32 mode : {Uint32(0), Uint32(SDL_WINDOW_FULLSCREEN_DESKTOP), Uint32(SDL_WINDOW_FULLSCREEN)}) {
             std::printf("MODE: 0x%x\n",mode); std::fflush(stdout);
             // Session selects a supported display mode before entering exclusive

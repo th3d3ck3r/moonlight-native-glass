@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.2.0.1U — unreleased — 2026-10-13
+
+- Restore prior relative mouse capture after title-bar buttons, overflow menus, popup dismissal and window dragging/resizing. Explicit input release and absolute desktop mode are preserved; computer-name Control Center behavior is retained.
+- Internal build 35. Checkpoint: `checkpoints/moonlightlg-1.2.0.0U-before-mouse-fix`.
+- Validation pending; U packages remain owner-only.
+
 ## 1.2.0.0U — unreleased — 2026-10-13
 
 - Adopt redesign.major.minor.hotfix without leading zeros or rollover at 10.

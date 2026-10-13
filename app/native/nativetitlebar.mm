@@ -1,6 +1,7 @@
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
 #include <SDL.h>
+#include <SDL_syswm.h>
 #include <mutex>
 #include <string>
 #include "nativetitlebar.h"
@@ -24,6 +25,8 @@ static std::mutex stateMutex;
 static unsigned epoch=0;
 static bool pending=false;
 
+static void requestTitlebarInputRepair(NSWindow* window);
+
 // SDL's Cocoa backend observes title-bar mouse-down before AppKit starts a
 // button's tracking loop. AppKit consumes the matching mouse-up inside that
 // loop, so return a title-bar release to SDL's normal event pump afterwards.
@@ -40,6 +43,7 @@ static bool pending=false;
             context:nil eventNumber:event.eventNumber clickCount:event.clickCount pressure:0];
         [NSApp postEvent:release atStart:YES];
     }
+    requestTitlebarInputRepair(self.window);
 }
 @end
 
@@ -73,6 +77,9 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 
 @interface MLStreamTitlebar : NSObject <NSToolbarDelegate, NSPopoverDelegate>
 @property(nonatomic, assign) NSWindow* window;
+@property(nonatomic, retain) id eventMonitor;
+@property(nonatomic, retain) NSTimer* inputRepairTimer;
+@property(nonatomic, retain) NSMenu* trackingMenu;
 @property(nonatomic, retain) NSToolbar* toolbar;
 @property(nonatomic, retain) NSToolbar* previousToolbar;
 @property(nonatomic, assign) NSWindowTitleVisibility previousTitleVisibility;
@@ -94,6 +101,8 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic, assign) NSUInteger controllerCount;
 @property(nonatomic, assign) BOOL batteryLow;
 @property(nonatomic, assign) SDL_JoystickPowerLevel batteryLevel;
+- (void)requestInputRepair;
+- (void)repairInput:(NSTimer*)timer;
 - (void)refresh;
 - (void)updateDetails;
 - (void)closeDetails;
@@ -105,13 +114,39 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @end
 static MLStreamTitlebar* titlebar;
 
+static void requestTitlebarInputRepair(NSWindow* window) {
+    if (window && titlebar.window==window) [titlebar requestInputRepair];
+}
+
 @implementation MLStreamTitlebar
+- (void)requestInputRepair {
+    if (!self.window || self.inputRepairTimer) return;
+    // A native button/menu can consume mouse-up in a nested tracking loop.
+    // Wait until tracking finishes, then let SDL process that release before
+    // asking the production input handler to re-establish prior capture.
+    self.inputRepairTimer=[NSTimer scheduledTimerWithTimeInterval:0.02 target:self
+        selector:@selector(repairInput:) userInfo:nil repeats:NO];
+}
+- (void)repairInput:(NSTimer*)timer {
+    self.inputRepairTimer=nil;
+    if (!self.window || !self.window.visible || self.window.miniaturized ||
+        !NSApp.active || !self.window.keyWindow) return;
+    if ([NSEvent pressedMouseButtons] & 1) { [self requestInputRepair]; return; }
+    // Popovers own local interaction until dismissal. Their close callbacks
+    // request repair; never recapture the host behind an open native popup.
+    if (self.details.shown) return;
+    SDL_Window* window=SDL_GetKeyboardFocus();
+    if (!window) return;
+    SDL_SysWMinfo info; SDL_VERSION(&info.version);
+    if (!SDL_GetWindowWMInfo(window,&info) || info.info.cocoa.window!=self.window) return;
+    nativeOverlayPerformAction(220,SDL_GetWindowID(window));
+}
 - (instancetype)init {
     if ((self=[super init])) {
         self.buttons=[NSMutableDictionary dictionary];
         [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(themeChanged:) name:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil];
         self.batteryDetails=@"No controller connected";
-        for (NSString* name in @[NSWindowDidResizeNotification, NSWindowDidMiniaturizeNotification, NSWindowWillEnterFullScreenNotification, NSWindowWillExitFullScreenNotification, NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification, NSWindowDidChangeOcclusionStateNotification, @"NSWindowDidFailToEnterFullScreenNotification", @"NSWindowDidFailToExitFullScreenNotification"])
+        for (NSString* name in @[NSWindowDidMoveNotification, NSWindowDidEndLiveResizeNotification, NSWindowDidResizeNotification, NSWindowDidMiniaturizeNotification, NSWindowWillEnterFullScreenNotification, NSWindowWillExitFullScreenNotification, NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification, NSWindowDidChangeOcclusionStateNotification, @"NSWindowDidFailToEnterFullScreenNotification", @"NSWindowDidFailToExitFullScreenNotification"])
             [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:name object:nil];
     }
     return self;
@@ -147,6 +182,7 @@ static MLStreamTitlebar* titlebar;
 - (void)windowChanged:(NSNotification*)notification {
     if (notification.object!=self.window) return;
     [self closeDetails];
+    if ([notification.name isEqual:NSWindowDidMoveNotification] || [notification.name isEqual:NSWindowDidEndLiveResizeNotification]) [self requestInputRepair];
     if ([notification.name isEqual:NSWindowWillEnterFullScreenNotification] || [notification.name isEqual:NSWindowWillExitFullScreenNotification])
         self.fullscreenTransition=YES;
     else if ([notification.name isEqual:NSWindowDidEnterFullScreenNotification] || [notification.name isEqual:NSWindowDidExitFullScreenNotification]
@@ -245,7 +281,10 @@ static MLStreamTitlebar* titlebar;
         command.image=((NSButton*)item.view).image; command.enabled=((NSButton*)item.view).enabled;
         [menu addItem:command];
     }
+    self.trackingMenu=menu;
     [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0,NSMinY(sender.bounds)) inView:sender];
+    self.trackingMenu=nil;
+    [self requestInputRepair];
 }
 - (void)overflowClicked:(NSMenuItem*)sender { [self perform:sender.representedObject anchor:nil]; }
 - (void)clicked:(NSButton*)sender {
@@ -362,14 +401,20 @@ static MLStreamTitlebar* titlebar;
 - (void)closeDetails {
     // Remove the delegate before closing/replacing a popover. A delayed close
     // notification must not clear a newer popover's state or target a dead owner.
+    BOOL wasShown=self.details.shown;
     self.details.delegate=nil; [self.details close]; self.details=nil; self.detailsID=nil;
+    if (wasShown) [self requestInputRepair];
 }
 - (void)popoverDidClose:(NSNotification*)notification {
-    if (notification.object==self.details) self.detailsID=nil;
+    if (notification.object==self.details) { self.detailsID=nil; [self requestInputRepair]; }
 }
 - (void)invalidate {
+    [self.trackingMenu cancelTracking]; self.trackingMenu=nil;
+    if (self.eventMonitor) { [NSEvent removeMonitor:self.eventMonitor]; self.eventMonitor=nil; }
+    [self.inputRepairTimer invalidate]; self.inputRepairTimer=nil;
     [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
     [[NSNotificationCenter defaultCenter] removeObserver:self]; [self closeDetails]; self.details.delegate=nil;
+    [self.inputRepairTimer invalidate]; self.inputRepairTimer=nil;
     [self removeAccessory];
     if (self.presentationInstalled && self.window) {
         self.window.titleVisibility=self.previousTitleVisibility;
@@ -409,6 +454,14 @@ void nativeTitlebarControllersChanged() { [titlebar readControllers]; }
 void nativeTitlebarAttach(void* window) {
     nativeTitlebarDetach();
     titlebar=[[MLStreamTitlebar alloc] init]; titlebar.window=(NSWindow*)window;
+    MLStreamTitlebar* owner=titlebar;
+    owner.eventMonitor=[NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown | NSEventMaskLeftMouseUp handler:^NSEvent*(NSEvent* event) {
+        if (event.window==owner.window && owner.window) {
+            NSRect content=owner.window.contentView.frame;
+            if (!NSPointInRect(event.locationInWindow,content)) [owner requestInputRepair];
+        }
+        return event;
+    }];
     titlebar.previousToolbar=titlebar.window.toolbar; titlebar.previousTitleVisibility=titlebar.window.titleVisibility; titlebar.previousToolbarStyle=titlebar.window.toolbarStyle; titlebar.previousTransparency=titlebar.window.titlebarAppearsTransparent; titlebar.previousBackgroundColor=titlebar.window.backgroundColor;
     titlebar.previousSeparator=(titlebar.window.styleMask & NSWindowStyleMaskTitled) ? titlebar.window.titlebarSeparatorStyle : NSTitlebarSeparatorStyleAutomatic;
     titlebar.toolbar=[[[NSToolbar alloc] initWithIdentifier:@"NativeStreamToolbar"] autorelease];

@@ -2130,6 +2130,13 @@ void Session::exec()
              (nativeStreamMenuCommandsEnabled() &&
               (event.user.code == 209 || event.user.code == 212)))) {
             const int action = event.user.code;
+            if (action == 220) {
+                // This internal command is scoped to the original SDL window;
+                // ignore stale repair requests after replacement or disconnect.
+                if (Uint32(reinterpret_cast<uintptr_t>(event.user.data1))==SDL_GetWindowID(m_Window) &&
+                    !nativeStreamDisconnectConfirmationVisible()) m_InputHandler->handleNativeOverlayAction(action);
+                continue;
+            }
             nativeAcknowledgeMenuAction(action, Uint32(reinterpret_cast<uintptr_t>(event.user.data1)));
             if (action == 217 || action == 218 || action == 219) nativeRecorderCommand(action);
             else if (action == 200) nativeHideStreamWindow(m_Window);

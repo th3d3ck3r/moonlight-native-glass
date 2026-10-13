@@ -199,6 +199,21 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
 #ifdef Q_OS_MACOS
 void SdlInputHandler::handleNativeOverlayAction(int action)
 {
+    if (action == 220) {
+        // Title-bar tracking can leave SDL relative mode enabled while its
+        // actual mouse focus/cursor association is stale. Repair after tracking,
+        // respecting explicit Release Input and absolute desktop mouse mode.
+        if (m_AbsoluteMouseMode || m_NativeMenuInputSuspended ||
+            (SDL_GetWindowFlags(m_Window) & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED)) ||
+            SDL_GetKeyboardFocus()!=m_Window) return;
+        if (m_NativeControlsVisible) { nativeOverlayBeginControlsInput(m_Window); return; }
+        if (!isCaptureActive() && !m_NativeCaptureBeforeFocusLoss) return;
+        setCaptureActive(false);
+        nativeOverlayRestoreStreamFocus(m_Window);
+        setCaptureActive(true);
+        return;
+    }
+
     if (action == 213) {
         if (m_NativeMenuInputSuspended) return;
         m_NativeCaptureBeforeMenu = isCaptureActive() || m_NativeCaptureBeforeFocusLoss;
