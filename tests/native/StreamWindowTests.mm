@@ -14,6 +14,9 @@
 // Test-only observation of the confinement property already used internally
 // by SDL's Cocoa backend; it is absent from AppKit's public headers.
 // Production code continues to use SDL's public capture/grab APIs exclusively.
+@interface NSObject (SDLMovementProbe)
+- (BOOL)isMoving;
+@end
 @interface NSWindow (SDLConfinementProbe)
 @property(nonatomic, readonly) NSRect mouseConfinementRect;
 @end
@@ -154,6 +157,8 @@ int main(int argc, char** argv) {
         [nativeWindow makeKeyAndOrderFront:nil];
         pump();
         check([NSStringFromClass([nativeWindow.delegate class]) isEqualToString:@"MLStreamWindowDelegate"], "Adapter did not attach to the opened SDL window");
+        id originalListener=[nativeWindow.delegate valueForKey:@"original"];
+        check([nativeWindow.delegate isKindOfClass:[originalListener class]],"Delegate proxy must preserve SDL listener identity for native drag-end handling");
         const Uint32 windowID = SDL_GetWindowID(window);
         // The new status menu uses the same token-checked distributed transport,
         // and must enqueue work instead of changing SDL from AppKit callbacks.
@@ -384,6 +389,16 @@ int main(int argc, char** argv) {
         check(titleInput.m_NativeControlsVisible && SDL_GetWindowMouseGrab(window) && !SDL_GetRelativeMouseMode(),"Title repair must preserve working Control Center local confinement");
         titleInput.handleNativeOverlayAction(101); pump();
         check(SDL_GetRelativeMouseMode(),"Computer-name Done restoration must remain unchanged");
+        // Reproduce SDL's real drag state, not merely a programmatic move.
+        [[NSNotificationCenter defaultCenter] postNotificationName:NSWindowWillMoveNotification object:cocoa(window)];
+        check([cocoa(window).delegate isMoving],"SDL must actually enter its moving state for the regression");
+        NSPoint dragPoint=NSMakePoint(NSMidX(cocoa(window).contentView.frame),NSMaxY(cocoa(window).contentView.frame)+10);
+        NSEvent* dragRelease=[NSEvent mouseEventWithType:NSEventTypeLeftMouseUp location:dragPoint modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:cocoa(window).windowNumber context:nil eventNumber:3 clickCount:1 pressure:0];
+        [NSApp postEvent:dragRelease atStart:NO]; pump();
+        check(![cocoa(window).delegate isMoving],"Native drag release must clear SDL moving state through the delegate proxy");
+        check(repairQueuedInput(titleInput),"Native drag release must request capture repair");
+        check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Drag-end must restore relative routing");
+        checkRelativeMotion(window);
         // A drag moves the window and can suppress SDL cursor association.
         SDL_FlushEvent(nativeOverlayEventType());
         SDL_SetWindowPosition(window,140,140); pump();

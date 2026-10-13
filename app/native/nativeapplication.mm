@@ -214,6 +214,12 @@ static bool hideStreamWindow(SDL_Window* window)
 }
 
 @implementation MLStreamWindowDelegate
+- (BOOL)isKindOfClass:(Class)kind {
+    // SDL's NSWindow subclass checks its delegate's listener identity before
+    // forwarding drag-end mouse-up. Preserve that identity through this proxy
+    // so SDL clears isMoving and reapplies deferred cursor association/warps.
+    return [super isKindOfClass:kind] || [self.original isKindOfClass:kind];
+}
 - (BOOL)respondsToSelector:(SEL)selector
 {
     return [super respondsToSelector:selector] || [self.original respondsToSelector:selector];

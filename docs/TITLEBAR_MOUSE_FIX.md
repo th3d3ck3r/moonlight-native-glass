@@ -11,3 +11,5 @@ Tests exercise actual AppKit clicks for Statistics, Record and Replay, relative 
 Title-bar/teardown ASan/UBSan passed in run 38342312021 at source 3b07d8c. Full package validation is pending the recording keyframe recovery addition.
 
 The same hotfix centers the complete native window frame after the stream size is applied on Continue. Size selection uses the existing connection window display. Fullscreen enters on that display, and maximized/minimized states are preserved. Actual SDL connection-window tests cover landscape/portrait size changes and retained window/content identity.
+
+Drag root cause: SDL's native window checks that its delegate is an SDL listener before forwarding mouse-up to clear its moving state. The MoonlightLG wrapper forwarded selectors but not listener class identity. The proxy now forwards isKindOfClass identity as well, allowing SDL's own drag-end implementation to run. Tests enter SDL's real moving state using the native notification, send mouse-up through NSApp, assert moving clears and verify relative motion routing.
