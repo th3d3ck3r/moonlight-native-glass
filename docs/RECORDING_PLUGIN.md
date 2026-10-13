@@ -1,5 +1,7 @@
 # MoonlightLG recording plugin — 1.2.00U (build 33)
 
+Current development version: **1.2.0.0U**, internal build 34, following the four-component version migration. The validation and package checksums below describe the original **1.2.00U/build 33** recording packages; they have not been relabeled. Recording source is unchanged.
+
 Recording work is isolated on `feature/recording-plugin`. The known-good rollback
 checkpoint is `checkpoints/moonlightlg-1.1.03U-before-recording`, commit
 `798eedd508911131ad78df8800345493ac72990c`. No merge or public U release is authorized.

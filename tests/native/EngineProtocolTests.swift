@@ -2,12 +2,14 @@ import Foundation
 
 @main struct EngineProtocolTests {
     static func main() throws {
-        precondition(MoonlightLGVersion(numeric: "1.0.00", channel: "U")?.display == "1.0.00U")
-        precondition(MoonlightLGVersion(numeric: "1.2.9", channel: "E")?.display == "1.2.09E")
-        precondition(MoonlightLGVersion(numeric: "1.0.00", channel: "stable")?.display == "1.0.00")
-        precondition(MoonlightLGVersion(numeric: "1.0.00U", channel: "U") == nil)
-        precondition(MoonlightLGVersion(numeric: "1.0", channel: "U") == nil)
-        precondition(MoonlightLGVersion(numeric: "1.0.00", channel: "X") == nil)
+        precondition(MoonlightLGVersion(numeric: "1.2.0.0", channel: "U")?.display == "1.2.0.0U")
+        precondition(MoonlightLGVersion(numeric: "1.2.10.0", channel: "E")?.display == "1.2.10.0E")
+        precondition(MoonlightLGVersion(numeric: "1.2.11.1", channel: "stable")?.display == "1.2.11.1")
+        precondition(MoonlightLGVersion(numeric: "2.0.0.0", channel: "stable")?.display == "2.0.0.0")
+        for invalid in ["1.2.0.0U", "1.2.0", "1.2.0.0.0", "1.2.00.0", "1.2.-1.0", "1.2..0"] {
+            precondition(MoonlightLGVersion(numeric: invalid, channel: "U") == nil)
+        }
+        precondition(MoonlightLGVersion(numeric: "1.2.0.0", channel: "X") == nil)
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: home) }
         let legacy = home.appendingPathComponent("Library/Logs/MoonlightNativeGlass")

@@ -14,7 +14,8 @@ for bundle, identity in [(app, "com.moonlight-stream.NativeGlass"),
     assert info["CFBundleDisplayName"] == ("MoonlightLG" if bundle == app else "MoonlightLG Engine")
     assert info["CFBundleName"] == ("MoonlightLG" if bundle == app else "MoonlightLG Engine")
     if bundle == app:
-        assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]{2,}", info["CFBundleShortVersionString"])
+        assert re.fullmatch(r"(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*)){3}", info["MoonlightLGVersion"])
+        assert info["CFBundleShortVersionString"] == ".".join(info["MoonlightLGVersion"].split(".")[:3])
         assert info["MoonlightLGReleaseChannel"] in {"U", "E", "stable"}
         assert info["CFBundleExecutable"] == "MoonlightLG"
     assert bool(info.get("LSUIElement", False)) == (bundle != app), "Only the frontend may own a Dock application icon"

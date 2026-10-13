@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.2.0.0U — unreleased — 2026-10-13
+
+- Adopt redesign.major.minor.hotfix without leading zeros or rollover at 10.
+- About and package filenames use the four-component version; Apple bundle metadata keeps its required three-component format. Internal build 34.
+- Recording behavior is unchanged. Existing 1.2.00U/build 33 test packages and validation evidence retain their original labels. Video library and mouse changes remain deferred.
+
 ## 1.2.00U — unreleased — 2026-10-13
 
 - Isolated recording/replay plugin, original-stream copy, optional hardware H.264/HEVC encoding and titlebar controls.

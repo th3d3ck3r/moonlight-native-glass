@@ -5,9 +5,13 @@ import re
 import sys
 
 info = plistlib.loads(pathlib.Path(sys.argv[1]).read_bytes())
-numeric = info['CFBundleShortVersionString']
+numeric = info['MoonlightLGVersion']
 channel = info['MoonlightLGReleaseChannel']
-if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]{2,}', numeric) or channel not in {'U', 'E', 'stable'}:
+component = r'(?:0|[1-9][0-9]*)'
+if not re.fullmatch(rf'{component}(?:\.{component}){{3}}', numeric) or channel not in {'U', 'E', 'stable'}:
     raise SystemExit('Invalid MoonlightLG version/channel metadata')
-major, minor, patch = map(int, numeric.split('.'))
-print(f'{major}.{minor}.{patch:02d}' + ('' if channel == 'stable' else channel))
+# Apple's bundle release version requires exactly three components. The app's
+# four-component version is authoritative for About and package filenames.
+if info['CFBundleShortVersionString'] != '.'.join(numeric.split('.')[:3]):
+    raise SystemExit('Apple bundle version must match the first three MoonlightLG components')
+print(numeric + ('' if channel == 'stable' else channel))

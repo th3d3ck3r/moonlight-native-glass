@@ -8,35 +8,38 @@ and macOS permissions. Do not rebrand upstream copyright/license attribution.
 
 ## Versions (user-required)
 
-Start the MoonlightLG release line at **1.0.00**. The user-facing scheme is
-`major.minor.patch` with at least two patch digits, followed by:
+The user-facing scheme is `redesign.major.minor.hotfix`, without leading zeros.
+The current development version is **1.2.0.0U**. Each component is a nonnegative
+integer with no decimal rollover: `1.2.9.0` → `1.2.10.0` → `1.2.11.0`.
 
-- `U`: unreleased development work (initial version **1.0.00U**). Share U build links only directly with the user. Do not post them as public
-  releases or README/changelog download links. CI app artifacts remain available
-  for the user’s testing. Public distribution requires promotion to E or stable.
-- `E`: experimental build (same numeric version, e.g. **1.0.00E**).
-- No suffix: stable release (**1.0.00**).
+- `U`: unreleased development work. Share U build links only directly with the user.
+  Do not post them as public releases or README/changelog download links. CI app
+  artifacts remain available for the user's testing.
+- `E`: experimental build (e.g. **1.2.0.0E**).
+- No suffix: stable release (**1.2.0.0**).
 
 Maintain versions autonomously when changing this project:
 
 1. Increment once per completed production change set, not once per edit/CI retry.
-   Fixes/small UI adjustments increment patch; meaningful compatible features
-   increment minor and reset patch to 00; major incompatible revisions increment
-   major and reset minor/patch. Documentation/test-only edits do not bump a version.
-2. Keep the numeric version in `macos-native/Info.plist` CFBundleShortVersionString.
-   Keep the channel in MoonlightLGReleaseChannel (`U`, `E`, or `stable`). Never put
-   suffix letters in the numeric Apple bundle version fields.
+   Urgent corrections increment hotfix; small improvements increment minor;
+   substantial features increment major; large UI/architecture redesigns increment
+   redesign. Reset components after the incremented component to zero.
+   Documentation/test-only edits do not bump a version.
+2. Store all four numeric components in `macos-native/Info.plist` MoonlightLGVersion.
+   Keep MoonlightLGReleaseChannel separate (`U`, `E`, or `stable`). Apple requires
+   three components in CFBundleShortVersionString: use the first three components
+   of MoonlightLGVersion. Keep CFBundleVersion as the separate increasing internal
+   build number, distinguishing hotfixes even with the same Apple short version.
 3. Channel promotion U → E → stable preserves the numeric version. Before each
-   distributed bundle iteration, increase numeric CFBundleVersion monotonically;
-   retain its count across the old preview/new MoonlightLG naming transition.
+   distributed bundle iteration, increase CFBundleVersion monotonically.
 4. New development after a distributed version uses the next numeric version + U.
-   Update the changelog, README/current download links, and any development-version
-   fallbacks in EngineProtocol.swift and version-specific UI assertions together
-   with Info.plist. Keep archived release
-   filenames/links and historical validation evidence accurate.
-5. Package names derive from bundle metadata via scripts/moonlightlg-version.py;
-   About uses the same numeric/channel metadata. Do not hardcode a different package
-   version or manually change an already validated/signed package's channel.
+   Update the changelog, README and EngineProtocol.swift development fallbacks and
+   version-specific UI assertions with Info.plist. Preserve archived release names,
+   links and historical validation evidence. The old 1.2.00U test packages remain
+   accurately labeled; the version-format migration is 1.2.0.0U, internal build 34.
+5. Package names derive from metadata via scripts/moonlightlg-version.py;
+   About uses the same numeric/channel metadata. Do not manually relabel an
+   already validated/signed package. Complete macOS/Xcode checks before delivery.
 
 ## Validation and scope
 
