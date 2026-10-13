@@ -169,6 +169,7 @@ struct Recorder {
     CMVideoFormatDescriptionRef format=nullptr;
     std::vector<uint8_t> parameters[3];
     OpusMSDecoder* opus=nullptr;
+    std::vector<float> pcm;
     CMAudioFormatDescriptionRef audioFormat=nullptr;
     uint64_t anchorClock=0;
     uint32_t lastRtp=0;
@@ -432,8 +433,13 @@ struct Recorder {
             NSData* layout=channelLayout(cfg.audio_channels);
             if(CMAudioFormatDescriptionCreate(nullptr,&asbd,layout.length,static_cast<const AudioChannelLayout*>(layout.bytes),0,nullptr,nullptr,&audioFormat)) {fail("Unsupported recording audio format");return;}
         }
-        std::vector<float> pcm(size_t(cfg.audio_rate)*120/1000*cfg.audio_channels);
-        int frames=opus_multistream_decode_float(opus,input.data.data(),int(input.data.size()),pcm.data(),int(cfg.audio_rate*120/1000),0);
+        const unsigned char* packet=input.data.empty() ? nullptr : input.data.data();
+        int capacity=packet ? opus_packet_get_nb_samples(packet,int(input.data.size()),cfg.audio_rate) : int(cfg.audio_frame_samples);
+        if(capacity<=0 || capacity>int(cfg.audio_rate*120/1000)) {fail("Invalid recording audio packet duration");return;}
+        pcm.resize(size_t(capacity)*cfg.audio_channels);
+        // NULL is Moonlight's missing-packet notification. Conceal exactly the
+        // negotiated duration so loss does not shorten the recording timeline.
+        int frames=opus_multistream_decode_float(opus,packet,int(input.data.size()),pcm.data(),capacity,0);
         if(frames<0) {fail("Recording audio packet decode failed");return;}
         if(!haveAudio) { haveAudio=true; audioTicks=input.clock>=anchorClock ? int64_t((input.clock-anchorClock)*90000/1000000) : 0; }
         size_t bytes=size_t(frames)*cfg.audio_channels*sizeof(float);
@@ -501,7 +507,7 @@ struct Recorder {
     }
 };
 void* create(const MLGRecorderConfig* c) {
-    if(!c || c->size!=sizeof(*c) || c->abi!=MLG_RECORDER_ABI || !c->width || !c->height || !c->fps || c->fps>240 || c->audio_channels>8 || c->memory_megabytes<16 || c->memory_megabytes>1024) return nullptr;
+    if(!c || c->size!=sizeof(*c) || c->abi!=MLG_RECORDER_ABI || !c->width || !c->height || !c->fps || c->fps>240 || c->audio_channels>8 || c->memory_megabytes<16 || c->memory_megabytes>1024 || (c->audio_channels && (!c->audio_frame_samples || c->audio_frame_samples>c->audio_rate*120/1000))) return nullptr;
     try {return new Recorder(*c);} catch(...) {return nullptr;}
 }
 void destroy(void* p) {delete static_cast<Recorder*>(p);}
@@ -529,7 +535,7 @@ int audioImpl(void* p,const void* bytes,size_t size,uint64_t clock) {
     auto self=static_cast<Recorder*>(p);if(!(interest(p)&4)) return 0;
     if(size>65536) {self->overload();return 0;}
     auto input=std::make_unique<Input>();input->kind=3;input->clock=clock;
-    auto data=static_cast<const uint8_t*>(bytes);input->data.assign(data,data+size);return self->enqueue(std::move(input),size);
+    auto data=static_cast<const uint8_t*>(bytes);if(size) input->data.assign(data,data+size);return self->enqueue(std::move(input),size);
 }
 int video(void* p,const MLGRecorderChunk* chunks,size_t count,uint32_t rtp,uint64_t clock,int key) {
     try {return videoImpl(p,chunks,count,rtp,clock,key);} catch(...) {static_cast<Recorder*>(p)->overload();return 0;}

@@ -7,14 +7,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define MLG_RECORDER_ABI 1u
+#define MLG_RECORDER_ABI 2u
 #define MLG_RECORDER_MAX_CHUNKS 128u
 typedef struct { const void* bytes; size_t size; } MLGRecorderChunk;
 typedef struct {
     uint32_t size, abi, codec, width, height, fps; /* codec: 1 H264, 2 HEVC, 0 unsupported */
     uint32_t mode, output_codec, output_width, output_height, output_fps, bitrate;
     uint32_t replay_seconds, memory_megabytes, audio_rate, audio_channels;
-    uint32_t audio_streams, audio_coupled; uint8_t audio_mapping[8];
+    uint32_t audio_streams, audio_coupled, audio_frame_samples; uint8_t audio_mapping[8];
     const char* directory; /* copied by create; local filesystem path */
 } MLGRecorderConfig;
 typedef struct {

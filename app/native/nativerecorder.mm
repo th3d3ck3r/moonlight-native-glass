@@ -38,7 +38,7 @@ void nativeRecorderVideoConfig(int format,int width,int height,int fps) {
 }
 void nativeRecorderAudioConfig(const OPUS_MULTISTREAM_CONFIGURATION* audio) {
     config.audio_rate=audio->sampleRate;config.audio_channels=audio->channelCount;
-    config.audio_streams=audio->streams;config.audio_coupled=audio->coupledStreams;
+    config.audio_streams=audio->streams;config.audio_coupled=audio->coupledStreams;config.audio_frame_samples=audio->samplesPerFrame;
     memcpy(config.audio_mapping,audio->mapping,sizeof(config.audio_mapping));
 }
 void nativeRecorderStart() {
@@ -117,5 +117,5 @@ void nativeRecorderPixel(const AVFrame* frame) {
 void nativeRecorderAudio(const void* bytes,int size) {
     if(!(wanted.load(std::memory_order_acquire)&4)) return;
     std::shared_lock<std::shared_mutex> lock(lifetime,std::try_to_lock);
-    if(lock && instance && size>0) api->audio(instance,bytes,size_t(size),LiGetMicroseconds());
+    if(lock && instance && size>=0) api->audio(instance,bytes,size_t(size),LiGetMicroseconds());
 }

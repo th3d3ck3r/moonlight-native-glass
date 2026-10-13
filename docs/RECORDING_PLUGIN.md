@@ -21,7 +21,7 @@ The reviewed changes relative to the checkpoint are:
 - Decoded output after the existing RTP PTS assignment and before the existing pacer:
   retain a VideoToolbox pixel buffer only in Custom Hardware Encoding mode.
 - Audio configuration and an Opus packet tap before drop/mute/playback-device checks:
-  the recorder has its own decoder, so local mute does not silence saved movies.
+  the recorder has its own decoder, so local mute does not silence saved movies. Missing-packet notifications use the negotiated Opus frame duration for concealment rather than shortening the audio timeline.
 - Session video setup, post-Continue recording startup, three titlebar actions, fast
   ingress quiescence on disconnect, and finalization after `LiStopConnection` in
   deferred cleanup. No input handlers, network code, common-c, decoder algorithms,
@@ -80,6 +80,8 @@ check. Encoding, packet copies and replay buffering are inactive.
 ## Research and validation
 
 Primary references consulted:
+
+- [Opus multistream decoding](https://opus-codec.org/docs/opus_api-1.5/group__opus__multistream.html): missing-packet concealment requires the exact missing frame duration.
 
 - [AVAssetWriterInput output settings](https://developer.apple.com/documentation/avfoundation/avassetwriterinput/outputsettings): nil passes samples through.
 - [Hardware encoder requirement](https://developer.apple.com/documentation/videotoolbox/kvtvideoencoderspecification_requirehardwareacceleratedvideoencoder): unsupported or busy hardware can fail.

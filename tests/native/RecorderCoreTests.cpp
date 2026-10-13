@@ -23,5 +23,5 @@ int main() {
     while(received<30000) {if(queue.pop(p)) {received++;total+=*p;} else std::this_thread::yield();}
     a.join();b.join();c.join();assert(done==3 && total==29999ULL*30000/2);
     assert(!queue.pop(p));
-    static_assert(MLG_RECORDER_ABI==1,"Explicit ABI version required");
+    static_assert(MLG_RECORDER_ABI==2,"Explicit ABI version required");
 }

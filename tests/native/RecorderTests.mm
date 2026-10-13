@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 static const MLGRecorderAPI* api;
 static void pauseMs(unsigned ms) {std::this_thread::sleep_for(std::chrono::milliseconds(ms));}
 static MLGRecorderStatus state(void* r) {MLGRecorderStatus s{};s.size=sizeof(s);api->status(r,&s);return s;}
@@ -44,6 +45,7 @@ static void verify(NSString* file,bool audio) {
     assert(reader.status==AVAssetReaderStatusCompleted && frames>30);
     if(audio) {
         NSArray* tracks=[asset tracksWithMediaType:AVMediaTypeAudio];assert(tracks.count==1);
+        assert(fabs(CMTimeGetSeconds(((AVAssetTrack*)tracks[0]).timeRange.duration)-CMTimeGetSeconds(((AVAssetTrack*)video[0]).timeRange.duration))<0.12);
         AVAssetReader* ar=[[AVAssetReader alloc] initWithAsset:asset error:&error];
         AVAssetReaderTrackOutput* out=[[AVAssetReaderTrackOutput alloc] initWithTrack:tracks[0] outputSettings:@{AVFormatIDKey:@(kAudioFormatLinearPCM)}];[ar addOutput:out];assert([ar startReading]);
         unsigned count=0;while(CMSampleBufferRef sample=[out copyNextSampleBuffer]) {count++;CFRelease(sample);}assert(count>0 && ar.status==AVAssetReaderStatusCompleted);
@@ -61,7 +63,7 @@ int main(int argc,char** argv) {
         void* disabled=api->create(&cfg);assert(disabled && api->interest(disabled)==0);
         auto begin=std::chrono::steady_clock::now();for(unsigned i=0;i<100000;i++) assert(!api->video(disabled,nullptr,0,0,0,0));
         fprintf(stderr,"Disabled 100000 submissions: %.3f ms\n",std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count());api->destroy(disabled);
-        cfg.replay_seconds=300;cfg.audio_rate=48000;cfg.audio_channels=2;cfg.audio_streams=1;cfg.audio_coupled=1;cfg.audio_mapping[1]=1;
+        cfg.replay_seconds=300;cfg.audio_rate=48000;cfg.audio_channels=2;cfg.audio_streams=1;cfg.audio_coupled=1;cfg.audio_frame_samples=960;cfg.audio_mapping[1]=1;
         void* recorder=api->create(&cfg);assert(recorder);api->command(recorder,1);pauseMs(100);assert(api->interest(recorder)&1);
         Source source{recorder,{}};VTCompressionSessionRef encoder=nullptr;
         assert(!VTCompressionSessionCreate(nullptr,640,360,kCMVideoCodecType_H264,nullptr,nullptr,nullptr,output,&source,&encoder));
@@ -74,7 +76,7 @@ int main(int argc,char** argv) {
         for(unsigned frame=0;frame<240;frame++) {
             assert(!VTCompressionSessionEncodeFrame(encoder,image,CMTimeMake(frame,60),CMTimeMake(1,60),nullptr,nullptr,nullptr));
             VTCompressionSessionCompleteFrames(encoder,kCMTimeInvalid);
-            while(audioIndex*20<=(frame+1)*1000/60) {int size=opus_encode_float(opus,pcm.data(),960,packet,sizeof(packet));assert(size>0);api->audio(recorder,packet,size,1000000+audioIndex*20000);audioIndex++;pauseMs(2);}
+            while(audioIndex*20<=(frame+1)*1000/60) {int size=opus_encode_float(opus,pcm.data(),960,packet,sizeof(packet));assert(size>0);api->audio(recorder,audioIndex%10==9 ? nullptr : packet,audioIndex%10==9 ? 0 : size,1000000+audioIndex*20000);audioIndex++;pauseMs(2);}
             pauseMs(16);
         }
         CFRelease(image);VTCompressionSessionInvalidate(encoder);CFRelease(encoder);opus_encoder_destroy(opus);
