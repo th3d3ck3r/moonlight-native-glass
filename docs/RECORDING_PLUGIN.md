@@ -1,8 +1,8 @@
-# MoonlightLG recording plugin — current 1.2.1.0U (build 37)
+# MoonlightLG recording plugin — current 1.2.2.0U (build 38)
 
-Current capture-driven title controls: [audit](TITLEBAR_AUTOHIDE.md). Fragmented-frame recording fix: [audit](RECORDING_FRAGMENT_FIX.md). Previous validated mouse/keyframe/centering fix: [audit](TITLEBAR_MOUSE_FIX.md).
+Current playback mute/native fullscreen refinements: [audit](TITLEBAR_AUDIO_FULLSCREEN.md). Capture-driven title controls: [audit](TITLEBAR_AUTOHIDE.md). Fragmented-frame recording fix: [audit](RECORDING_FRAGMENT_FIX.md). Previous validated mouse/keyframe/centering fix: [audit](TITLEBAR_MOUSE_FIX.md).
 
-Current development version: **1.2.1.0U**, internal build 37, adding capture-driven title controls while retaining source-copy fragmented-keyframe support (recorder ABI 4). The recording implementation is unchanged; the existing mouse restoration routes are retained. The validation and package checksums below describe the original **1.2.00U/build 33** recording packages; they have not been relabeled. The ABI 3 keyframe recovery addition is validated in the hotfix audit; historical package evidence below remains unchanged.
+Current development version: **1.2.2.0U**, internal build 38, refining native fullscreen chrome, Apollo star speed and playback-only title mute while retaining source-copy fragmented-keyframe support (recorder ABI 4). The recording implementation is unchanged; the existing mouse restoration routes are retained. The validation and package checksums below describe the original **1.2.00U/build 33** recording packages; they have not been relabeled. The ABI 3 keyframe recovery addition is validated in the hotfix audit; historical package evidence below remains unchanged.
 
 Recording work is isolated on `feature/recording-plugin`. The known-good rollback
 checkpoint is `checkpoints/moonlightlg-1.1.03U-before-recording`, commit

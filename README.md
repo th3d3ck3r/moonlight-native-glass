@@ -23,7 +23,7 @@ Liquid Glass navigation and controls on **macOS 26+**, standard native styling o
 
 ## 🌙 MoonlightLG builds
 
-**MoonlightLG 1.2.2.0U** corrects overlapping native chrome after green-button fullscreen, speeds up the Apollo warp stars, and adds a playback-only mute button using the same mouse-restoration handling as the other title controls. Recording audio is unchanged. Validation is pending; see the [current audit](docs/TITLEBAR_AUDIO_FULLSCREEN.md). The previous capture-driven title bar passed full validation; see its [audit](docs/TITLEBAR_AUTOHIDE.md). Its isolated recording/replay plugin is disabled by default. Enable it in Recording settings before starting a stream. The app, menu names,
+**MoonlightLG 1.2.2.0U** corrects overlapping native chrome after green-button fullscreen, speeds up the Apollo warp stars, and adds a playback-only mute button using the same mouse-restoration handling as the other title controls. Recording audio is unchanged. Full Intel/Universal, Xcode, UI, native-fullscreen/Metal, mouse/sanitizer and recording-mute boundary checks passed; see the [current audit](docs/TITLEBAR_AUDIO_FULLSCREEN.md). The previous capture-driven title bar passed full validation; see its [audit](docs/TITLEBAR_AUTOHIDE.md). Its isolated recording/replay plugin is disabled by default. Enable it in Recording settings before starting a stream. The app, menu names,
 Xcode project and build products now use MoonlightLG; the GitHub repository URL
 stays unchanged. The startup arrival displays **MoonlightLG** beneath the moon. Connection flight
 meets a full moon and orbits until **Continue to Stream**, with real status details below.
@@ -137,7 +137,7 @@ startup, About and title-bar captures are linked from the [current audit](https:
 
 ## 🧪 Testing and known limitations
 
-**Current MoonlightLG 1.2.2.0U:** Title controls hide during captured streaming and reappear on release without changing the video geometry. The previous 1.2.1.0U passed full Intel/Universal, Xcode, UI and mouse/Metal/sanitizer checks; validation of the fullscreen/audio/warp refinements is pending. Recording adds Record/Stop and Save Replay controls,
+**Current MoonlightLG 1.2.2.0U:** Title controls hide during captured streaming and reappear on release without changing the video geometry. The previous 1.2.1.0U passed full Intel/Universal, Xcode, UI and mouse/Metal/sanitizer checks; the fullscreen/audio/warp refinements also passed those checks plus the production audio mute boundary fixture. Recording adds Record/Stop and Save Replay controls,
 Original Stream Quality and optional hardware encoding. The previous 1.1.03U checkpoint
 is retained for rollback. Recording build 33 passed both complete packages, recorder/sanitizer checks, full Xcode and UI suites. The previous 1.2.0.1U mouse/keyframe/centering hotfix passed full macOS/Xcode, UI and sanitizer validation; the current fragmented-frame fix also passed those checks. Source-quality recording requests missing keyframes with bounded retries.
 Live-host performance, HDR and surround still need physical-host acceptance before promotion; see the [recording audit](docs/RECORDING_PLUGIN.md).

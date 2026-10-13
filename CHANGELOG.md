@@ -6,7 +6,7 @@
 - Faster scale-aware Apollo warp stars, preserving arrival braking and Reduce Motion.
 - Playback Mute/Unmute in the title row and narrow overflow, synchronized with the existing stream menu; source recording audio stays independent.
 - Mute uses the same tracked mouse-up and session/window-scoped capture restoration as the other title buttons.
-- Internal build 38. Checkpoint: `checkpoints/moonlightlg-1.2.1.0U-before-title-audio`. Validation pending.
+- Internal build 38. Checkpoint: `checkpoints/moonlightlg-1.2.1.0U-before-title-audio`. Full Intel/Universal packages, Xcode, both 12-test UI suites, green-button fullscreen/hover, actual mute-button capture restoration, production recording-mute boundary and sanitizer checks passed. Downloaded versions/CPU slices/checksums verified.
 
 ## 1.2.1.0U — unreleased — 2026-10-13
 
