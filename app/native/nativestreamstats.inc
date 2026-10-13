@@ -75,6 +75,7 @@ static CGFloat streamDetailHeight(const NativeStreamStats::Row& row,CGFloat widt
 }
 - (void)toggleGraphs:(id)sender {
     [self.preferences setBool:!self.graphs forKey:@"streamStatsGraphs"];
+    [self.preferences synchronize];
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:changed object:nil userInfo:nil deliverImmediately:YES];
     [self refresh];
 }
@@ -115,7 +116,7 @@ static CGFloat streamDetailHeight(const NativeStreamStats::Row& row,CGFloat widt
     CGFloat gap=12*s,cellWidth=columns ? (contentWidth-gap)/2 : contentWidth;
     CGFloat rowHeight=(self.graphs ? 65 : 43)*s;
     // A flipped document starts at the top and preserves scroll offset on reflow.
-    CGFloat total=MAX(self.scroll.contentSize.height,[self preferredHeightForWidth:width]-38*s);
+    CGFloat total=MAX(self.scroll.contentSize.height,[self preferredHeightForWidth:width]-40*s);
     self.document.frame=NSMakeRect(0,0,contentWidth,total);
     CGFloat top=0; NSUInteger column=0;
     for (const auto& row:rows) {
@@ -145,6 +146,8 @@ static CGFloat streamDetailHeight(const NativeStreamStats::Row& row,CGFloat widt
 - (void)drawRect:(NSRect)dirty {
     [[NSColor colorWithSRGBRed:.035 green:.025 blue:.03 alpha:NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceTransparency ? 1 : .48] setFill];
     [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:12 yRadius:12] fill];
+    [[(crimsonEnabled() ? crimsonAccent() : NSColor.controlAccentColor) colorWithAlphaComponent:.4] setStroke];
+    [[NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds,.5,.5) xRadius:12 yRadius:12] stroke];
     [@"STREAM STATISTICS" drawAtPoint:NSMakePoint(12*self.scale,11*self.scale) withAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:11*self.scale weight:NSFontWeightMedium],NSForegroundColorAttributeName:NSColor.secondaryLabelColor}];
 }
 - (void)drawGraph:(NSString*)key inRect:(NSRect)rect percentage:(BOOL)percentage {
@@ -160,7 +163,14 @@ static CGFloat streamDetailHeight(const NativeStreamStats::Row& row,CGFloat widt
         if (started && point.time-last<=5) [path lineToPoint:position]; else [path moveToPoint:position];
         started=YES; last=point.time;
     }
-    [(crimsonEnabled() ? crimsonAccent() : NSColor.controlAccentColor) setStroke]; path.lineWidth=1.5; [path stroke];
+    NSColor* accent=crimsonEnabled() ? crimsonAccent() : NSColor.controlAccentColor;
+    [accent setStroke]; path.lineWidth=1.5; [path stroke];
+    if (found->second.size()==1 && std::isfinite(found->second.back().value)) {
+        // A first real sample is a point, not a fabricated history segment.
+        double value=found->second.back().value;
+        CGFloat x=MAX(1.5,rect.size.width-1.5),y=MAX(1.5,MIN(rect.size.height-1.5,NSMaxY(rect)-1-MIN(1.,value/maximum)*MAX(0,rect.size.height-2)));
+        [accent setFill]; [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(x-1.5,y-1.5,3,3)] fill];
+    }
 }
 - (void)dealloc {
     self.graphsButton.target=nil;

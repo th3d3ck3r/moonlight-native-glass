@@ -87,8 +87,12 @@ int main() { @autoreleasepool {
     SDL_RaiseWindow(window);
     check(SDL_GetKeyboardFocus()==window,"Stopped-owner fixture must retain SDL focus during the delayed callback");
     __block bool ran=false; dispatch_async(dispatch_get_main_queue(), ^{ ran=true; });
-    drain();
+    // Cold AppKit/ASan work may consume the first 150 ms drain. Wait for the
+    // queued barrier itself, keeping a finite deadline and the original checks.
+    NSDate* barrierDeadline=[NSDate dateWithTimeIntervalSinceNow:3];
+    while (!ran && barrierDeadline.timeIntervalSinceNow>0) drain();
     check(ran,"Fixture must actually drain deferred main-queue callbacks");
+    drain();
     fprintf(stderr,"AFTER STOP: focus=%p flags=0x%x configured=%d\n",(void*)SDL_GetKeyboardFocus(),SDL_GetWindowFlags(window),nativeOverlayConfigured());
     check(!nativeOverlayConfigured(),"Deferred focus callback reattached native controls after stream teardown");
     check(cocoa(window).toolbar==nil && !titlebarRoot(cocoa(window)) && !titlebarBackground(cocoa(window)),"Shutdown must leave no orphan native toolbar");
