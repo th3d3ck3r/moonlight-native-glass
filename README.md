@@ -23,7 +23,7 @@ Liquid Glass navigation and controls on **macOS 26+**, standard native styling o
 
 ## 🌙 MoonlightLG builds
 
-**MoonlightLG 1.3.0.0U** adds an adjustable local hardware monitor with scrolling graphs, grouped stream title controls, and a playback volume/mute popover that leaves recording audio unchanged. GPU readings depend on driver support; thermal status is available when numeric temperatures are not. Validation is in progress; see the [current audit](docs/HARDWARE_VOLUME_OVERLAY.md). Its isolated recording/replay plugin is disabled by default. Enable it in Recording settings before starting a stream. The app, menu names,
+**MoonlightLG 1.3.0.0U** adds an adjustable local hardware monitor with scrolling graphs, grouped stream title controls, and a playback volume/mute popover that leaves recording audio unchanged. GPU readings depend on driver support; thermal status is available when numeric temperatures are not. Intel/Universal packages, Xcode, both UI suites, recording/audio boundaries and native mouse/fullscreen/sanitizer checks passed; see the [current audit](docs/HARDWARE_VOLUME_OVERLAY.md). Its isolated recording/replay plugin is disabled by default. Enable it in Recording settings before starting a stream. The app, menu names,
 Xcode project and build products now use MoonlightLG; the GitHub repository URL
 stays unchanged. The startup arrival displays **MoonlightLG** beneath the moon. Connection flight
 meets a full moon and orbits until **Continue to Stream**, with real status details below.
@@ -137,9 +137,9 @@ startup, About and title-bar captures are linked from the [current audit](https:
 
 ## 🧪 Testing and known limitations
 
-**Current MoonlightLG 1.3.0.0U:** The hardware monitor stays visible with gameplay clicks passing through while captured. Release input to move, resize or adjust it. Title controls keep the capture-driven hide behavior; playback volume is independent from source recording audio. Validation is in progress. Recording adds Record/Stop and Save Replay controls,
+**Current MoonlightLG 1.3.0.0U:** The hardware monitor stays visible with gameplay clicks passing through while captured. Release input to move, resize or adjust it. Title controls keep the capture-driven hide behavior; playback volume is independent from source recording audio. Intel/Universal bundles and Xcode builds passed; both UI suites completed 12 tests with zero failures. Recording adds Record/Stop and Save Replay controls,
 Original Stream Quality and optional hardware encoding. The previous 1.1.03U checkpoint
-is retained for rollback. Recording build 33 passed both complete packages, recorder/sanitizer checks, full Xcode and UI suites. The previous 1.2.0.1U mouse/keyframe/centering hotfix passed full macOS/Xcode, UI and sanitizer validation; the current fragmented-frame fix also passed those checks. Source-quality recording requests missing keyframes with bounded retries.
+is retained for rollback. Recording build 33 passed both complete packages, recorder/sanitizer checks, full Xcode and UI suites. The previous 1.2.0.1U mouse/keyframe/centering hotfix passed full macOS/Xcode, UI and sanitizer validation; the previous 1.2.0.2U fragmented-frame fix also passed those checks. Source-quality recording requests missing keyframes with bounded retries.
 Live-host performance, HDR and surround still need physical-host acceptance before promotion; see the [recording audit](docs/RECORDING_PLUGIN.md).
 
 **Archived Experimental 24 validation:** [Native validation run 38219537762](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537762) and [Xcode validation run 38219537999](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537999) passed at application/test source **`4d8ee8a4`**.

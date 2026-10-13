@@ -1,8 +1,8 @@
-# MoonlightLG recording plugin — current 1.2.2.0U (build 38)
+# MoonlightLG recording plugin — current 1.3.0.0U (build 39)
 
-Current playback mute/native fullscreen refinements: [audit](TITLEBAR_AUDIO_FULLSCREEN.md). Capture-driven title controls: [audit](TITLEBAR_AUTOHIDE.md). Fragmented-frame recording fix: [audit](RECORDING_FRAGMENT_FIX.md). Previous validated mouse/keyframe/centering fix: [audit](TITLEBAR_MOUSE_FIX.md).
+Current hardware graphs and playback volume: [audit](HARDWARE_VOLUME_OVERLAY.md). Previous playback mute/native fullscreen refinements: [audit](TITLEBAR_AUDIO_FULLSCREEN.md). Capture-driven title controls: [audit](TITLEBAR_AUTOHIDE.md). Fragmented-frame recording fix: [audit](RECORDING_FRAGMENT_FIX.md). Previous validated mouse/keyframe/centering fix: [audit](TITLEBAR_MOUSE_FIX.md).
 
-Current development version: **1.2.2.0U**, internal build 38, refining native fullscreen chrome, Apollo star speed and playback-only title mute while retaining source-copy fragmented-keyframe support (recorder ABI 4). The recording implementation is unchanged; the existing mouse restoration routes are retained. The validation and package checksums below describe the original **1.2.00U/build 33** recording packages; they have not been relabeled. The ABI 3 keyframe recovery addition is validated in the hotfix audit; historical package evidence below remains unchanged.
+Current development version: **1.3.0.0U**, internal build 39, adding local hardware graphs and playback volume/mute controls while retaining source-copy fragmented-keyframe support (recorder ABI 4). The recorder plugin and original source packet delivery are unchanged; playback gain acts only on decoded local PCM, with existing mouse restoration routes retained. The validation and package checksums below describe the original **1.2.00U/build 33** recording packages; they have not been relabeled. The ABI 3 keyframe recovery addition is validated in the hotfix audit; historical package evidence below remains unchanged.
 
 Recording work is isolated on `feature/recording-plugin`. The known-good rollback
 checkpoint is `checkpoints/moonlightlg-1.1.03U-before-recording`, commit

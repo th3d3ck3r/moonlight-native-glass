@@ -5,7 +5,7 @@
 - Adjustable local CPU, RAM, GPU (where supported), network graphs and thermal status in a Crimson Glass overlay. Position, size, opacity, visible metrics, refresh cadence and history are remembered. Captured gameplay passes clicks through; releasing input enables adjustment.
 - Speaker button opens playback volume and mute controls. PCM gain is applied only to local playback after original encoded audio reaches the recorder.
 - Title actions grouped as input/control, monitoring, playback/recording, then controller/connection status. New controls use the existing mouse-up/capture restoration boundary.
-- Internal build 39. Validation in progress; no distributed package yet.
+- Internal build 39. Checkpoint: `checkpoints/moonlightlg-1.2.2.0U-before-hardware-volume`. Intel/Universal packages, fresh/incremental Xcode, both 12-test UI suites, native mouse/fullscreen/Metal/sanitizer and production playback-volume/recording boundary checks passed. Downloaded versions, CPU slices and checksums verified.
 
 ## 1.2.2.0U — unreleased — 2026-10-13
 
