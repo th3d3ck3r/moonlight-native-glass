@@ -94,7 +94,34 @@ macOS plugin tests generate compressed source video and Opus audio, record and s
 replay, decode the resulting movies, exercise hardware capability failure and disk
 failure, and measure the disabled submission path. Full macOS/Xcode, existing UI,
 startup, disconnect, fullscreen, bundle and shutdown validation are required before
-sharing a U package. Validation results will be recorded after those jobs complete.
+sharing a U package. These checks completed successfully on 2026-10-13 UTC.
+
+Validated production source: `49db63f5964c1496f694c6212062f4d1db88a5a3`.
+
+| Check | Evidence / result |
+|---|---|
+| Recorder, both architectures, functional + ASan/UBSan | [Recorder run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38332340090) passed. Source recording/replay decoded all 240 frames with AAC audio; simulated 10% audio packet loss kept A/V durations matched. Stop/restart across an idle gap retained audio. Resized HEVC recording/replay decoded 90 frames at 320×180 / 30 fps. Disk failure, bounded overload, disabled submissions and concurrent queue stress passed. |
+| Complete Intel and Universal apps | [Native run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38332339217) passed; each bundle audited 107 Mach-O files, dependencies, identities, permissions and signatures. Packaged window-first startup, bridge/persistence, status-menu commands and 200 immediate shutdown cycles passed. |
+| Existing UI, Apollo, fullscreen and window lifetime | Same native run: 12 XCTest tests passed; actual Qt/SDL Apollo controls, same-window Continue handoff, Metal fullscreen/borderless rendering, captured hide/restore and window lifetime ASan/UBSan passed. Recording settings were visually reviewed. |
+| Full Xcode project | [Xcode run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38332339299) passed fresh/incremental app builds, real embedded engine, source-ZIP dependency setup, startup preview and all 12 XCTest tests. |
+| Stock platform builds | [Build run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38332339640) passed Windows, macOS, AppImage and Steam Link jobs. |
+| Disconnect/E and presentation teardown | [Shutdown run](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38330610619) passed the production shortcut/gate and SDL/AppKit teardown sanitizer probe. Its tested presentation/input source is unchanged in the final recorder source. |
+| Downloaded packages | Independently verified SHA-256, 1.2.00/U/33 metadata, exported plugin entry and x86_64 / arm64 plugin slices. Recorder is 118,144 bytes in Intel and 258,720 bytes in Universal. Recording tests/fixtures are absent from both app ZIPs. |
+
+Package SHA-256 values (U download links remain owner-only):
+
+- Intel: `074b19675d49c86bdb229149d19dbef331d7ab124fd4bf5db7cecdd40a97f855`
+- Universal: `88797287f0fbee15b56f901e5adeec2ba42d54be6966e859bf28eef2246b70be`
+
+The sanitizer found and prompted a fix for a replay-cache path buffer over-read;
+the final functional and sanitizer runs passed after correction. Review also added
+exact-duration Opus loss concealment and explicit sync-sample metadata handling.
+
+Enable Recording in Settings before starting a stream. Original Stream Quality
+uses the host's H.264/HEVC packets and waits for natural keyframes. For reliable
+local keyframe intervals on hosts without periodic IDRs, select Custom Hardware
+Encoding with the VideoToolbox decoder. Custom encoding is SDR-only in this U build.
+No public U release or posted app download links were created.
 
 CI cannot prove unchanged latency/frame time on the owner's host. Physical Intel,
 Apple Silicon, HDR, surround, long-duration recordings, window resizing/minimizing

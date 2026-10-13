@@ -6,7 +6,7 @@
 - Recording settings, independent audio capture, bounded queues and RAM/disk buffers.
 - Disabled by default. Rollback checkpoint: `checkpoints/moonlightlg-1.1.03U-before-recording`. Mouse work remains deferred.
 - Internal build 33. U links remain owner-only.
-- [Design and validation](docs/RECORDING_PLUGIN.md); macOS validation pending.
+- [Design and validation](docs/RECORDING_PLUGIN.md). Recorder functional/sanitizer checks, both complete packages, both 12-test UI suites, full Xcode and stock platform builds passed. Live-host performance, HDR and surround acceptance remain.
 
 ## 1.1.03U — unreleased — 2026-10-12
 

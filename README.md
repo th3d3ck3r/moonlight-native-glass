@@ -137,8 +137,8 @@ startup, About and title-bar captures are linked from the [current audit](https:
 
 **Current MoonlightLG 1.2.00U:** Recording adds Record/Stop and Save Replay controls,
 Original Stream Quality and optional hardware encoding. The previous 1.1.03U checkpoint
-is retained for rollback. This branch requires macOS validation and physical-host
-acceptance before promotion; see the [recording audit](docs/RECORDING_PLUGIN.md).
+is retained for rollback. Both complete packages, recorder/sanitizer checks, full Xcode and UI suites passed.
+Live-host performance, HDR and surround still need physical-host acceptance before promotion; see the [recording audit](docs/RECORDING_PLUGIN.md).
 
 **Archived Experimental 24 validation:** [Native validation run 38219537762](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537762) and [Xcode validation run 38219537999](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38219537999) passed at application/test source **`4d8ee8a4`**.
 
