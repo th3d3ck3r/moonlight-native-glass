@@ -165,7 +165,7 @@ int main(int argc, char** argv) { @autoreleasepool {
             SDL_WarpMouseInWindow(window,320,2); pump(.5);
             NSView* root=titlebarRoot(cocoa(window));
             check(root && root.hiddenOrHasHiddenAncestor==captured,"Green-button Space must use the same capture-driven command row");
-            id owner=titlebarButton(cocoa(window),@"NativeHost").target;
+            NSObject* owner=(NSObject*)titlebarButton(cocoa(window),@"NativeHost").target;
             NSView* nativeChrome=[owner valueForKey:@"nativeChrome"];
             check(!nativeChrome || nativeChrome.hidden,"Native fullscreen title chrome must not overlap the command row on release/hover");
             NSButton* close=[cocoa(window) standardWindowButton:NSWindowCloseButton];
