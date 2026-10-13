@@ -374,7 +374,7 @@ struct Recorder {
         sample->pts=CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer),90000,kCMTimeRoundingMethod_Default).value;
         sample->bytes=CMSampleBufferGetTotalSampleSize(buffer);
         CFArrayRef a=CMSampleBufferGetSampleAttachmentsArray(buffer,false);
-        sample->key=!a || !CFDictionaryContainsKey((CFDictionaryRef)CFArrayGetValueAtIndex(a,0),kCMSampleAttachmentKey_NotSync);
+        sample->key=!a || CFArrayGetCount(a)==0 || CFDictionaryGetValue((CFDictionaryRef)CFArrayGetValueAtIndex(a,0),kCMSampleAttachmentKey_NotSync)!=kCFBooleanTrue;
         // Feed a bounded queue. The callback never writes files or dispatches
         // an unbounded collection of retained pixel/sample buffers.
         auto input=std::make_unique<Input>(); input->kind=4; input->sample=sample;

@@ -27,7 +27,7 @@ static void output(void* ref,void*,OSStatus error,VTEncodeInfoFlags,CMSampleBuff
     std::vector<uint8_t> payload(size);assert(!CMBlockBufferCopyDataBytes(block,0,size,payload.data()));
     for(size_t i=0;i+4<=size;) {size_t n=(size_t(payload[i])<<24)|(size_t(payload[i+1])<<16)|(size_t(payload[i+2])<<8)|payload[i+3];i+=4;assert(n<=size-i);bytes.insert(bytes.end(),{0,0,0,1});bytes.insert(bytes.end(),payload.begin()+i,payload.begin()+i+n);i+=n;}
     CFArrayRef attachments=CMSampleBufferGetSampleAttachmentsArray(sample,false);
-    bool key=!attachments||!CFDictionaryContainsKey((CFDictionaryRef)CFArrayGetValueAtIndex(attachments,0),kCMSampleAttachmentKey_NotSync);
+    bool key=!attachments||CFArrayGetCount(attachments)==0||CFDictionaryGetValue((CFDictionaryRef)CFArrayGetValueAtIndex(attachments,0),kCMSampleAttachmentKey_NotSync)!=kCFBooleanTrue;
     if(key) source->keyBytes=bytes;
     uint32_t rtp=uint32_t(CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(sample),90000,kCMTimeRoundingMethod_Default).value);
     MLGRecorderChunk chunk={bytes.data(),bytes.size()};
