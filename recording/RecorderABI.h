@@ -7,8 +7,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define MLG_RECORDER_ABI 3u
-#define MLG_RECORDER_MAX_CHUNKS 128u
+#define MLG_RECORDER_ABI 4u
+#define MLG_RECORDER_MAX_CHUNKS 65536u
+#define MLG_RECORDER_MAX_FRAME_BYTES (32u*1024u*1024u)
+enum MLGRecorderRejection {
+    MLG_REJECT_FRAGMENT_LIMIT=1, MLG_REJECT_FRAME_BYTES=2,
+    MLG_REJECT_QUEUE_BYTES=3, MLG_REJECT_QUEUE_ITEMS=4,
+    MLG_REJECT_MEMORY=5, MLG_REJECT_INVALID_FRAME=6
+};
 typedef struct { const void* bytes; size_t size; } MLGRecorderChunk;
 typedef struct {
     uint32_t size, abi, codec, width, height, fps; /* codec: 1 H264, 2 HEVC, 0 unsupported */
@@ -32,6 +38,7 @@ typedef struct {
     int (*pixel)(void*, void* cv_pixel_buffer, uint32_t rtp90k, uint64_t clock_us, int hdr);
     int (*audio)(void*, const void*, size_t, uint64_t clock_us);
     void (*status)(void*, MLGRecorderStatus*);
+    void (*reject)(void*, uint32_t reason); /* atomic/nonallocating ingress failure */
 } MLGRecorderAPI;
 typedef const MLGRecorderAPI* (*MLGRecorderEntry)(uint32_t);
 const MLGRecorderAPI* MoonlightLGRecorderGetAPI(uint32_t);

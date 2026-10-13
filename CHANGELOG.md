@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.2.0.2U — unreleased — 2026-10-13
+
+- Accept large fragmented source-quality keyframes instead of falsely reporting queue overload at 129 fragments. Keep 32 MB ingress bounds and use reusable, bounded fragment metadata; recorder ABI 4.
+- Distinguish fragment/frame input limits, queue byte/item congestion, invalid frames and allocation failures.
+- Internal build 36. Mouse fixes are owner-confirmed and unchanged. Checkpoint: `checkpoints/moonlightlg-1.2.0.1U-before-recorder-fragments`. Validation pending.
+
 ## 1.2.0.1U — unreleased — 2026-10-13
 
 - Restore prior relative mouse capture after title-bar buttons, overflow menus, popup dismissal and window dragging/resizing. Explicit input release and absolute desktop mode are preserved; computer-name Control Center behavior is retained.

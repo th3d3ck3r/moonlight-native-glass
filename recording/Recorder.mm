@@ -20,7 +20,7 @@
 #include <cstring>
 
 namespace {
-constexpr size_t MaxIngress=32*1024*1024, MaxPackets=256;
+constexpr size_t MaxIngress=MLG_RECORDER_MAX_FRAME_BYTES, MaxPackets=256;
 struct Spool {
     int fd=-1; off_t end=0;
     explicit Spool(NSString* directory) {
@@ -158,7 +158,7 @@ struct Recorder {
     dispatch_queue_t exportQueue;
     dispatch_group_t exports;
     std::atomic<unsigned> interest{0};
-    std::atomic<bool> overflow{false};
+    std::atomic<uint32_t> overflow{0};
     std::atomic<uint64_t> drops{0};
     MLGRecorderStatus current{};
     bool recordWanted=false, replay=false, waitKey=true;
@@ -236,15 +236,19 @@ struct Recorder {
         if(bits && cfg.audio_channels) bits|=4;
         interest.store(bits);
     }
-    void overload() {overflow.store(true);dispatch_semaphore_signal(wake);}
+    void overload(uint32_t reason=MLG_REJECT_QUEUE_ITEMS) {
+        uint32_t empty=0;overflow.compare_exchange_strong(empty,reason);
+        drops++;dispatch_semaphore_signal(wake);
+    }
     bool enqueue(std::unique_ptr<Input> input, size_t bytes, bool command=false) {
-        if(bytes>MaxIngress) {drops++;overload();return false;}
+        if(bytes>MaxIngress) {overload(MLG_REJECT_FRAME_BYTES);return false;}
         if(quit.load() && input->kind!=4 && input->kind!=5) return false;
         size_t previous=queuedBytes.fetch_add(bytes,std::memory_order_relaxed);
         input->cost=bytes;
-        if(previous>MaxIngress-bytes || !queue.push(std::move(input))) {
+        const bool byteLimit=previous>MaxIngress-bytes;
+        if(byteLimit || !queue.push(std::move(input))) {
             queuedBytes.fetch_sub(bytes,std::memory_order_relaxed);
-            if(!command) {drops++;overload();}
+            if(!command) overload(byteLimit ? MLG_REJECT_QUEUE_BYTES : MLG_REJECT_QUEUE_ITEMS);
             return false;
         }
         dispatch_semaphore_signal(wake);return true;
@@ -471,7 +475,18 @@ struct Recorder {
             if(![[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:&error]) fail("Recording folder cannot be created");
         }
         for(;;) {
-            if(overflow.exchange(false)) { @autoreleasepool {fail("Recorder queue overloaded; recording stopped and streaming continues");} }
+            if(uint32_t reason=overflow.exchange(0)) {
+                @autoreleasepool {
+                    const char* message=reason==MLG_REJECT_FRAGMENT_LIMIT ? "Recording frame exceeds 65,536 fragments; streaming continues" :
+                        reason==MLG_REJECT_FRAME_BYTES ? "Recording frame exceeds the 32 MB capture limit; streaming continues" :
+                        reason==MLG_REJECT_QUEUE_BYTES ? "Recorder queue exceeded its 32 MB budget; recording stopped and streaming continues" :
+                        reason==MLG_REJECT_MEMORY ? "Recorder could not allocate capture memory; streaming continues" :
+                        reason==MLG_REJECT_INVALID_FRAME ? "Recorder received invalid frame fragments; streaming continues" :
+                        "Recorder event queue congested (256-item limit); recording stopped and streaming continues";
+                    fprintf(stderr,"MoonlightLG recorder rejection %u: queued bytes %zu, dropped %llu: %s\n",reason,queuedBytes.load(),(unsigned long long)drops.load(),message);
+                    fail(message);
+                }
+            }
             std::unique_ptr<Input> input;
             if(!pop(input)) {
                 if(quit.load()) break;
@@ -521,10 +536,15 @@ void command(void* p,uint32_t c) {
 uint32_t interest(void* p) {return static_cast<Recorder*>(p)->interest.load(std::memory_order_relaxed);}
 int videoImpl(void* p,const MLGRecorderChunk* chunks,size_t count,uint32_t rtp,uint64_t clock,int key) {
     auto self=static_cast<Recorder*>(p); if(!(interest(p)&1)) return 0;
-    if(count>MLG_RECORDER_MAX_CHUNKS) {self->overload();return 0;}
-    size_t size=0; for(size_t i=0;i<count;i++) {if(chunks[i].size>MaxIngress-size) {self->overload();return 0;}size+=chunks[i].size;}
+    if(count>MLG_RECORDER_MAX_CHUNKS) {self->overload(MLG_REJECT_FRAGMENT_LIMIT);return 0;}
+    if(count && !chunks) {self->overload(MLG_REJECT_INVALID_FRAME);return 0;}
+    size_t size=0; for(size_t i=0;i<count;i++) {
+        if(chunks[i].size>MaxIngress-size) {self->overload(MLG_REJECT_FRAME_BYTES);return 0;}
+        if(chunks[i].size && !chunks[i].bytes) {self->overload(MLG_REJECT_INVALID_FRAME);return 0;}
+        size+=chunks[i].size;
+    }
     auto input=std::make_unique<Input>();input->kind=1;input->rtp=rtp;input->clock=clock;input->key=key;input->data.reserve(size);
-    for(size_t i=0;i<count;i++) {auto b=static_cast<const uint8_t*>(chunks[i].bytes);input->data.insert(input->data.end(),b,b+chunks[i].size);}
+    for(size_t i=0;i<count;i++) {if(!chunks[i].size) continue;auto b=static_cast<const uint8_t*>(chunks[i].bytes);input->data.insert(input->data.end(),b,b+chunks[i].size);}
     return self->enqueue(std::move(input),size);
 }
 int pixelImpl(void* p,void* cv,uint32_t rtp,uint64_t clock,int hdr) {
@@ -535,24 +555,25 @@ int pixelImpl(void* p,void* cv,uint32_t rtp,uint64_t clock,int hdr) {
 }
 int audioImpl(void* p,const void* bytes,size_t size,uint64_t clock) {
     auto self=static_cast<Recorder*>(p);if(!(interest(p)&4)) return 0;
-    if(size>65536) {self->overload();return 0;}
+    if(size>65536) {self->overload(MLG_REJECT_FRAME_BYTES);return 0;}
     auto input=std::make_unique<Input>();input->kind=3;input->clock=clock;
     auto data=static_cast<const uint8_t*>(bytes);if(size) input->data.assign(data,data+size);return self->enqueue(std::move(input),size);
 }
 int video(void* p,const MLGRecorderChunk* chunks,size_t count,uint32_t rtp,uint64_t clock,int key) {
-    try {return videoImpl(p,chunks,count,rtp,clock,key);} catch(...) {static_cast<Recorder*>(p)->overload();return 0;}
+    try {return videoImpl(p,chunks,count,rtp,clock,key);} catch(...) {static_cast<Recorder*>(p)->overload(MLG_REJECT_MEMORY);return 0;}
 }
 int pixel(void* p,void* cv,uint32_t rtp,uint64_t clock,int hdr) {
-    try {return pixelImpl(p,cv,rtp,clock,hdr);} catch(...) {static_cast<Recorder*>(p)->overload();return 0;}
+    try {return pixelImpl(p,cv,rtp,clock,hdr);} catch(...) {static_cast<Recorder*>(p)->overload(MLG_REJECT_MEMORY);return 0;}
 }
 int audio(void* p,const void* data,size_t size,uint64_t clock) {
-    try {return audioImpl(p,data,size,clock);} catch(...) {static_cast<Recorder*>(p)->overload();return 0;}
+    try {return audioImpl(p,data,size,clock);} catch(...) {static_cast<Recorder*>(p)->overload(MLG_REJECT_MEMORY);return 0;}
 }
 void status(void* p,MLGRecorderStatus* out) {
     auto self=static_cast<Recorder*>(p);if(!out||out->size!=sizeof(*out)) return;
     std::lock_guard<std::mutex> l(self->statusMutex);*out=self->current;
 }
-const MLGRecorderAPI api={sizeof(api),MLG_RECORDER_ABI,create,destroy,command,interest,video,pixel,audio,status};
+void reject(void* p,uint32_t reason) {static_cast<Recorder*>(p)->overload(reason ? reason : uint32_t(MLG_REJECT_INVALID_FRAME));}
+const MLGRecorderAPI api={sizeof(api),MLG_RECORDER_ABI,create,destroy,command,interest,video,pixel,audio,status,reject};
 }
 extern "C" __attribute__((visibility("default"))) const MLGRecorderAPI* MoonlightLGRecorderGetAPI(uint32_t version) {
     return version==MLG_RECORDER_ABI ? &api : nullptr;

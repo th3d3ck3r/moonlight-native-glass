@@ -4,6 +4,7 @@
 #include "nativeoverlay.h"
 #include "../../recording/RecorderABI.h"
 #include "../../recording/KeyframeRecovery.h"
+#include "../../recording/FragmentCollector.h"
 #include <SDL.h>
 #include <dlfcn.h>
 #include <atomic>
@@ -113,12 +114,12 @@ void nativeRecorderVideo(PDECODE_UNIT du) {
     if(!(wanted.load(std::memory_order_acquire)&1)) return;
     std::shared_lock<std::shared_mutex> lock(lifetime,std::try_to_lock);
     if(!lock || !instance) return;
-    MLGRecorderChunk chunks[MLG_RECORDER_MAX_CHUNKS];size_t count=0;
-    for(PLENTRY p=du->bufferList;p;p=p->next) {
-        if(count==MLG_RECORDER_MAX_CHUNKS) {api->video(instance,nullptr,count+1,du->rtpTimestamp,du->receiveTimeUs,du->frameType==FRAME_TYPE_IDR);return;}
-        chunks[count++]={p->data,size_t(p->length)};
-    }
-    api->video(instance,chunks,count,du->rtpTimestamp,du->receiveTimeUs,du->frameType==FRAME_TYPE_IDR);
+    // Keyframes can span hundreds/thousands of network fragments. Preserve
+    // payload bounds without treating a 129-fragment frame as queue overload.
+    thread_local mlg::FragmentCollector collector;
+    const auto frame=collector.collect(du->bufferList);
+    if(frame.error) {api->reject(instance,frame.error);return;}
+    api->video(instance,frame.chunks,frame.count,du->rtpTimestamp,du->receiveTimeUs,du->frameType==FRAME_TYPE_IDR);
 }
 void nativeRecorderPixel(const AVFrame* frame) {
     if(!(wanted.load(std::memory_order_acquire)&2)) return;

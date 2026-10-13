@@ -11,10 +11,11 @@
 #include <cstdio>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
 static const MLGRecorderAPI* api;
 static void pauseMs(unsigned ms) {std::this_thread::sleep_for(std::chrono::milliseconds(ms));}
 static MLGRecorderStatus state(void* r) {MLGRecorderStatus s{};s.size=sizeof(s);api->status(r,&s);return s;}
-struct Source {void* recorder;std::vector<uint8_t> annex,keyBytes;};
+struct Source {void* recorder;std::vector<uint8_t> annex,keyBytes;bool fragmentedKeySeen=false;};
 static void output(void* ref,void*,OSStatus error,VTEncodeInfoFlags,CMSampleBufferRef sample) {
     assert(!error && sample);auto source=static_cast<Source*>(ref);
     auto& bytes=source->annex;bytes.clear();
@@ -28,10 +29,17 @@ static void output(void* ref,void*,OSStatus error,VTEncodeInfoFlags,CMSampleBuff
     for(size_t i=0;i+4<=size;) {size_t n=(size_t(payload[i])<<24)|(size_t(payload[i+1])<<16)|(size_t(payload[i+2])<<8)|payload[i+3];i+=4;assert(n<=size-i);bytes.insert(bytes.end(),{0,0,0,1});bytes.insert(bytes.end(),payload.begin()+i,payload.begin()+i+n);i+=n;}
     CFArrayRef attachments=CMSampleBufferGetSampleAttachmentsArray(sample,false);
     bool key=!attachments||CFArrayGetCount(attachments)==0||CFDictionaryGetValue((CFDictionaryRef)CFArrayGetValueAtIndex(attachments,0),kCMSampleAttachmentKey_NotSync)!=kCFBooleanTrue;
-    if(key) source->keyBytes=bytes;
+    if(key) {
+        // Valid filler NAL ensures the keyframe spans >128 fragments even for
+        // the flat-color fixture. Previously this falsely reported queue-full.
+        bytes.insert(bytes.end(),{0,0,0,1,0x0c});bytes.insert(bytes.end(),4096,0xff);bytes.push_back(0x80);
+        source->keyBytes=bytes;
+    }
     uint32_t rtp=uint32_t(CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(sample),90000,kCMTimeRoundingMethod_Default).value);
-    MLGRecorderChunk chunk={bytes.data(),bytes.size()};
-    api->video(source->recorder,&chunk,1,rtp,1000000+uint64_t(rtp)*1000000/90000,key);
+    size_t count=std::min(size_t(1024),bytes.size());std::vector<MLGRecorderChunk> chunks;
+    for(size_t i=0;i<count;i++) {size_t start=bytes.size()*i/count,end=bytes.size()*(i+1)/count;chunks.push_back({bytes.data()+start,end-start});}
+    if(key && count>128) source->fragmentedKeySeen=true;
+    assert(api->video(source->recorder,chunks.data(),chunks.size(),rtp,1000000+uint64_t(rtp)*1000000/90000,key));
 }
 static void verify(NSString* file,bool audio) {
     AVURLAsset* asset=[AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:file] options:nil];
@@ -55,7 +63,7 @@ static void verify(NSString* file,bool audio) {
 int main(int argc,char** argv) {
     @autoreleasepool {
         assert(argc==3);void* library=dlopen(argv[1],RTLD_NOW|RTLD_LOCAL);if(!library) {fprintf(stderr,"%s\n",dlerror());return 1;}
-        auto entry=reinterpret_cast<MLGRecorderEntry>(dlsym(library,"MoonlightLGRecorderGetAPI"));assert(entry && !entry(999) && !entry(2));api=entry(MLG_RECORDER_ABI);assert(api && api->size==sizeof(*api));
+        auto entry=reinterpret_cast<MLGRecorderEntry>(dlsym(library,"MoonlightLGRecorderGetAPI"));assert(entry && !entry(999) && !entry(2) && !entry(3));api=entry(MLG_RECORDER_ABI);assert(api && api->size==sizeof(*api));
         NSString* dir=[NSString stringWithUTF8String:argv[2]];
         [[NSFileManager defaultManager] removeItemAtPath:dir error:nullptr];
         MLGRecorderConfig cfg{};cfg.size=sizeof(cfg);cfg.abi=MLG_RECORDER_ABI;cfg.codec=1;cfg.width=640;cfg.height=360;cfg.fps=60;cfg.memory_megabytes=16;cfg.directory=argv[2];
@@ -86,7 +94,7 @@ int main(int argc,char** argv) {
             pauseMs(16);
         }
         CFRelease(image);VTCompressionSessionInvalidate(encoder);CFRelease(encoder);opus_encoder_destroy(opus);
-        pauseMs(300);auto s=state(recorder);fprintf(stderr,"Source status: %s, drops %llu\n",s.message,(unsigned long long)s.dropped);assert(!s.failed && s.recording && s.replay_ready);
+        pauseMs(300);auto s=state(recorder);fprintf(stderr,"Source status: %s, drops %llu\n",s.message,(unsigned long long)s.dropped);assert(!s.failed && s.recording && s.replay_ready && !s.waiting_keyframe && source.fragmentedKeySeen);
         api->command(recorder,2);pauseMs(100);api->command(recorder,1);pauseMs(100);api->destroy(recorder);
         unsigned recordings=0;for(NSString* file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nullptr]) if([file.pathExtension isEqual:@"mov"]) {verify([dir stringByAppendingPathComponent:file],true);recordings++;}assert(recordings==2);
         // Record/stop/record with replay OFF and a timestamp gap. The second
@@ -129,7 +137,12 @@ int main(int argc,char** argv) {
         // Bounded overload fails closed without crashing the ingress caller.
         cfg.mode=0;cfg.replay_seconds=30;recorder=api->create(&cfg);assert(recorder);
         MLGRecorderChunk oversized={nullptr,size_t(33)*1024*1024};api->video(recorder,&oversized,1,0,0,1);pauseMs(100);
-        assert(state(recorder).failed && !api->interest(recorder));api->destroy(recorder);
+        assert(state(recorder).failed && !api->interest(recorder));
+        assert(strstr(state(recorder).message,"frame exceeds"));api->destroy(recorder);
+        recorder=api->create(&cfg);api->reject(recorder,MLG_REJECT_FRAGMENT_LIMIT);pauseMs(100);
+        assert(state(recorder).failed && strstr(state(recorder).message,"fragments"));api->destroy(recorder);
+        recorder=api->create(&cfg);api->reject(recorder,MLG_REJECT_QUEUE_ITEMS);pauseMs(100);
+        assert(state(recorder).failed && strstr(state(recorder).message,"event queue"));api->destroy(recorder);
         // Failure is isolated: an unwritable destination does not abort callers.
         cfg.directory="/dev/null/MoonlightLG";recorder=api->create(&cfg);pauseMs(100);assert(state(recorder).failed);api->destroy(recorder);
         // Match the host: retain the module through process exit so system
