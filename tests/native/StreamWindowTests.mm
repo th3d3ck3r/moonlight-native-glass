@@ -28,27 +28,33 @@ static NSString* const restoreName = @"com.moonlight-stream.NativeGlass.restoreS
 static void check(bool value, const char* message) {
     if (!value) { std::fprintf(stderr, "FAIL: %s\n", message); std::exit(1); }
 }
-static void pump(double seconds = 0.3) {
-    // A cursor left over from a different fixture can land on the green widget
-    // as windows move/restore, opening Tahoe's remote tiling menu and blocking
-    // this noninteractive fixture in a nested AppKit loop. Park it in content
-    // and send real AppKit motion so delayed hover tracking sees the departure.
-    // Relative-motion tests keep their pointer/routing untouched. The separate
-    // fullscreen fixture explicitly covers native green-button entry and hover.
+static Uint32 fixtureStreamWindowID=0;
+static void parkFixturePointer() {
+    // Focus can be temporarily nil during hide/restore. Resolve the still-live
+    // fixture window by ID so a delayed green-widget hover cannot survive it.
     SDL_Window* focus=SDL_GetKeyboardFocus();
-    if (focus && !SDL_GetRelativeMouseMode() && ![NSEvent pressedMouseButtons]) {
+    if (!focus && fixtureStreamWindowID) focus=SDL_GetWindowFromID(fixtureStreamWindowID);
+    if (!focus || [NSEvent pressedMouseButtons]) return;
+    if (!SDL_GetRelativeMouseMode()) {
         int width,height; SDL_GetWindowSize(focus,&width,&height);
         SDL_WarpMouseInWindow(focus,width/2,height/2);
-        SDL_SysWMinfo info; SDL_VERSION(&info.version);
-        if (SDL_GetWindowWMInfo(focus,&info)) {
-            NSWindow* window=info.info.cocoa.window;
-            NSPoint point=[window.contentView convertPoint:NSMakePoint(NSMidX(window.contentView.bounds),NSMidY(window.contentView.bounds)) toView:nil];
-            NSEvent* motion=[NSEvent mouseEventWithType:NSEventTypeMouseMoved location:point modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil eventNumber:0 clickCount:0 pressure:0];
-            [NSApp postEvent:motion atStart:YES];
-        }
     }
+    // Native zero-delta motion cancels stale hover even in relative mode;
+    // physical pointer/routing stay untouched for the 13/-7 motion assertions.
+    SDL_SysWMinfo info; SDL_VERSION(&info.version);
+    if (SDL_GetWindowWMInfo(focus,&info)) {
+        NSWindow* window=info.info.cocoa.window;
+        NSPoint point=[window.contentView convertPoint:NSMakePoint(NSMidX(window.contentView.bounds),NSMidY(window.contentView.bounds)) toView:nil];
+        NSEvent* motion=[NSEvent mouseEventWithType:NSEventTypeMouseMoved location:point modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil eventNumber:0 clickCount:0 pressure:0];
+        [NSApp postEvent:motion atStart:YES];
+    }
+}
+static void pump(double seconds = 0.3) {
+    // Only the general fixture parks its cursor. FullscreenWindowTests still
+    // explicitly exercises actual green-button entry and top-edge hover.
     NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:seconds];
     do {
+        parkFixturePointer();
         SDL_PumpEvents();
         [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
         SDL_Event restore;
@@ -170,6 +176,7 @@ int main(int argc, char** argv) {
         check(NSApp.windows.count == before, "Restore created a window without an existing stream");
         SDL_Window* window = SDL_CreateWindow("Stream lifecycle fixture", 100, 100, 640, 360, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
         check(window != nullptr, "SDL window creation failed");
+        fixtureStreamWindowID=SDL_GetWindowID(window);
         NSWindow* nativeWindow = cocoa(window);
         [NSApp activateIgnoringOtherApps:YES];
         [nativeWindow makeKeyAndOrderFront:nil];
@@ -647,6 +654,7 @@ int main(int argc, char** argv) {
         check(width == 720 && height == 400, "Delegate forwarding broke SDL resizing");
         SDL_FlushEvent(nativeOverlayEventType());
         check(nativeConfirmDisconnectAndExit(window),"Teardown fixture must own an open stream confirmation"); pump();
+        fixtureStreamWindowID=0;
         SDL_DestroyWindow(window);
         pump();
         check(!nativeStreamDisconnectConfirmationVisible(),"Stream teardown must release its confirmation");
