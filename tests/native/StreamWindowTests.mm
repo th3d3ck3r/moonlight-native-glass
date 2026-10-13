@@ -29,6 +29,24 @@ static void check(bool value, const char* message) {
     if (!value) { std::fprintf(stderr, "FAIL: %s\n", message); std::exit(1); }
 }
 static void pump(double seconds = 0.3) {
+    // A cursor left over from a different fixture can land on the green widget
+    // as windows move/restore, opening Tahoe's remote tiling menu and blocking
+    // this noninteractive fixture in a nested AppKit loop. Park it in content
+    // and send real AppKit motion so delayed hover tracking sees the departure.
+    // Relative-motion tests keep their pointer/routing untouched. The separate
+    // fullscreen fixture explicitly covers native green-button entry and hover.
+    SDL_Window* focus=SDL_GetKeyboardFocus();
+    if (focus && !SDL_GetRelativeMouseMode() && ![NSEvent pressedMouseButtons]) {
+        int width,height; SDL_GetWindowSize(focus,&width,&height);
+        SDL_WarpMouseInWindow(focus,width/2,height/2);
+        SDL_SysWMinfo info; SDL_VERSION(&info.version);
+        if (SDL_GetWindowWMInfo(focus,&info)) {
+            NSWindow* window=info.info.cocoa.window;
+            NSPoint point=[window.contentView convertPoint:NSMakePoint(NSMidX(window.contentView.bounds),NSMidY(window.contentView.bounds)) toView:nil];
+            NSEvent* motion=[NSEvent mouseEventWithType:NSEventTypeMouseMoved location:point modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil eventNumber:0 clickCount:0 pressure:0];
+            [NSApp postEvent:motion atStart:YES];
+        }
+    }
     NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:seconds];
     do {
         SDL_PumpEvents();
