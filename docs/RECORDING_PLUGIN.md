@@ -28,7 +28,7 @@ The reviewed changes relative to the checkpoint are:
   pacing, renderer implementation, or stock preference schema are changed.
 
 The plugin is independent of the displayed window geometry. It does not capture the
-screen, titlebar, startup animation or control center. Mouse work remains deferred.
+screen, titlebar, startup animation or control center. Mouse work remains deferred. Record / Stop and Save Replay are also available in the menu-bar menu for fullscreen or hidden windows.
 
 ## Modes and files
 

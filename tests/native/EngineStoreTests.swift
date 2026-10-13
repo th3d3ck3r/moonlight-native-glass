@@ -228,9 +228,9 @@ func nativeArgument(_ name: String) -> String? { nil }
         }
         delayed.message = nil // Clear the earlier deliberately rejected launch.
         try await wait { delayed.streamWindowExists }
-        for action in [213, 214, 212, 209, 216] { delayed.menuAction(action) }
+        for action in [213, 214, 212, 209, 216, 217, 219] { delayed.menuAction(action) }
         let actionFile = delayedHelper.deletingLastPathComponent().appendingPathComponent("menu-actions")
-        try await wait { (try? String(contentsOf: actionFile, encoding: .utf8))?.contains("216") == true }
+        try await wait { (try? String(contentsOf: actionFile, encoding: .utf8))?.contains("219") == true }
         try await Task.sleep(for: .seconds(4))
         precondition(delayed.message == nil,"Acknowledged menu commands must not trigger a timeout")
         delayed.message = nil

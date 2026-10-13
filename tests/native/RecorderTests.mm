@@ -13,7 +13,7 @@
 static const MLGRecorderAPI* api;
 static void pauseMs(unsigned ms) {std::this_thread::sleep_for(std::chrono::milliseconds(ms));}
 static MLGRecorderStatus state(void* r) {MLGRecorderStatus s{};s.size=sizeof(s);api->status(r,&s);return s;}
-struct Source {void* recorder;std::vector<uint8_t> annex;};
+struct Source {void* recorder;std::vector<uint8_t> annex,keyBytes;};
 static void output(void* ref,void*,OSStatus error,VTEncodeInfoFlags,CMSampleBufferRef sample) {
     assert(!error && sample);auto source=static_cast<Source*>(ref);
     auto& bytes=source->annex;bytes.clear();
@@ -27,6 +27,7 @@ static void output(void* ref,void*,OSStatus error,VTEncodeInfoFlags,CMSampleBuff
     for(size_t i=0;i+4<=size;) {size_t n=(size_t(payload[i])<<24)|(size_t(payload[i+1])<<16)|(size_t(payload[i+2])<<8)|payload[i+3];i+=4;assert(n<=size-i);bytes.insert(bytes.end(),{0,0,0,1});bytes.insert(bytes.end(),payload.begin()+i,payload.begin()+i+n);i+=n;}
     CFArrayRef attachments=CMSampleBufferGetSampleAttachmentsArray(sample,false);
     bool key=!attachments||!CFDictionaryContainsKey((CFDictionaryRef)CFArrayGetValueAtIndex(attachments,0),kCMSampleAttachmentKey_NotSync);
+    if(key) source->keyBytes=bytes;
     uint32_t rtp=uint32_t(CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(sample),90000,kCMTimeRoundingMethod_Default).value);
     MLGRecorderChunk chunk={bytes.data(),bytes.size()};
     api->video(source->recorder,&chunk,1,rtp,1000000+uint64_t(rtp)*1000000/90000,key);
@@ -80,15 +81,47 @@ int main(int argc,char** argv) {
         pauseMs(300);auto s=state(recorder);fprintf(stderr,"Source status: %s, drops %llu\n",s.message,(unsigned long long)s.dropped);assert(!s.failed && s.recording && s.replay_ready);
         api->command(recorder,2);pauseMs(100);api->command(recorder,1);pauseMs(100);api->destroy(recorder);
         unsigned recordings=0;for(NSString* file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nullptr]) if([file.pathExtension isEqual:@"mov"]) {verify([dir stringByAppendingPathComponent:file],true);recordings++;}assert(recordings==2);
+        // Record/stop/record with replay OFF and a timestamp gap. The second
+        // audio decoder must re-anchor rather than omit audio until it catches up.
+        cfg.replay_seconds=0;
+        recorder=api->create(&cfg);assert(recorder);
+        for(unsigned phase=0;phase<2;phase++) {
+            api->command(recorder,1);pauseMs(100);
+            opus=opus_encoder_create(48000,2,OPUS_APPLICATION_AUDIO,&err);assert(opus&&!err);
+            unsigned packets=0;unsigned base=phase?600:0;
+            for(unsigned i=0;i<120;i++) {
+                MLGRecorderChunk chunk={source.keyBytes.data(),source.keyBytes.size()};
+                api->video(recorder,&chunk,1,(base+i)*1500,1000000+uint64_t(base+i)*1000000/60,1);
+                while(packets*20<=(i+1)*1000/60) {int size=opus_encode_float(opus,pcm.data(),960,packet,sizeof(packet));assert(size>0);api->audio(recorder,packet,size,1000000+uint64_t(base)*1000000/60+packets*20000);packets++;pauseMs(2);}
+                pauseMs(16);
+            }
+            opus_encoder_destroy(opus);api->command(recorder,1);pauseMs(200);assert(!state(recorder).failed && !api->interest(recorder));
+        }
+        api->destroy(recorder);
+        recordings=0;for(NSString* file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nullptr]) if([file.pathExtension isEqual:@"mov"]) {verify([dir stringByAppendingPathComponent:file],true);recordings++;}assert(recordings==4);
         // Hardware path: one encoder, a replay buffer and a manual writer.
         cfg.mode=1;cfg.output_codec=2;cfg.output_width=320;cfg.output_height=180;cfg.output_fps=30;cfg.bitrate=5000000;cfg.audio_channels=0;cfg.replay_seconds=30;
         recorder=api->create(&cfg);assert(recorder);api->command(recorder,1);pauseMs(100);
         assert(!CVPixelBufferCreate(nullptr,640,360,kCVPixelFormatType_32BGRA,(__bridge CFDictionaryRef)@{(__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey:@{}},&image));
         for(unsigned i=0;i<180;i++) {api->pixel(recorder,image,i*1500,1000000+i*16667,0);pauseMs(17);}
         s=state(recorder);fprintf(stderr,"Hardware status: %s\n",s.message);
-        if(!s.failed) {assert(s.replay_ready);api->command(recorder,2);pauseMs(100);}
+        bool hardware=!s.failed;
+        if(hardware) {assert(s.replay_ready);api->command(recorder,2);pauseMs(100);}
         else assert(strstr(s.message,"Hardware") || strstr(s.message,"hardware"));
         CFRelease(image);api->destroy(recorder);
+        if(hardware) {
+            unsigned count=0;
+            for(NSString* file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nullptr]) if([file.pathExtension isEqual:@"mov"]) {
+                NSString* path=[dir stringByAppendingPathComponent:file];
+                AVAssetTrack* track=[[AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:path] options:nil] tracksWithMediaType:AVMediaTypeVideo].firstObject;
+                if(track.naturalSize.width==320) {verify(path,false);assert(track.naturalSize.height==180 && track.nominalFrameRate<=31);count++;}
+            }
+            assert(count==2);
+        }
+        // Bounded overload fails closed without crashing the ingress caller.
+        cfg.mode=0;cfg.replay_seconds=30;recorder=api->create(&cfg);assert(recorder);
+        MLGRecorderChunk oversized={nullptr,size_t(33)*1024*1024};api->video(recorder,&oversized,1,0,0,1);pauseMs(100);
+        assert(state(recorder).failed && !api->interest(recorder));api->destroy(recorder);
         // Failure is isolated: an unwritable destination does not abort callers.
         cfg.directory="/dev/null/MoonlightLG";recorder=api->create(&cfg);pauseMs(100);assert(state(recorder).failed);api->destroy(recorder);
         dlclose(library);

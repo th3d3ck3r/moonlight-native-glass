@@ -238,11 +238,11 @@ static MLStreamTitlebar* titlebar;
     if (self.overflow.superview!=self.row) [self.row addSubview:self.overflow];
 }
 - (void)showOverflow:(NSButton*)sender {
-    NSMenu* menu=[[[NSMenu alloc] initWithTitle:@"Stream Controls"] autorelease];
+    NSMenu* menu=[[[NSMenu alloc] initWithTitle:@"Stream Controls"] autorelease]; menu.autoenablesItems=NO;
     for (NSToolbarItem* item in self.toolbar.items) {
         if (!item.menuFormRepresentation) continue;
         NSMenuItem* command=[[item.menuFormRepresentation copy] autorelease];
-        command.image=((NSButton*)item.view).image;
+        command.image=((NSButton*)item.view).image; command.enabled=((NSButton*)item.view).enabled;
         [menu addItem:command];
     }
     [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0,NSMinY(sender.bounds)) inView:sender];

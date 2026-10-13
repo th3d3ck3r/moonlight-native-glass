@@ -91,6 +91,9 @@ import Combine
         }
         let mode = NSMenuItem(title: "Window Mode (Next Stream)", action: nil, keyEquivalent: ""); mode.submenu = modes; mode.isEnabled = state.exists; menu.addItem(mode)
         entry(state.muted ? "Unmute Stream Audio" : "Mute Stream Audio", 207, state.exists)
+        let recording = UserDefaults(suiteName: "com.moonlight-stream.NativeGlass.Recording")!
+        entry("Record / Stop", 217, state.exists && state.token?.isEmpty == false && recording.bool(forKey: "enabled"))
+        entry("Save Instant Replay", 219, state.exists && state.token?.isEmpty == false && recording.bool(forKey: "enabled") && recording.bool(forKey: "replay"))
         menu.addItem(.separator())
         entry("Disconnect", 212, state.exists)
         entry("Disconnect and Exit Host Game…", 209, state.exists)

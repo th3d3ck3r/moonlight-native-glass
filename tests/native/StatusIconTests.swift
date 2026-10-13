@@ -71,7 +71,7 @@ import Combine
         precondition(button.image === fullMoon, "Rebinding must preserve state observation")
         // No stream: app actions stay available, all stream actions are disabled.
         let idleMenu = menu.makeMenu()
-        for tag in [200, 100, 201, 203, 207, 209, 212] {
+        for tag in [200, 100, 201, 203, 207, 209, 212, 217, 219] {
             precondition(idleMenu.items.first { $0.tag == tag }?.isEnabled == false)
         }
         precondition(idleMenu.items.first { $0.title == "Open Library" }?.isEnabled == true)
@@ -90,6 +90,16 @@ import Combine
         menu.menuAction(connectedMenu.items.first { $0.title == "Open Library" }!)
         menu.menuAction(connectedMenu.items.first { $0.title == "Disconnect" }!)
         precondition(actions == [202, 208, 212] && libraries == 1)
+        let recording = UserDefaults(suiteName: "com.moonlight-stream.NativeGlass.Recording")!
+        let previousEnabled = recording.object(forKey: "enabled"), previousReplay = recording.object(forKey: "replay")
+        defer { recording.set(previousEnabled, forKey: "enabled"); recording.set(previousReplay, forKey: "replay") }
+        recording.set(true, forKey: "enabled"); recording.set(true, forKey: "replay")
+        let recordMenu = menu.makeMenu()
+        for tag in [217, 219] {
+            let command = recordMenu.items.first { $0.tag == tag }!; precondition(command.isEnabled)
+            menu.menuAction(command)
+        }
+        precondition(Array(actions.suffix(2)) == [217, 219], "Recording commands remain available without a titlebar")
         let exitItem = connectedMenu.items.first { $0.tag == 209 }!
         let beforeExit = actions.count
         menu.menuAction(exitItem)
@@ -109,7 +119,7 @@ import Combine
         precondition(NSApp.windows.count == windowCount, "Idle status item must not create a preview window")
         menu.state = NativeMenuState()
         let finalMenu = menu.makeMenu()
-        for tag in [200, 100, 201, 203, 207, 209, 212] {
+        for tag in [200, 100, 201, 203, 207, 209, 212, 217, 219] {
             precondition(finalMenu.items.first { $0.tag == tag }?.isEnabled == false)
         }
         precondition(finalMenu.items.first { $0.title == "Settings…" }?.isEnabled == true)
