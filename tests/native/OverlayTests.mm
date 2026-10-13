@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 static void check(bool okay,const char* message) { if (!okay) { fprintf(stderr,"FAIL: %s\n",message); exit(1); } }
-static void pump() { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:.2]; while (end.timeIntervalSinceNow>0) { SDL_PumpEvents(); [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; } }
+static void pump(double seconds=.2) { NSDate* end=[NSDate dateWithTimeIntervalSinceNow:seconds]; while (end.timeIntervalSinceNow>0) { SDL_PumpEvents(); [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]]; } }
 #include "TitlebarFixture.h"
 static bool hasLabel(NSView* view, NSString* text) {
     if ([view isKindOfClass:NSTextField.class] && [((NSTextField*)view).stringValue containsString:text]) return true;
@@ -68,14 +68,17 @@ int main(int argc,char** argv) { @autoreleasepool {
     BOOL originalTransparency=window.titlebarAppearsTransparent;
     NSColor* originalBackground=window.backgroundColor;
     NSTitlebarSeparatorStyle originalSeparator=window.titlebarSeparatorStyle;
+    NSWindowStyleMask originalStyle=window.styleMask;
+    NSRect originalFrame=window.frame;
     nativeOverlayAttach(window,"overlay-test"); check(nativeOverlayEventType()!=SDL_USEREVENT,"Must not consume upstream SDL user events");
     pump();
     check(titlebarRoot(window)!=nil && window.toolbar==nil && window.titleVisibility==NSWindowTitleHidden,"Slim native title row installed without a tall toolbar");
     CGFloat slimChrome=window.frame.size.height-window.contentLayoutRect.size.height;
     fprintf(stderr,"Titlebar chrome: original=%.1f slim=%.1f points\n",stockChrome,slimChrome);
     check(slimChrome<=32 && slimChrome<=stockChrome+1,"Slim controls must stay in the original title row and preserve drawable geometry");
+    check((window.styleMask & NSWindowStyleMaskFullSizeContentView) && NSEqualRects(originalFrame,window.frame),"Video must extend under the title overlay without moving the window");
     NSView* backdrop=titlebarBackground(window);
-    check(window.titlebarSeparatorStyle==NSTitlebarSeparatorStyleNone && backdrop && backdrop.frame.size.width==window.frame.size.width && backdrop.frame.size.height==slimChrome,"Rounded surface must span the full bar, including traffic lights");
+    check(window.titlebarSeparatorStyle==NSTitlebarSeparatorStyleNone && backdrop && backdrop.frame.size.width==window.frame.size.width && backdrop.frame.size.height>=24 && backdrop.frame.size.height<=32,"Rounded surface must span the full bar, including traffic lights");
     check([backdrop hitTest:NSMakePoint(10,10)]==nil,"Decorative rounded background must pass all mouse input through");
     check(titlebarButton(window,@"NativeHost") && titlebarButton(window,@"NativeCapture") && titlebarButton(window,@"NativeStatistics") && titlebarButton(window,@"NativeConnection"),"Required title-bar controls");
     check(!titlebarButton(window,@"NativeControllerBattery"),"Controller indicator hidden when none connected");
@@ -95,8 +98,21 @@ int main(int argc,char** argv) { @autoreleasepool {
     check(!replayButton.enabled && [replayButton.toolTip containsString:@"Saving"],"Replay save prevents duplicate exports");
     nativeTitlebarSetRecording(false,false,false,false,false,false,0,"Disabled"); pump();
     check(!recordButton.enabled && !replayButton.enabled,"Disabled recorder controls");
+    NSRect videoBounds=window.contentView.bounds, videoFrame=window.contentView.frame;
+    int drawableWidth,drawableHeight; SDL_GL_GetDrawableSize(stream,&drawableWidth,&drawableHeight);
     nativeTitlebarSetCapture(true); pump(); check([captureButton.toolTip containsString:@"captured by host"],"Capture state refresh");
+    check(titlebarRoot(window).hiddenOrHasHiddenAncestor && backdrop.hidden && !window.movable && [window standardWindowButton:NSWindowCloseButton].hiddenOrHasHiddenAncestor,"Captured stream must have no visible or draggable title chrome");
+    NSPoint top=NSMakePoint(NSMidX(window.contentView.bounds),NSMaxY(window.contentView.bounds)-10);
+    NSView* hit=[window.contentView.superview hitTest:[window.contentView convertPoint:top toView:window.contentView.superview]];
+    check(hit && (hit==window.contentView || [hit isDescendantOf:window.contentView]),"Hidden title buttons must not intercept the video region");
+    for (int i=0;i<4;++i) { nativeTitlebarSetCapture(false); pump(); nativeTitlebarSetCapture(true); pump(); }
     nativeTitlebarSetCapture(false); pump(); check([captureButton.toolTip containsString:@"released to Mac"],"Capture release refresh");
+    check(!titlebarRoot(window).hiddenOrHasHiddenAncestor && !backdrop.hidden && backdrop.alphaValue==1 && window.movable,"Intentional release must restore all title controls and dragging");
+    int afterWidth,afterHeight; SDL_GL_GetDrawableSize(stream,&afterWidth,&afterHeight);
+    check(NSEqualRects(videoBounds,window.contentView.bounds) && NSEqualRects(videoFrame,window.contentView.frame) && NSEqualRects(originalFrame,window.frame) && drawableWidth==afterWidth && drawableHeight==afterHeight,"Capture changes must not resize or shift the video/drawable/window");
+    // Releasing during the fade must defeat its stale completion callback.
+    nativeTitlebarSetCapture(true); pump(.02); nativeTitlebarSetCapture(false); pump();
+    check(!backdrop.hidden && backdrop.alphaValue==1,"A previous hide must not hide freshly released controls");
     NSButton* connectionButton=titlebarButton(window,@"NativeConnection");
     nativeTitlebarSetConnection(NativeConnectionState::Connecting); pump(); check([connectionButton.toolTip containsString:@"Connecting"],"Connecting state");
     nativeTitlebarSetConnection(NativeConnectionState::Connected); pump(); check([connectionButton.toolTip containsString:@"No connection warning"],"Connected state");
@@ -125,6 +141,8 @@ int main(int argc,char** argv) { @autoreleasepool {
     NSString* titlebarOut=argc>1 ? [NSString stringWithUTF8String:argv[1]] : @"/tmp/native-overlay-previews";
     [[NSFileManager defaultManager] createDirectoryAtPath:titlebarOut withIntermediateDirectories:YES attributes:nil error:nil];
     capture([titlebarOut stringByAppendingPathComponent:@"titlebar-slim-dark.png"]);
+    nativeTitlebarSetCapture(true); pump(); capture([titlebarOut stringByAppendingPathComponent:@"titlebar-captured-hidden.png"]);
+    nativeTitlebarSetCapture(false); pump(); capture([titlebarOut stringByAppendingPathComponent:@"titlebar-released-overlay.png"]);
     [window setContentSize:NSMakeSize(300,360)]; pump();
     NSButton* overflow=titlebarButton(window,@"NativeOverflow");
     check(overflow && !overflow.hidden && statisticsButton.hidden,"Narrow title row must expose overflow rather than overlapping controls");
@@ -154,7 +172,10 @@ int main(int argc,char** argv) { @autoreleasepool {
     [defaults setBool:NO forKey:@"controlsEnabled"]; [defaults synchronize];
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
     check(nativeOverlayShortcut(&key)==11,"Default controls shortcut");
+    nativeTitlebarSetCapture(true); pump();
+    check(titlebarRoot(window).hiddenOrHasHiddenAncestor,"Shortcut checks must run with chrome hidden");
     for (int i=0;i<13;i++) { key.keysym.sym="qzxsmcdvlekob"[i]; check(nativeOverlayShortcut(&key)==i,"Every existing shortcut and plain Disconnect must resolve"); }
+    nativeTitlebarSetCapture(false); pump();
     key.keysym.mod=KMOD_LCTRL; check(nativeOverlayShortcut(&key)==-1,"Normal host keys must not be consumed");
     [defaults setObject:@{@"11":@{@"key":@"p",@"modifiers":@3}, @"12":@{@"key":@"r",@"modifiers":@10}} forKey:@"shortcuts"]; [defaults synchronize];
     [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.moonlight-stream.NativeGlass.overlaySettingsChanged" object:nil userInfo:nil deliverImmediately:YES]; pump();
@@ -208,7 +229,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     for (NSWindow* panel in window.childWindows) check(NSContainsRect(bounds,panel.frame),"Every panel must fit after controls shrink with all actions selected");
     controls=nil; for (NSWindow* panel in window.childWindows) if (!panel.ignoresMouseEvents) controls=panel;
     check(buttonWithTag(controls.contentView,12)!=nil,"Disconnect must remain directly visible in compact controls");
-    nativeOverlayDetach(); check(window.toolbar==nil && !titlebarRoot(window) && window.titleVisibility==NSWindowTitleVisible && window.titlebarAppearsTransparent==originalTransparency && !titlebarBackground(window) && [window.backgroundColor isEqual:originalBackground] && window.titlebarSeparatorStyle==originalSeparator,"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
+    nativeOverlayDetach(); check((window.styleMask & NSWindowStyleMaskFullSizeContentView)==(originalStyle & NSWindowStyleMaskFullSizeContentView),"Detach restores original full-size content style"); check(window.toolbar==nil && !titlebarRoot(window) && window.titleVisibility==NSWindowTitleVisible && window.titlebarAppearsTransparent==originalTransparency && !titlebarBackground(window) && [window.backgroundColor isEqual:originalBackground] && window.titlebarSeparatorStyle==originalSeparator,"Original title bar restored on detach"); check(!nativeOverlayPresent(0,true,sample),"Detached adapter must allow legacy fallback"); check(window.childWindows.count==0,"No orphan overlay panels");
     nativeOverlayAttach(window,"next-session"); check(nativeOverlayConfigured(),"Repeated session attachment"); nativeOverlayDetach();
     if (previous) [defaults setPersistentDomain:previous forName:@"com.moonlight-stream.NativeGlass.Overlay"]; else [defaults removePersistentDomainForName:@"com.moonlight-stream.NativeGlass.Overlay"]; [previous release]; [defaults synchronize];
     SDL_DestroyWindow(stream); SDL_Quit(); puts("Native overlay state, all shortcuts, layout, focus, teardown and preview checks passed"); return 0;

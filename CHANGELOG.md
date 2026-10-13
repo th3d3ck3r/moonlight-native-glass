@@ -1,5 +1,12 @@
 # MoonlightLG changelog
 
+## 1.2.1.0U — unreleased — 2026-10-13
+
+- QuickTime-style title controls overlay the video and hide while host input is captured; releasing input shows them again. Local popups, menus and focus loss keep controls accessible.
+- Fullscreen and borderless fullscreen show only the stream command overlay on release, with no native title row or drawable resize. Windowed video extends beneath the title area; capture changes do not alter window/video geometry.
+- Existing shortcuts, recording, replay and mouse restoration routes are preserved. Hidden controls do not intercept clicks or allow title-area dragging. Hide animation respects Reduce Motion.
+- Internal build 37. Checkpoint: `checkpoints/moonlightlg-1.2.0.2U-before-autohide`. macOS/Xcode validation pending.
+
 ## 1.2.0.2U — unreleased — 2026-10-13
 
 - Accept large fragmented source-quality keyframes instead of falsely reporting queue overload at 129 fragments. Keep 32 MB ingress bounds and use reusable, bounded fragment metadata; recorder ABI 4.

@@ -107,11 +107,17 @@ int main(int argc, char** argv) { @autoreleasepool {
     // Reattach synchronously to catch even a transient toolbar/layout mutation.
     NSRect frame=cocoa(window).frame, content=cocoa(window).contentView.bounds;
     NSView* contentView=cocoa(window).contentView;
-    nativeTitlebarAttach(cocoa(window));
-    check(cocoa(window).toolbar==nil && !titlebarRoot(cocoa(window)) && !titlebarBackground(cocoa(window)),"Initial fullscreen attached a native title toolbar");
+    nativeTitlebarSetCapture(true); pump();
+    nativeTitlebarAttach(cocoa(window)); pump();
+    check(cocoa(window).toolbar==nil && titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor && titlebarBackground(cocoa(window)).hidden,"Captured fullscreen must hide all stream chrome");
     check(cocoa(window).contentView==contentView && NSEqualRects(frame,cocoa(window).frame)
         && NSEqualRects(content,cocoa(window).contentView.bounds),"Native attachment changed fullscreen video geometry");
-    pump(); draw(layer,queue);
+    nativeTitlebarSetCapture(false); pump();
+    check(!titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor,"Released fullscreen must show command controls");
+    check(NSEqualRects(content,cocoa(window).contentView.bounds) && NSEqualRects(frame,cocoa(window).frame),"Showing fullscreen controls must preserve Metal geometry");
+    draw(layer,queue); capture(directory,@"released.png",true);
+    nativeTitlebarSetCapture(true); pump();
+    draw(layer,queue);
     capture(directory,@"initial.png",true);
     const Uint32 id=SDL_GetWindowID(window);
     for (int attempt=0; attempt<2; ++attempt) {
@@ -133,14 +139,22 @@ int main(int argc, char** argv) { @autoreleasepool {
         check(SDL_GetKeyboardFocus()==window && cocoa(window).visible,"Restore lost the original stream focus");
         check(SDL_GetWindowFlags(window)&SDL_WINDOW_FULLSCREEN,"Restore lost the requested fullscreen mode");
         check(!nativeStreamWindowHasHiddenFullscreen(window) && SDL_GetRelativeMouseMode(),"Restore lost fullscreen capture intent");
-        check(cocoa(window).toolbar==nil && !titlebarRoot(cocoa(window)) && !titlebarBackground(cocoa(window)),"Restore installed fullscreen title controls");
+        check(cocoa(window).toolbar==nil && titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor && titlebarBackground(cocoa(window)).hidden,"Captured fullscreen restore must not show title controls");
         draw(layer,queue);
         capture(directory,[NSString stringWithFormat:@"restored-%d.png",attempt],true);
         SDL_SetRelativeMouseMode(SDL_FALSE); SDL_SetWindowKeyboardGrab(window,SDL_FALSE);
     }
     check(fullscreenExits==2 && fullscreenRestores==2,"Hide/restore must route every fullscreen change through the supplied Session transition");
     check(SDL_SetWindowFullscreen(window,0)==0,"Return to windowed failed"); pump(1);
-    check(titlebarRoot(cocoa(window))!=nil,"Returning to windowed lost the native title controls");
+    nativeTitlebarSetCapture(false); pump();
+    check(titlebarRoot(cocoa(window))!=nil && !titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor,"Returning to released windowed mode lost native title controls");
+    const NSRect windowedFrame=cocoa(window).frame, windowedBounds=cocoa(window).contentView.bounds;
+    const CGSize drawable=layer.drawableSize;
+    for (bool captured : {true,false,true,false}) {
+        nativeTitlebarSetCapture(captured); pump(); draw(layer,queue);
+        check(titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor==captured,"Metal window must follow capture state");
+        check(NSEqualRects(windowedFrame,cocoa(window).frame) && NSEqualRects(windowedBounds,cocoa(window).contentView.bounds) && CGSizeEqualToSize(drawable,layer.drawableSize),"Autohide must not shift or resize the Metal drawable");
+    }
     [queue release]; SDL_Metal_DestroyView(view); SDL_DestroyWindow(window); pump();
     nativeSetStreamFullscreenTransition(nullptr);
     stopNativeStreamWindow(); [desktop orderOut:nil]; SDL_Quit();

@@ -92,6 +92,12 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic, retain) NSView* row;
 @property(nonatomic, retain) NSButton* overflow;
 @property(nonatomic, assign) BOOL presentationInstalled;
+@property(nonatomic, assign) BOOL previousFullSizeContent;
+@property(nonatomic, assign) BOOL previousMovable;
+@property(nonatomic, assign) CGFloat titleHeight;
+@property(nonatomic, retain) NSView* nativeChrome;
+@property(nonatomic, assign) BOOL chromeVisible;
+@property(nonatomic, assign) NSUInteger visibilityRevision;
 @property(nonatomic, assign) BOOL windowTransition;
 @property(nonatomic, assign) BOOL fullscreenTransition;
 @property(nonatomic, retain) NSMutableDictionary* buttons;
@@ -111,6 +117,7 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 - (void)updateWindowToolbar;
 - (void)invalidate;
 - (void)layoutControls;
+- (void)updateVisibility;
 @end
 static MLStreamTitlebar* titlebar;
 
@@ -149,6 +156,10 @@ static void requestTitlebarInputRepair(NSWindow* window) {
         self.batteryDetails=@"No controller connected";
         for (NSString* name in @[NSWindowDidMoveNotification, NSWindowDidEndLiveResizeNotification, NSWindowDidResizeNotification, NSWindowDidMiniaturizeNotification, NSWindowWillEnterFullScreenNotification, NSWindowWillExitFullScreenNotification, NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification, NSWindowDidChangeOcclusionStateNotification, @"NSWindowDidFailToEnterFullScreenNotification", @"NSWindowDidFailToExitFullScreenNotification"])
             [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:name object:nil];
+        for (NSString* name in @[NSWindowDidBecomeKeyNotification, NSWindowDidResignKeyNotification])
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(focusChanged:) name:name object:nil];
+        for (NSString* name in @[NSApplicationDidBecomeActiveNotification, NSApplicationDidResignActiveNotification])
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(focusChanged:) name:name object:NSApp];
     }
     return self;
 }
@@ -200,13 +211,27 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     });
 }
 - (void)themeChanged:(NSNotification*)notification { [self updateWindowToolbar]; [self refresh]; }
+- (void)focusChanged:(NSNotification*)notification {
+    if (notification.object==self.window || notification.object==NSApp) [self updateVisibility];
+}
 - (void)removeAccessory {
+    ++self.visibilityRevision;
+    self.nativeChrome.hidden=NO; self.nativeChrome.alphaValue=1; self.nativeChrome=nil;
+    self.chromeVisible=YES;
+    self.accessory.view.hidden=NO;
+    [self.background.layer removeAllAnimations];
+    self.background.hidden=NO; self.background.alphaValue=1;
+    for (NSNumber* type in @[@(NSWindowCloseButton),@(NSWindowMiniaturizeButton),@(NSWindowZoomButton)])
+        [self.window standardWindowButton:(NSWindowButton)type.integerValue].hidden=NO;
+    if (self.presentationInstalled && self.window) self.window.movable=self.previousMovable;
     [self.background removeFromSuperview];
     if (self.window && self.presentationInstalled) self.window.backgroundColor=self.previousBackgroundColor;
-    if (!self.window || !self.accessory || !(self.window.styleMask & NSWindowStyleMaskTitled)) return;
-    if (self.presentationInstalled) self.window.titlebarSeparatorStyle=self.previousSeparator;
-    NSUInteger index=[self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory];
-    if (index!=NSNotFound) [self.window removeTitlebarAccessoryViewControllerAtIndex:index];
+    if (self.window && self.accessory && (self.window.styleMask & NSWindowStyleMaskTitled)) {
+        if (self.presentationInstalled) self.window.titlebarSeparatorStyle=self.previousSeparator;
+        NSUInteger index=[self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory];
+        if (index!=NSNotFound) [self.window removeTitlebarAccessoryViewControllerAtIndex:index];
+    }
+    [self.accessory.view removeFromSuperview];
 }
 - (void)updateWindowToolbar {
     if (!self.window) return;
@@ -216,30 +241,91 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     BOOL fullscreen=self.windowTransition || self.fullscreenTransition || (style & NSWindowStyleMaskFullScreen) || !(style & NSWindowStyleMaskTitled);
     if (fullscreen) {
         [self removeAccessory];
+        if (!self.windowTransition && !self.fullscreenTransition && self.window.visible) {
+            // Fullscreen has no native title row. Reuse only the stream command
+            // row as an overlay when input is released; never add window chrome
+            // or mutate fullscreen/Metal drawable geometry.
+            self.presentationInstalled=YES;
+            NSView* frame=self.window.contentView.superview;
+            self.background.frame=NSMakeRect(0,NSMaxY(frame.bounds)-28,frame.bounds.size.width,28);
+            self.background.subviews.firstObject.frame=self.background.bounds;
+            [frame addSubview:self.background positioned:NSWindowAbove relativeTo:self.window.contentView];
+            self.accessory.view.frame=NSMakeRect(6,NSMaxY(frame.bounds)-26,MAX(40,frame.bounds.size.width-12),24);
+            [frame addSubview:self.accessory.view positioned:NSWindowAbove relativeTo:self.background];
+            [self layoutControls]; [self updateVisibility];
+        }
         return;
     }
-    // A right-aligned accessory shares the ordinary thin title row. No toolbar
-    // or FullSizeContentView change: SDL keeps its original drawable geometry.
+    // A right-aligned accessory shares the ordinary thin title row. Full-size
+    // content is permanent while installed; capture toggles never change layout.
     if (self.window.visible) {
         self.presentationInstalled=YES;
+        if (self.titleHeight<=0)
+            self.titleHeight=MIN(32,MAX(24,self.window.frame.size.height-self.window.contentLayoutRect.size.height));
+        // Install full-size content once, never in response to capture changes.
+        // Video fills the title area; showing chrome only overlays that picture.
+        // Keep SDL's original content view and native window/frame identity.
+        if (!(style & NSWindowStyleMaskFullSizeContentView))
+            self.window.styleMask=style | NSWindowStyleMaskFullSizeContentView;
         self.window.titleVisibility=NSWindowTitleHidden;
         self.window.titlebarAppearsTransparent=YES;
         self.window.titlebarSeparatorStyle=NSTitlebarSeparatorStyleNone;
         // Draw one rounded surface across the full title area, underneath all
-        // native controls. The SDL content view/frame and window style stay intact.
+        // native controls. The same SDL content view and window frame stay intact.
         self.window.backgroundColor=NSColor.blackColor;
         NSView* frame=self.window.contentView.superview;
-        CGFloat height=frame.bounds.size.height-self.window.contentLayoutRect.size.height;
+        CGFloat height=self.titleHeight;
         if (frame && height>0 && height<=40) {
             self.background.frame=NSMakeRect(0,NSMaxY(frame.bounds)-height,frame.bounds.size.width,height);
             self.background.subviews.firstObject.frame=self.background.bounds;
             if (self.background.superview!=frame)
-                [frame addSubview:self.background positioned:NSWindowBelow relativeTo:nil];
+                [frame addSubview:self.background positioned:NSWindowAbove relativeTo:self.window.contentView];
         }
-        if ([self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory]==NSNotFound)
+        if ([self.window.titlebarAccessoryViewControllers indexOfObjectIdenticalTo:self.accessory]==NSNotFound) {
+            [self.accessory.view removeFromSuperview];
             [self.window addTitlebarAccessoryViewController:self.accessory];
+        }
         self.accessory.view.frame=NSMakeRect(0,0,MAX(40,self.window.frame.size.width-88),self.accessory.view.frame.size.height);
         [self layoutControls];
+        // Find the title-only ancestor using the public view hierarchy. Never
+        // hide the frame/content view or depend on private AppKit class names.
+        NSView* close=[self.window standardWindowButton:NSWindowCloseButton];
+        for (NSView* view=close.superview; view && view!=frame; view=view.superview) {
+            if ([self.accessory.view isDescendantOf:view] &&
+                ![self.window.contentView isDescendantOf:view]) {
+                self.nativeChrome=view; break;
+            }
+        }
+        [self updateVisibility];
+    }
+}
+- (void)updateVisibility {
+    if (!self.window || !self.presentationInstalled || self.windowTransition || self.fullscreenTransition) return;
+    TitleState copy; { std::lock_guard<std::mutex> lock(stateMutex); copy=state; }
+    BOOL show=!copy.captured || !NSApp.active || !self.window.keyWindow || self.details.shown || self.trackingMenu || self.window.attachedSheet;
+    BOOL fullscreen=(self.window.styleMask & NSWindowStyleMaskFullScreen) || !(self.window.styleMask & NSWindowStyleMaskTitled);
+    // Hidden native chrome must not retain a title-bar drag target. SDL keeps
+    // receiving motion/keys in the same view, with all command routes intact.
+    self.window.movable=show && !fullscreen ? self.previousMovable : NO;
+    self.accessory.view.hidden=!show;
+    self.nativeChrome.hidden=!show;
+    for (NSNumber* type in @[@(NSWindowCloseButton),@(NSWindowMiniaturizeButton),@(NSWindowZoomButton)])
+        [self.window standardWindowButton:(NSWindowButton)type.integerValue].hidden=!show || fullscreen;
+    if (show==self.chromeVisible) return;
+    self.chromeVisible=show;
+    NSUInteger revision=++self.visibilityRevision;
+    if (show) {
+        [self.background.layer removeAllAnimations];
+        self.background.hidden=NO; self.background.alphaValue=1;
+    } else {
+        // The decorative surface fades; interactive controls disappear at
+        // once, so there are no invisible buttons during the animation.
+        [NSAnimationContext runAnimationGroup:^(NSAnimationContext* context) {
+            context.duration=NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion ? 0 : .16;
+            self.background.animator.alphaValue=0;
+        } completionHandler:^{
+            if (self.window && self.visibilityRevision==revision && !self.chromeVisible) self.background.hidden=YES;
+        }];
     }
 }
 - (void)layoutControls {
@@ -283,8 +369,10 @@ static void requestTitlebarInputRepair(NSWindow* window) {
         [menu addItem:command];
     }
     self.trackingMenu=menu;
+    [self updateVisibility];
     [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0,NSMinY(sender.bounds)) inView:sender];
     self.trackingMenu=nil;
+    [self updateVisibility];
     [self requestInputRepair];
 }
 - (void)overflowClicked:(NSMenuItem*)sender { [self perform:sender.representedObject anchor:nil]; }
@@ -311,6 +399,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     NSView* source=anchor.window ? anchor : self.window.contentView;
     NSRect rect=anchor.window ? anchor.bounds : NSMakeRect(NSMidX(source.bounds),NSMaxY(source.bounds)-1,1,1);
     [self.details showRelativeToRect:rect ofView:source preferredEdge:NSRectEdgeMinY];
+    [self updateVisibility];
 }
 - (void)updateDetails {
     if (!self.details) return;
@@ -372,6 +461,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     battery.toolTip=self.batteryDetails; [battery setAccessibilityLabel:[@"Controller Battery · " stringByAppendingString:self.batteryDetails]];
     for (NSButton* button in self.buttons.allValues) if (button!=self.buttons[batteryID]) button.image=[button.image imageWithSymbolConfiguration:[NSImageSymbolConfiguration configurationWithPointSize:13 weight:NSFontWeightRegular]];
     [self updateDetails];
+    [self updateVisibility];
 }
 - (void)readControllers {
     // Read cached SDL power data only from already-open controllers. Never open
@@ -405,9 +495,10 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     BOOL wasShown=self.details.shown;
     self.details.delegate=nil; [self.details close]; self.details=nil; self.detailsID=nil;
     if (wasShown) [self requestInputRepair];
+    [self updateVisibility];
 }
 - (void)popoverDidClose:(NSNotification*)notification {
-    if (notification.object==self.details) { self.detailsID=nil; [self requestInputRepair]; }
+    if (notification.object==self.details) { self.detailsID=nil; [self requestInputRepair]; [self updateVisibility]; }
 }
 - (void)invalidate {
     [self.trackingMenu cancelTracking]; self.trackingMenu=nil;
@@ -420,11 +511,15 @@ static void requestTitlebarInputRepair(NSWindow* window) {
     if (self.presentationInstalled && self.window) {
         self.window.titleVisibility=self.previousTitleVisibility;
         self.window.titlebarAppearsTransparent=self.previousTransparency;
+        if (!self.previousFullSizeContent && (self.window.styleMask & NSWindowStyleMaskTitled))
+            self.window.styleMask=self.window.styleMask & ~NSWindowStyleMaskFullSizeContentView;
+        for (NSNumber* type in @[@(NSWindowCloseButton),@(NSWindowMiniaturizeButton),@(NSWindowZoomButton)])
+            [self.window standardWindowButton:(NSWindowButton)type.integerValue].hidden=NO;
     }
     self.toolbar.delegate=nil; self.window=nil;
 }
 - (void)dealloc {
-    [self invalidate]; [_background release]; [_previousBackgroundColor release]; [_accessory release]; [_row release]; [_overflow release]; [_toolbar release]; [_previousToolbar release]; [_buttons release]; [_details release]; [_detailsID release]; [_batteryDetails release]; [super dealloc];
+    [self invalidate]; [_nativeChrome release]; [_background release]; [_previousBackgroundColor release]; [_accessory release]; [_row release]; [_overflow release]; [_toolbar release]; [_previousToolbar release]; [_buttons release]; [_details release]; [_detailsID release]; [_batteryDetails release]; [super dealloc];
 }
 @end
 
@@ -455,11 +550,17 @@ void nativeTitlebarControllersChanged() { [titlebar readControllers]; }
 void nativeTitlebarAttach(void* window) {
     nativeTitlebarDetach();
     titlebar=[[MLStreamTitlebar alloc] init]; titlebar.window=(NSWindow*)window;
+    titlebar.previousFullSizeContent=(titlebar.window.styleMask & NSWindowStyleMaskFullSizeContentView)!=0;
+    titlebar.previousMovable=titlebar.window.movable;
+    titlebar.chromeVisible=YES;
     MLStreamTitlebar* owner=titlebar;
     owner.eventMonitor=[NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown | NSEventMaskLeftMouseUp handler:^NSEvent*(NSEvent* event) {
         if (event.window==owner.window && owner.window) {
             NSRect content=owner.window.contentView.frame;
-            if (!NSPointInRect(event.locationInWindow,content)) [owner requestInputRepair];
+            NSPoint barPoint=[owner.background convertPoint:event.locationInWindow fromView:nil];
+            if (!NSPointInRect(event.locationInWindow,content) ||
+                (owner.chromeVisible && owner.background.superview && NSPointInRect(barPoint,owner.background.bounds)))
+                [owner requestInputRepair];
         }
         return event;
     }];

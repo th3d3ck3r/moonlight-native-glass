@@ -287,7 +287,10 @@ int main(int argc, char** argv) {
         check(pressed && released,"Accessory stream must still receive SDL keyboard input");
         check(SDL_SetWindowFullscreen(window,SDL_WINDOW_FULLSCREEN_DESKTOP)==0,"Accessory fullscreen entry"); pump(1.0);
         check(NSApp.activationPolicy==NSApplicationActivationPolicyAccessory,"Fullscreen must not promote engine to Dock");
-        check(cocoa(window).toolbar==nil && !titlebarRoot(cocoa(window)) && !titlebarBackground(cocoa(window)),"Borderless fullscreen must not show native title-bar controls");
+        nativeTitlebarSetCapture(true); pump();
+        check(cocoa(window).toolbar==nil && titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor && titlebarBackground(cocoa(window)).hidden,"Captured borderless fullscreen must hide stream controls");
+        nativeTitlebarSetCapture(false); pump();
+        check(!titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor,"Released fullscreen must show the stream command overlay");
         check(SDL_SetWindowFullscreen(window,0)==0,"Accessory fullscreen exit"); pump(1.0);
         nativeWindow=cocoa(window);
         // Keep the title toolbar and customizable overlays in an accessory app.
@@ -313,7 +316,7 @@ int main(int argc, char** argv) {
         nativeTitlebarSetRecording(true,false,true,true,false,false,0,"Ready"); pump();
         auto clickTitleButton=[&](NSString* identifier) {
             NSButton* button=titlebarButton(cocoa(window),identifier);
-            check(button && !button.hidden && button.enabled,"Title-bar fixture button unavailable");
+            check(button && !button.hiddenOrHasHiddenAncestor && button.enabled,"Title-bar fixture button unavailable");
             NSPoint point=[button convertPoint:NSMakePoint(NSMidX(button.bounds),NSMidY(button.bounds)) toView:nil];
             for (NSEventType type : {NSEventTypeLeftMouseDown,NSEventTypeLeftMouseUp}) {
                 NSEvent* event=[NSEvent mouseEventWithType:type location:point modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:cocoa(window).windowNumber context:nil eventNumber:2 clickCount:1 pressure:0];
@@ -334,23 +337,25 @@ int main(int argc, char** argv) {
         SdlInputHandler titleInput(window);
         for (NSString* identifier in @[@"NativeStatistics",@"NativeRecord",@"NativeReplay"]) {
             SDL_FlushEvent(nativeOverlayEventType());
-            nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(true);
+            nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(false); pump();
+            titleInput.m_NativeCaptureBeforeFocusLoss=true;
             clickTitleButton(identifier);
             check(repairQueuedInput(titleInput),"Actual title-bar tracking must request capture repair");
             check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Direct title-bar control must restore relative mouse routing");
             checkRelativeMotion(window);
             // Reproduce focus loss after a title click without a matching SDL
             // focus-gained callback: the saved capture intent must suffice.
-            titleInput.setCaptureActive(false); titleInput.m_NativeCaptureBeforeFocusLoss=true;
+            titleInput.setCaptureActive(false); pump(); titleInput.m_NativeCaptureBeforeFocusLoss=true;
             titleInput.handleNativeOverlayAction(220); pump();
             check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Title repair must recover saved capture intent");
-            titleInput.setCaptureActive(false);
+            titleInput.setCaptureActive(false); pump();
             clickTitleButton(identifier); repairQueuedInput(titleInput);
             check(!SDL_GetRelativeMouseMode(),"Title-bar interaction must preserve intentional Release Input");
         }
         SDL_SetWindowSize(window,320,360); pump();
         for (bool selectStatistics : {false,true}) {
-            nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(true);
+            nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(false); pump();
+            titleInput.m_NativeCaptureBeforeFocusLoss=true;
             SDL_FlushEvent(nativeOverlayEventType());
             NSButton* overflow=titlebarButton(cocoa(window),@"NativeOverflow");
             NSTimer* cancel=[NSTimer timerWithTimeInterval:0.1 repeats:NO block:^(NSTimer*) {
@@ -371,12 +376,15 @@ int main(int argc, char** argv) {
             check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Overflow must restore relative routing");
         }
         SDL_SetWindowSize(window,1000,560); pump();
-        titleInput.setCaptureActive(false);
-        titleInput.m_AbsoluteMouseMode=true; titleInput.setCaptureActive(true);
+        titleInput.setCaptureActive(false); pump();
+        titleInput.m_AbsoluteMouseMode=true;
         clickTitleButton(@"NativeStatistics"); repairQueuedInput(titleInput);
-        check(!SDL_GetRelativeMouseMode() && titleInput.isCaptureActive(),"Desktop absolute mode must not become relative capture");
-        titleInput.setCaptureActive(false); titleInput.m_AbsoluteMouseMode=false;
-        nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(true);
+        check(!SDL_GetRelativeMouseMode() && !titleInput.isCaptureActive(),"Released desktop absolute mode must stay released after title controls");
+        titleInput.setCaptureActive(true); pump();
+        check(titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor,"Absolute host capture must also hide title controls");
+        titleInput.setCaptureActive(false); pump(); titleInput.m_AbsoluteMouseMode=false;
+        nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(false); pump();
+        titleInput.m_NativeCaptureBeforeFocusLoss=true;
         SDL_FlushEvent(nativeOverlayEventType());
         clickTitleButton(@"NativeConnection");
         check(!repairQueuedInput(titleInput),"Open popover must defer title-bar repair");
@@ -389,10 +397,12 @@ int main(int argc, char** argv) {
         check(titleInput.m_NativeControlsVisible && SDL_GetWindowMouseGrab(window) && !SDL_GetRelativeMouseMode(),"Title repair must preserve working Control Center local confinement");
         titleInput.handleNativeOverlayAction(101); pump();
         check(SDL_GetRelativeMouseMode(),"Computer-name Done restoration must remain unchanged");
-        // Reproduce SDL's real drag state, not merely a programmatic move.
+        // Reproduce SDL's real drag state after temporary focus release.
+        titleInput.setCaptureActive(false); pump(); titleInput.m_NativeCaptureBeforeFocusLoss=true;
+        // This uses the actual moving state, not merely a programmatic move.
         [[NSNotificationCenter defaultCenter] postNotificationName:NSWindowWillMoveNotification object:cocoa(window)];
         check([cocoa(window).delegate isMoving],"SDL must actually enter its moving state for the regression");
-        NSPoint dragPoint=NSMakePoint(NSMidX(cocoa(window).contentView.frame),NSMaxY(cocoa(window).contentView.frame)+10);
+        NSPoint dragPoint=NSMakePoint(NSMidX(cocoa(window).contentView.frame),NSMaxY(cocoa(window).contentView.frame)-10);
         NSEvent* dragRelease=[NSEvent mouseEventWithType:NSEventTypeLeftMouseUp location:dragPoint modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:cocoa(window).windowNumber context:nil eventNumber:3 clickCount:1 pressure:0];
         [NSApp postEvent:dragRelease atStart:NO]; pump();
         check(![cocoa(window).delegate isMoving],"Native drag release must clear SDL moving state through the delegate proxy");
@@ -403,7 +413,7 @@ int main(int argc, char** argv) {
         SDL_FlushEvent(nativeOverlayEventType());
         SDL_SetWindowPosition(window,140,140); pump();
         check(repairQueuedInput(titleInput),"Window drag/move completion must request repair");
-        titleInput.setCaptureActive(false);
+        titleInput.setCaptureActive(false); pump();
         for (Uint32 mode : {Uint32(0), Uint32(SDL_WINDOW_FULLSCREEN_DESKTOP), Uint32(SDL_WINDOW_FULLSCREEN)}) {
             std::printf("MODE: 0x%x\n",mode); std::fflush(stdout);
             // Session selects a supported display mode before entering exclusive
@@ -447,7 +457,20 @@ int main(int argc, char** argv) {
                 check(menuInput.isCaptureActive(),"Cancel path must restore previous capture after the sheet closes");
                 menuInput.setCaptureActive(false);
             }
-            check((titlebarRoot(cocoa(window))==nil)==(mode!=0),"Title bar must appear only in windowed mode");
+            check(titlebarRoot(cocoa(window)) && !titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor,"Released controls must appear in every window mode");
+            const NSRect releasedFrame=cocoa(window).frame, releasedVideo=cocoa(window).contentView.bounds;
+            menuInput.setCaptureActive(true); pump();
+            check(titlebarRoot(cocoa(window)).hiddenOrHasHiddenAncestor,"Captured controls must hide in every window mode");
+            check(NSEqualRects(releasedFrame,cocoa(window).frame) && NSEqualRects(releasedVideo,cocoa(window).contentView.bounds),"Autohide must preserve window and video geometry in every mode");
+            SDL_FlushEvents(SDL_KEYDOWN,SDL_KEYUP);
+            [NSApp postEvent:keyDown atStart:NO]; [NSApp postEvent:keyUp atStart:NO]; pump();
+            bool hiddenPressed=false,hiddenReleased=false; SDL_Event hiddenKey;
+            while (SDL_PeepEvents(&hiddenKey,1,SDL_GETEVENT,SDL_KEYDOWN,SDL_KEYUP)==1) {
+                if (hiddenKey.type==SDL_KEYDOWN && hiddenKey.key.keysym.sym==SDLK_a) hiddenPressed=true;
+                if (hiddenKey.type==SDL_KEYUP && hiddenKey.key.keysym.sym==SDLK_a) hiddenReleased=true;
+            }
+            check(hiddenPressed && hiddenReleased,"Hidden chrome must leave SDL keyboard routing intact in every mode");
+            menuInput.setCaptureActive(false); pump();
             nativeOverlayRestoreStreamFocus(window);
             check(SDL_SetRelativeMouseMode(SDL_TRUE)==0,"Fresh relative capture must work before controls");
             pump();
