@@ -7,7 +7,6 @@
 #include "BoundedQueue.h"
 #include <atomic>
 #include <mutex>
-#include <condition_variable>
 #include <thread>
 #include <deque>
 #include <vector>
@@ -148,8 +147,8 @@ struct Movie {
 struct Recorder {
     MLGRecorderConfig cfg{};
     NSString* directory=nil;
-    std::mutex mutex, statusMutex;
-    std::condition_variable wake;
+    std::mutex statusMutex;
+    dispatch_semaphore_t wake=dispatch_semaphore_create(0);
     mlg::BoundedQueue<std::unique_ptr<Input>,MaxPackets> queue;
     std::deque<std::unique_ptr<Input>> pendingInput;
     std::atomic<size_t> queuedBytes{0};
@@ -195,7 +194,7 @@ struct Recorder {
     ~Recorder() {
         interest.store(0);
         quit.store(true);
-        wake.notify_one(); worker.join();
+        dispatch_semaphore_signal(wake); worker.join();
         // No ingress remains. Complete hardware output before releasing its callback target.
         if(encoder) { VTCompressionSessionCompleteFrames(encoder,kCMTimeInvalid); VTCompressionSessionInvalidate(encoder); CFRelease(encoder); }
         if(transfer) { VTPixelTransferSessionInvalidate(transfer); CFRelease(transfer); }
@@ -234,17 +233,18 @@ struct Recorder {
         if(bits && cfg.audio_channels) bits|=4;
         interest.store(bits);
     }
+    void overload() {overflow.store(true);dispatch_semaphore_signal(wake);}
     bool enqueue(std::unique_ptr<Input> input, size_t bytes, bool command=false) {
-        if(bytes>MaxIngress) {drops++;overflow.store(true);return false;}
+        if(bytes>MaxIngress) {drops++;overload();return false;}
         if(quit.load() && input->kind!=4 && input->kind!=5) return false;
         size_t previous=queuedBytes.fetch_add(bytes,std::memory_order_relaxed);
         input->cost=bytes;
         if(previous>MaxIngress-bytes || !queue.push(std::move(input))) {
             queuedBytes.fetch_sub(bytes,std::memory_order_relaxed);
-            if(!command) {drops++;overflow.store(true);}
+            if(!command) {drops++;overload();}
             return false;
         }
-        wake.notify_one();return true;
+        dispatch_semaphore_signal(wake);return true;
     }
     bool pop(std::unique_ptr<Input>& input) {
         if(!pendingInput.empty()) {input=std::move(pendingInput.front());pendingInput.pop_front();return true;}
@@ -467,9 +467,9 @@ struct Recorder {
             std::unique_ptr<Input> input;
             if(!pop(input)) {
                 if(quit.load()) break;
-                // A timed wait closes the notification race without locking an
-                // ingress producer. The worker sleeps when recording is idle.
-                std::unique_lock<std::mutex> l(mutex);wake.wait_for(l,std::chrono::milliseconds(10));continue;
+                // A counted wake closes publication/notification races without
+                // a playback mutex or periodic idle polling.
+                dispatch_semaphore_wait(wake,DISPATCH_TIME_FOREVER);continue;
             }
             @autoreleasepool {
                 std::lock_guard<std::mutex> serial(encodeMutex);
@@ -512,8 +512,8 @@ void command(void* p,uint32_t c) {
 uint32_t interest(void* p) {return static_cast<Recorder*>(p)->interest.load(std::memory_order_relaxed);}
 int videoImpl(void* p,const MLGRecorderChunk* chunks,size_t count,uint32_t rtp,uint64_t clock,int key) {
     auto self=static_cast<Recorder*>(p); if(!(interest(p)&1)) return 0;
-    if(count>MLG_RECORDER_MAX_CHUNKS) {self->overflow.store(true);return 0;}
-    size_t size=0; for(size_t i=0;i<count;i++) {if(chunks[i].size>MaxIngress-size) {self->overflow.store(true);return 0;}size+=chunks[i].size;}
+    if(count>MLG_RECORDER_MAX_CHUNKS) {self->overload();return 0;}
+    size_t size=0; for(size_t i=0;i<count;i++) {if(chunks[i].size>MaxIngress-size) {self->overload();return 0;}size+=chunks[i].size;}
     auto input=std::make_unique<Input>();input->kind=1;input->rtp=rtp;input->clock=clock;input->key=key;input->data.reserve(size);
     for(size_t i=0;i<count;i++) {auto b=static_cast<const uint8_t*>(chunks[i].bytes);input->data.insert(input->data.end(),b,b+chunks[i].size);}
     return self->enqueue(std::move(input),size);
@@ -526,18 +526,18 @@ int pixelImpl(void* p,void* cv,uint32_t rtp,uint64_t clock,int hdr) {
 }
 int audioImpl(void* p,const void* bytes,size_t size,uint64_t clock) {
     auto self=static_cast<Recorder*>(p);if(!(interest(p)&4)) return 0;
-    if(size>65536) {self->overflow.store(true);return 0;}
+    if(size>65536) {self->overload();return 0;}
     auto input=std::make_unique<Input>();input->kind=3;input->clock=clock;
     auto data=static_cast<const uint8_t*>(bytes);input->data.assign(data,data+size);return self->enqueue(std::move(input),size);
 }
 int video(void* p,const MLGRecorderChunk* chunks,size_t count,uint32_t rtp,uint64_t clock,int key) {
-    try {return videoImpl(p,chunks,count,rtp,clock,key);} catch(...) {static_cast<Recorder*>(p)->overflow.store(true);return 0;}
+    try {return videoImpl(p,chunks,count,rtp,clock,key);} catch(...) {static_cast<Recorder*>(p)->overload();return 0;}
 }
 int pixel(void* p,void* cv,uint32_t rtp,uint64_t clock,int hdr) {
-    try {return pixelImpl(p,cv,rtp,clock,hdr);} catch(...) {static_cast<Recorder*>(p)->overflow.store(true);return 0;}
+    try {return pixelImpl(p,cv,rtp,clock,hdr);} catch(...) {static_cast<Recorder*>(p)->overload();return 0;}
 }
 int audio(void* p,const void* data,size_t size,uint64_t clock) {
-    try {return audioImpl(p,data,size,clock);} catch(...) {static_cast<Recorder*>(p)->overflow.store(true);return 0;}
+    try {return audioImpl(p,data,size,clock);} catch(...) {static_cast<Recorder*>(p)->overload();return 0;}
 }
 void status(void* p,MLGRecorderStatus* out) {
     auto self=static_cast<Recorder*>(p);if(!out||out->size!=sizeof(*out)) return;

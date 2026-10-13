@@ -290,7 +290,7 @@ private struct RecordingSettings: View {
     @AppStorage("directory", store: defaults) private var directory = ""
     var body: some View {
         Section("Recording") {
-            Toggle("Enable Recording Controls", isOn: $enabled)
+            Toggle("Enable Recording Controls", isOn: $enabled).accessibilityIdentifier("recording-enabled")
             Text("Use Record / Stop and Save Instant Replay in the stream title bar. Changes apply to the next stream.").foregroundStyle(.secondary)
         }
         Section("Video Encoding") {

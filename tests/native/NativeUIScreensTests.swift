@@ -219,7 +219,7 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication()
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "preview-settings", withExtension: "json"))
-        let screens = ["main-light", "main-dark", "main-compact", "empty", "loading", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-input", "settings-network", "settings-advanced", "settings-shortcuts"]
+        let screens = ["main-light", "main-dark", "main-compact", "empty", "loading", "offline", "unpaired", "add", "pair", "details", "settings-video", "settings-audio", "settings-recording", "settings-input", "settings-network", "settings-advanced", "settings-shortcuts"]
         for screen in screens {
             app.launchArguments = ["--design-preview", "--settings-fixture=" + fixture.path, screen == "main-light" ? "--light" : "--dark"]
             if screen == "main-compact" { app.launchArguments.append("--compact") }
@@ -247,6 +247,9 @@ import XCTest
                 resolution.click()
                 app.menuItems["1080p"].click()
                 XCTAssertEqual(resolution.value as? String, "1080p")
+            }
+            if screen == "settings-recording" {
+                XCTAssertTrue(window.checkBoxes["recording-enabled"].exists, "Recording opt-in missing")
             }
             if screen == "settings-shortcuts" {
                 XCTAssertTrue(window.staticTexts["Close Stream Window"].exists, "Shortcut bindings missing")

@@ -110,7 +110,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         }
         Settings {
             NativeSettingsView(store: store)
-                .frame(width: 640, height: 540)
+                .frame(width: 860, height: 600)
         }
     }
 }

@@ -19,9 +19,10 @@ void* instance=nullptr;
 void* library=nullptr;
 std::shared_mutex lifetime;
 std::atomic<unsigned> wanted{0};
-SDL_TimerID timer=0;
+SDL_TimerID timer=0, commandPoll=0;
 std::atomic<bool> stopped{true};
 Uint32 tick(Uint32 interval,void*) { nativeOverlayPerformAction(218);return interval; }
+Uint32 pollCommand(Uint32,void*) {nativeOverlayPerformAction(218);return 0;}
 void poll() {
     if(stopped.load() || !instance) return;
     wanted.store(api->interest(instance),std::memory_order_release);
@@ -74,6 +75,7 @@ void nativeRecorderQuiesce() {
     stopped.store(true);
     wanted.store(0,std::memory_order_release);
     if(timer) {SDL_RemoveTimer(timer);timer=0;}
+    if(commandPoll) {SDL_RemoveTimer(commandPoll);commandPoll=0;}
 }
 void nativeRecorderStop() {
     nativeRecorderQuiesce();
@@ -84,7 +86,11 @@ void nativeRecorderStop() {
 }
 void nativeRecorderCommand(unsigned action) {
     if(stopped.load()) return;
-    if(instance && action!=218) api->command(instance,action==217?1:2);
+    if(instance && action!=218) {
+        api->command(instance,action==217?1:2);
+        if(commandPoll) SDL_RemoveTimer(commandPoll);
+        commandPoll=SDL_AddTimer(20,pollCommand,nullptr);
+    }
     poll();
 }
 void nativeRecorderVideo(PDECODE_UNIT du) {
