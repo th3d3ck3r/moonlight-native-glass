@@ -366,6 +366,7 @@ int main(int argc, char** argv) {
             check(SDL_GetRelativeMouseMode() && SDL_GetMouseFocus()==window,"Overflow must restore relative routing");
         }
         SDL_SetWindowSize(window,1000,560); pump();
+        titleInput.setCaptureActive(false);
         titleInput.m_AbsoluteMouseMode=true; titleInput.setCaptureActive(true);
         clickTitleButton(@"NativeStatistics"); repairQueuedInput(titleInput);
         check(!SDL_GetRelativeMouseMode() && titleInput.isCaptureActive(),"Desktop absolute mode must not become relative capture");

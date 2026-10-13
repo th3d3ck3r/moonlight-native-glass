@@ -2,7 +2,7 @@ name: MoonlightLG presentation shutdown regression
 on:
   push:
     branches: [feature/native-boot-animation, feature/recording-plugin]
-    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, tests/native/extract_native_exit_shortcut.py, app/native/nativeapplication.mm, app/native/nativetitlebar.mm, tests/native/TitlebarFixture.h, app/native/nativeoverlay.mm, app/native/nativeoverlay.h, app/streaming/input/keyboard.cpp, app/streaming/session.cpp]
+    paths: [.github/workflows/native-shutdown-probe.yml, tests/native/NativeShutdownTests.mm, tests/native/StreamWindowTests.mm, tests/native/extract_native_focus_methods.py, tests/native/extract_native_exit_shortcut.py, app/native/nativeapplication.mm, app/native/nativetitlebar.mm, tests/native/TitlebarFixture.h, app/native/nativeoverlay.mm, app/native/nativeoverlay.h, app/streaming/input/keyboard.cpp, app/streaming/session.cpp]
 permissions:
   contents: read
 jobs:
@@ -27,3 +27,12 @@ jobs:
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/native-shutdown-tests
           ASAN_OPTIONS=detect_leaks=0 build/native-shutdown-tests
+      - name: Test title-bar tracking and production mouse restoration
+        run: |
+          python3 tests/native/extract_native_focus_methods.py
+          xcrun clang++ -std=c++17 -fno-objc-arc -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all \
+            -I libs/mac/include/SDL2 -I app/native -I build \
+            app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/titlebar-input-sanitizer-tests
+          ASAN_OPTIONS=detect_leaks=0 build/titlebar-input-sanitizer-tests
