@@ -62,6 +62,21 @@ static NSWindow* nativeSDLWindow(SDL_Window* window)
     return SDL_GetWindowWMInfo(window, &info) && info.subsystem == SDL_SYSWM_COCOA ? info.info.cocoa.window : nil;
 }
 
+void nativeResizeAndCenterStreamWindow(SDL_Window* window, int width, int height) {
+    NSWindow* owner=nativeSDLWindow(window);
+    // Keep the display selected by the connection window, even when resizing
+    // changes which display contains most of its old off-center rectangle.
+    NSScreen* screen=owner.screen ?: NSScreen.mainScreen;
+    SDL_SetWindowSize(window,width,height);
+    if (!owner || !screen || owner.miniaturized || owner.zoomed ||
+        (SDL_GetWindowFlags(window)&SDL_WINDOW_FULLSCREEN)) return;
+    NSRect usable=screen.visibleFrame, frame=owner.frame;
+    // Center the complete frame, including native title chrome, after applying
+    // the negotiated content size. Keep placement clear of Dock/menu bar.
+    [owner setFrameOrigin:NSMakePoint(NSMidX(usable)-frame.size.width/2,
+        NSMidY(usable)-frame.size.height/2)];
+}
+
 static Uint32 connectionWindowID;
 static bool connectionVideoReference;
 static void* connectionLibrary;

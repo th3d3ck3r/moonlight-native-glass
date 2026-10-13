@@ -4,6 +4,7 @@
 #include <QGuiApplication>
 #include <QCoreApplication>
 #include <cstdio>
+#include <cmath>
 #include <cstdlib>
 #include "nativeapplication.h"
 #include "nativeoverlay.h"
@@ -71,6 +72,15 @@ int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepoo
     check(action==1,"Mouse click on real Continue must invoke the bridge callback");
     check(!nativeConnectionWaiting(),"Actual Continue callback must release the connection gate"); nativeDetachConnectionWindowView();
     check(host(content)==nil && original.contentView==content && SDL_GetWindowID(window)==windowID,"Continue removes only the temporary hosting subview");
+    NSScreen* selectedScreen=original.screen;
+    for (NSSize size : {NSMakeSize(640,360),NSMakeSize(900,520),NSMakeSize(480,640)}) {
+        SDL_SetWindowPosition(window,20,20); drain(.1);
+        selectedScreen=original.screen;
+        nativeResizeAndCenterStreamWindow(window,int(size.width),int(size.height)); drain(.1);
+        NSRect usable=selectedScreen.visibleFrame;
+        check(fabs(NSMidX(original.frame)-NSMidX(usable))<1 && fabs(NSMidY(original.frame)-NSMidY(usable))<1,"Final stream frame must center after resolution/aspect changes");
+        check(original.contentView==content && nativeConnectionWindow()==window,"Centering must retain the same SDL window/content");
+    }
     nativeAttachStreamWindow(window); drain(.2);
     check(nativeOverlayConfigured() && nativeConnectionWindow()==window,"Same SDL window accepts the normal stream controls after handoff");
     stopNativeStreamWindow(); nativeEndConnectionWindow();

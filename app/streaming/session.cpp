@@ -1871,6 +1871,11 @@ void Session::exec()
     QCoreApplication::sendPostedEvents();
 
     int x, y, width, height;
+#ifdef Q_OS_MACOS
+    // Compute the final size on the display containing the actual connection
+    // window, rather than the hidden Qt selection window.
+    m_Window = nativeConnectionWindow();
+#endif
     getWindowDimensions(x, y, width, height);
 
 #ifdef STEAM_LINK
@@ -1925,10 +1930,9 @@ void Session::exec()
 #ifdef Q_OS_MACOS
     // Adopt the SAME SDL window opened before host/game lookup. Never wrap or
     // replace its content view; the temporary SwiftUI subview is already gone.
-    m_Window = nativeConnectionWindow();
     if (m_Window) {
         SDL_SetWindowTitle(m_Window,windowName.c_str());
-        SDL_SetWindowSize(m_Window,width,height);
+        nativeResizeAndCenterStreamWindow(m_Window,width,height);
     }
 #endif
     if (!m_Window) m_Window = SDL_CreateWindow(windowName.c_str(),

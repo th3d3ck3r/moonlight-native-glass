@@ -28,6 +28,7 @@ bool nativeConnectionWaiting();
 #include <functional>
 bool nativeCreateConnectionWindow(const char* host, const char* game, int x, int y, Uint32 flags);
 SDL_Window* nativeConnectionWindow();
+void nativeResizeAndCenterStreamWindow(SDL_Window* window, int width, int height);
 void nativeUpdateConnectionWindow(const char* message, int phase);
 void nativeDetachConnectionWindowView();
 void nativeEndConnectionWindow();

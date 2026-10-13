@@ -4,6 +4,7 @@
 
 - Restore prior relative mouse capture after title-bar buttons, overflow menus, popup dismissal and window dragging/resizing. Explicit input release and absolute desktop mode are preserved; computer-name Control Center behavior is retained.
 - Request missing host keyframes for source-quality recording/replay startup and empty-buffer recovery, with bounded retries and explicit timeout; recorder ABI 3.
+- Center the final stream window on its current display after resolution changes at Continue/start.
 - Internal build 35. Checkpoint: `checkpoints/moonlightlg-1.2.0.0U-before-mouse-fix`.
 - Validation pending; U packages remain owner-only.
 
