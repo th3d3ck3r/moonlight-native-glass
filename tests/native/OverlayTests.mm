@@ -124,6 +124,17 @@ int main(int argc,char** argv) { @autoreleasepool {
     [adjust performClick:nil]; pump();
     NSView* adjustments=[monitor valueForKey:@"adjustments"];
     check(adjustments && !adjustments.hidden,"Monitor adjustment controls open locally");
+    NSPopUpButton* cadence=nil; NSSlider* opacity=nil;
+    for (NSView* view in adjustments.subviews) {
+        if ([view isKindOfClass:NSPopUpButton.class] && view.tag==0) cadence=(NSPopUpButton*)view;
+        if ([view isKindOfClass:NSSlider.class]) opacity=(NSSlider*)view;
+    }
+    check(cadence && [NSStringFromClass(cadence.class) isEqualToString:@"MLStreamMonitorPopup"] && opacity && [NSStringFromClass(opacity.class) isEqualToString:@"MLStreamVolumeSlider"],"Monitor menus and opacity use shared tracking, including cancellation");
+    [cadence selectItemAtIndex:2]; [cadence.target performSelector:cadence.action withObject:cadence];
+    check([defaults doubleForKey:@"hardwareInterval"]==2,"Monitor sampling cadence must persist");
+    [cadence selectItemAtIndex:1]; [cadence.target performSelector:cadence.action withObject:cadence];
+    opacity.doubleValue=.8; [opacity.target performSelector:opacity.action withObject:opacity];
+    check(std::fabs([defaults doubleForKey:@"hardwareOpacity"]-.8)<.0001,"Monitor opacity must persist");
     // Exercise resize tracking without changing any stream drawable geometry.
     [adjust performClick:nil]; pump();
     NSRect beforeMonitor=monitor.frame, beforeVideo=window.contentView.frame;

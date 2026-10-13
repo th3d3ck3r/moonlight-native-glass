@@ -40,6 +40,17 @@ static NSView* nativeTitleChrome(NSWindow* window) {
     return candidate;
 }
 
+static void finishNativeTracking(NSEvent* event,NSWindow* window) {
+    if (([NSEvent pressedMouseButtons] & 1) == 0) {
+        NSEvent* release=[NSEvent mouseEventWithType:NSEventTypeLeftMouseUp
+            location:event.locationInWindow modifierFlags:event.modifierFlags
+            timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:event.windowNumber
+            context:nil eventNumber:event.eventNumber clickCount:event.clickCount pressure:0];
+        [NSApp postEvent:release atStart:YES];
+    }
+    requestTitlebarInputRepair(window);
+}
+
 // SDL's Cocoa backend observes title-bar mouse-down before AppKit starts a
 // button's tracking loop. AppKit consumes the matching mouse-up inside that
 // loop, so return a title-bar release to SDL's normal event pump afterwards.
@@ -52,14 +63,7 @@ static NSView* nativeTitleChrome(NSWindow* window) {
     [[self retain] autorelease];
     NSWindow* trackingWindow=[[self.window retain] autorelease];
     [super mouseDown:event];
-    if (([NSEvent pressedMouseButtons] & 1) == 0) {
-        NSEvent* release=[NSEvent mouseEventWithType:NSEventTypeLeftMouseUp
-            location:event.locationInWindow modifierFlags:event.modifierFlags
-            timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:event.windowNumber
-            context:nil eventNumber:event.eventNumber clickCount:event.clickCount pressure:0];
-        [NSApp postEvent:release atStart:YES];
-    }
-    requestTitlebarInputRepair(trackingWindow);
+    finishNativeTracking(event,trackingWindow);
 }
 @end
 
@@ -72,11 +76,18 @@ static NSView* nativeTitleChrome(NSWindow* window) {
     [[self retain] autorelease];
     NSWindow* trackingWindow=[[self.window retain] autorelease];
     [super mouseDown:event];
-    if (([NSEvent pressedMouseButtons] & 1)==0) {
-        NSEvent* release=[NSEvent mouseEventWithType:NSEventTypeLeftMouseUp location:event.locationInWindow modifierFlags:event.modifierFlags timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:event.windowNumber context:nil eventNumber:event.eventNumber clickCount:event.clickCount pressure:0];
-        [NSApp postEvent:release atStart:YES];
-    }
-    requestTitlebarInputRepair(trackingWindow);
+    finishNativeTracking(event,trackingWindow);
+}
+@end
+// Popup menu cancellation consumes tracking too, even without a selection.
+@interface MLStreamMonitorPopup : NSPopUpButton
+@end
+@implementation MLStreamMonitorPopup
+- (void)mouseDown:(NSEvent*)event {
+    [[self retain] autorelease];
+    NSWindow* trackingWindow=[[self.window retain] autorelease];
+    [super mouseDown:event];
+    finishNativeTracking(event,trackingWindow);
 }
 @end
 #include "nativehardware.inc"
@@ -402,6 +413,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
         BOOL show=!compact && (![identifier isEqual:batteryID] || battery);
         button.hidden=!show;
         if (show) { CGFloat size=[identifier isEqual:batteryID] ? 38 : 24; button.frame=NSMakeRect(right-size,0,size,h); right-=size+4; if ([identifier isEqual:recordID] || [identifier isEqual:muteID]) right-=8; }
+        if ([identifier isEqual:batteryID]) right-=8;
     }
     NSButton* capture=self.buttons[captureID]; capture.hidden=compact;
     capture.frame=NSMakeRect(3,0,24,h);

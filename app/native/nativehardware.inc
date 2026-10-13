@@ -150,13 +150,15 @@ static MLHardwareReading readLocalHardware() {
             b.frame=NSMakeRect(10+(i%3)*92,8+(i/3)*26,90,24); [self.adjustments addSubview:b];
         }
         for (NSUInteger i=0;i<2;++i) {
-            NSPopUpButton* b=[[[NSPopUpButton alloc] initWithFrame:NSMakeRect(10+i*132,64,126,26) pullsDown:NO] autorelease];
+            NSPopUpButton* b=[[[MLStreamMonitorPopup alloc] initWithFrame:NSMakeRect(10+i*132,64,126,26) pullsDown:NO] autorelease];
             [b addItemsWithTitles:i ? @[@"History: 1 min",@"History: 3 min",@"History: 5 min"] : @[@"Update: 0.5 sec",@"Update: 1 sec",@"Update: 2 sec"]];
             b.tag=i; b.target=self; b.action=@selector(option:);
             [b selectItemAtIndex:i ? (self.seconds==60 ? 0 : self.seconds==180 ? 1 : 2) : (self.interval==.5 ? 0 : self.interval==1 ? 1 : 2)];
             [self.adjustments addSubview:b];
         }
-        NSSlider* opacity=[MLStreamVolumeSlider sliderWithValue:self.alphaValue minValue:.35 maxValue:1 target:self action:@selector(opacity:)];
+        NSSlider* opacity=[[[MLStreamVolumeSlider alloc] initWithFrame:NSMakeRect(74,100,184,24)] autorelease];
+        opacity.minValue=.35; opacity.maxValue=1; opacity.doubleValue=self.alphaValue;
+        opacity.target=self; opacity.action=@selector(opacity:); opacity.continuous=YES;
         opacity.trackFillColor=crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : nil;
         opacity.frame=NSMakeRect(74,100,184,24); [opacity setAccessibilityLabel:@"Hardware Monitor Opacity"];
         [self.adjustments addSubview:opacity];
