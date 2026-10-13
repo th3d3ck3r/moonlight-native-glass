@@ -104,7 +104,7 @@ jobs:
             app/native/nativeapplication.mm app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/StreamWindowTests.mm \
             -L libs/mac/lib -lSDL2 -framework AppKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/stream-window-tests
-          build/stream-window-tests
+          python3 tests/native/run_window_probe.py build/stream-window-tests
       - name: Audit native window and input lifetime with sanitizers
         if: matrix.architecture == 'universal'
         run: |
@@ -118,7 +118,9 @@ jobs:
         if: always() && matrix.architecture == 'universal'
         with:
           name: Native-Fullscreen-Previews
-          path: build/fullscreen-previews/**/*.png
+          path: |
+            build/fullscreen-previews/**/*.png
+            build/window-probe-sample.txt
           if-no-files-found: warn
       - uses: actions/upload-artifact@v6
         if: matrix.architecture == 'universal'
