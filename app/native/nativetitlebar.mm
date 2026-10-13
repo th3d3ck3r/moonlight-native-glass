@@ -130,11 +130,12 @@ static void requestTitlebarInputRepair(NSWindow* window) {
 - (void)repairInput:(NSTimer*)timer {
     self.inputRepairTimer=nil;
     if (!self.window || !self.window.visible || self.window.miniaturized ||
+        self.windowTransition || self.fullscreenTransition ||
         !NSApp.active || !self.window.keyWindow) return;
     if ([NSEvent pressedMouseButtons] & 1) { [self requestInputRepair]; return; }
     // Popovers own local interaction until dismissal. Their close callbacks
     // request repair; never recapture the host behind an open native popup.
-    if (self.details.shown) return;
+    if (self.details.shown || self.trackingMenu) return;
     SDL_Window* window=SDL_GetKeyboardFocus();
     if (!window) return;
     SDL_SysWMinfo info; SDL_VERSION(&info.version);
