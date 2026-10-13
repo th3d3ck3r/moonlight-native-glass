@@ -2,7 +2,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <VideoToolbox/VideoToolbox.h>
 #include "../../recording/RecorderABI.h"
-#include <opus/opus.h>
+#include <opus.h>
 #include <dlfcn.h>
 #include <thread>
 #include <chrono>
@@ -54,7 +54,7 @@ int main(int argc,char** argv) {
         assert(argc==3);void* library=dlopen(argv[1],RTLD_NOW|RTLD_LOCAL);if(!library) {fprintf(stderr,"%s\n",dlerror());return 1;}
         auto entry=reinterpret_cast<MLGRecorderEntry>(dlsym(library,"MoonlightLGRecorderGetAPI"));assert(entry && !entry(999));api=entry(MLG_RECORDER_ABI);assert(api && api->size==sizeof(*api));
         NSString* dir=[NSString stringWithUTF8String:argv[2]];
-        [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+        [[NSFileManager defaultManager] removeItemAtPath:dir error:nullptr];
         MLGRecorderConfig cfg{};cfg.size=sizeof(cfg);cfg.abi=MLG_RECORDER_ABI;cfg.codec=1;cfg.width=640;cfg.height=360;cfg.fps=60;cfg.memory_megabytes=16;cfg.directory=argv[2];
         // Recorder disabled: input is ignored without inspecting a null buffer.
         void* disabled=api->create(&cfg);assert(disabled && api->interest(disabled)==0);
@@ -79,7 +79,7 @@ int main(int argc,char** argv) {
         CFRelease(image);VTCompressionSessionInvalidate(encoder);CFRelease(encoder);opus_encoder_destroy(opus);
         pauseMs(300);auto s=state(recorder);fprintf(stderr,"Source status: %s, drops %llu\n",s.message,(unsigned long long)s.dropped);assert(!s.failed && s.recording && s.replay_ready);
         api->command(recorder,2);pauseMs(100);api->command(recorder,1);pauseMs(100);api->destroy(recorder);
-        unsigned recordings=0;for(NSString* file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nil]) if([file.pathExtension isEqual:@"mov"]) {verify([dir stringByAppendingPathComponent:file],true);recordings++;}assert(recordings==2);
+        unsigned recordings=0;for(NSString* file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nullptr]) if([file.pathExtension isEqual:@"mov"]) {verify([dir stringByAppendingPathComponent:file],true);recordings++;}assert(recordings==2);
         // Hardware path: one encoder, a replay buffer and a manual writer.
         cfg.mode=1;cfg.output_codec=2;cfg.output_width=320;cfg.output_height=180;cfg.output_fps=30;cfg.bitrate=5000000;cfg.audio_channels=0;cfg.replay_seconds=30;
         recorder=api->create(&cfg);assert(recorder);api->command(recorder,1);pauseMs(100);

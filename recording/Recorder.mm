@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <AVFoundation/AVFoundation.h>
 #import <VideoToolbox/VideoToolbox.h>
-#include <opus/opus_multistream.h>
+#include <opus_multistream.h>
 #include "RecorderABI.h"
 #include "AnnexB.h"
 #include "BoundedQueue.h"
@@ -216,7 +216,18 @@ struct Recorder {
     void fail(const char* text) {
         interest.store(0); replay=false; recordWanted=false;
         { std::lock_guard<std::mutex> l(statusMutex); current.failed=1; }
-        finishMovie(); update(text);
+        finishMovie();releaseEncoder();resetAudio(); update(text);
+    }
+    void resetAudio() {
+        if(opus) {opus_multistream_decoder_destroy(opus);opus=nullptr;}
+        if(audioFormat) {CFRelease(audioFormat);audioFormat=nullptr;}
+        haveAudio=false;
+    }
+    void releaseEncoder() {
+        if(encoder) {VTCompressionSessionInvalidate(encoder);CFRelease(encoder);encoder=nullptr;}
+        if(transfer) {VTPixelTransferSessionInvalidate(transfer);CFRelease(transfer);transfer=nullptr;}
+        if(pool) {CFRelease(pool);pool=nullptr;}
+        lastEncoded=-1;
     }
     void refreshInterest() {
         unsigned bits=(replay||recordWanted) ? (cfg.mode==0 ? 1 : 2) : 0;
@@ -224,7 +235,8 @@ struct Recorder {
         interest.store(bits);
     }
     bool enqueue(std::unique_ptr<Input> input, size_t bytes, bool command=false) {
-        if(bytes>MaxIngress || (quit.load() && input->kind!=4 && input->kind!=5)) return false;
+        if(bytes>MaxIngress) {drops++;overflow.store(true);return false;}
+        if(quit.load() && input->kind!=4 && input->kind!=5) return false;
         size_t previous=queuedBytes.fetch_add(bytes,std::memory_order_relaxed);
         input->cost=bytes;
         if(previous>MaxIngress-bytes || !queue.push(std::move(input))) {
@@ -378,10 +390,11 @@ struct Recorder {
             fail("Hardware encoder does not support requested recording settings"); return false;
         }
         set(kVTCompressionPropertyKey_ExpectedFrameRate,(__bridge CFNumberRef)@(cfg.output_fps?:cfg.fps));
+        if(VTCompressionSessionPrepareToEncodeFrames(encoder)) {fail("Hardware encoder could not prepare");return false;}
         CFTypeRef hardware=nullptr;
         e=VTSessionCopyProperty(encoder,kVTCompressionPropertyKey_UsingHardwareAcceleratedVideoEncoder,nullptr,&hardware);
         bool supported=!e && hardware==kCFBooleanTrue; if(hardware) CFRelease(hardware);
-        if(!supported || VTCompressionSessionPrepareToEncodeFrames(encoder)) {fail("Hardware encoding could not be confirmed"); return false;}
+        if(!supported) {fail("Hardware encoding could not be confirmed"); return false;}
         if(width!=cfg.width || height!=cfg.height) {
             NSDictionary* attrs=@{(__bridge NSString*)kCVPixelBufferWidthKey:@(width),(__bridge NSString*)kCVPixelBufferHeightKey:@(height),(__bridge NSString*)kCVPixelBufferPixelFormatTypeKey:@(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange),(__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey:@{}};
             if(CVPixelBufferPoolCreate(nullptr,nullptr,(__bridge CFDictionaryRef)attrs,&pool) || VTPixelTransferSessionCreate(nullptr,&transfer)) {fail("Hardware frame resizing unavailable");return false;}
@@ -391,7 +404,7 @@ struct Recorder {
     void decoded(const Input& input) {
         if(input.hdr) {fail("Custom HDR recording is not enabled; use Original Stream Quality for HDR");return;}
         int64_t pts=timestamp(input.rtp,input.clock);
-        unsigned fps=cfg.output_fps?:cfg.fps;
+        unsigned fps=std::min(cfg.output_fps?:cfg.fps,cfg.fps);
         if(lastEncoded>=0 && pts-lastEncoded<90000/int64_t(fps)) return;
         if(!encoder && !setupEncoder()) return;
         CVPixelBufferRef image=input.pixel, resized=nullptr;
@@ -450,6 +463,7 @@ struct Recorder {
             if(![[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:&error]) fail("Recording folder cannot be created");
         }
         for(;;) {
+            if(overflow.exchange(false)) { @autoreleasepool {fail("Recorder queue overloaded; recording stopped and streaming continues");} }
             std::unique_ptr<Input> input;
             if(!pop(input)) {
                 if(quit.load()) break;
@@ -459,10 +473,11 @@ struct Recorder {
             }
             @autoreleasepool {
                 std::lock_guard<std::mutex> serial(encodeMutex);
-                if(overflow.exchange(false)) { fail("Recorder queue overloaded; recording stopped and streaming continues"); }
                 if(input->kind>=10) {
                     if(input->kind==11) {
-                        if(recordWanted) {drainEncoded();recordWanted=false;finishMovie();} else recordWanted=true;
+                        if(cfg.mode==0 && cfg.codec==0) {fail("Original Stream Quality supports H.264/HEVC; select Custom Hardware Encoding");continue;}
+                        if(recordWanted) {drainEncoded();recordWanted=false;finishMovie();if(!replay) {releaseEncoder();resetAudio();}}
+                        else {if(!replay) resetAudio();recordWanted=true;}
                         {std::lock_guard<std::mutex> l(statusMutex);current.failed=0;}
                         refreshInterest(); update(recordWanted ? "Waiting for next keyframe" : "Recording stopped");
                     } else if(input->kind==12) saveReplay();
@@ -480,8 +495,8 @@ struct Recorder {
         drainEncoded();
         // Encoder callbacks are queued before finalization. The queue remains
         // alive until all callbacks/exports complete in the destructor.
-        dispatch_group_wait(exports,DISPATCH_TIME_FOREVER);
         finishMovie();
+        dispatch_group_wait(exports,DISPATCH_TIME_FOREVER);
     }
 };
 void* create(const MLGRecorderConfig* c) {

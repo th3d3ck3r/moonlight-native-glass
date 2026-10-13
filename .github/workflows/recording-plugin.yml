@@ -1,0 +1,38 @@
+name: MoonlightLG Recorder Validation
+on:
+  push:
+    branches: [feature/recording-plugin]
+    paths: ['recording/**', 'tests/native/Recorder*', 'scripts/build-recorder-plugin.py', '.github/workflows/recording-plugin.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: recorder-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  recorder:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - name: Build both plugin architectures and test actual movies
+        run: |
+          python3 setup-deps.py
+          mkdir -p build
+          python3 scripts/build-recorder-plugin.py build/libMoonlightLGRecorder.dylib arm64 x86_64
+          xcrun clang++ -std=c++17 -pthread -fsanitize=address,undefined tests/native/RecorderCoreTests.cpp -o build/recorder-core-tests
+          build/recorder-core-tests
+          xcrun clang++ -std=c++17 -fobjc-arc -I libs/mac/include tests/native/RecorderTests.mm \
+            -L libs/mac/lib -lopus.0 -framework Foundation -framework AVFoundation \
+            -framework VideoToolbox -framework CoreMedia -framework CoreVideo -framework AudioToolbox \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/recorder-tests
+          DYLD_LIBRARY_PATH="$PWD/libs/mac/lib" build/recorder-tests "$PWD/build/libMoonlightLGRecorder.dylib" "$PWD/build/recording-fixtures"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: Recording-Test-Fixtures
+          path: build/recording-fixtures/*.mov
+          if-no-files-found: warn
