@@ -25,7 +25,8 @@ struct Spool {
     int fd=-1; off_t end=0;
     explicit Spool(NSString* directory) {
         NSString* file=[directory stringByAppendingPathComponent:@".MoonlightLG-replay-XXXXXX"];
-        std::vector<char> path(file.fileSystemRepresentation,file.fileSystemRepresentation+strlen(file.fileSystemRepresentation)+1);
+        const char* representation=file.fileSystemRepresentation;
+        std::vector<char> path(representation,representation+strlen(representation)+1);
         fd=mkstemp(path.data());
         if(fd>=0) {fcntl(fd,F_SETFD,FD_CLOEXEC);unlink(path.data());}
     }
@@ -522,7 +523,7 @@ int pixelImpl(void* p,void* cv,uint32_t rtp,uint64_t clock,int hdr) {
     auto self=static_cast<Recorder*>(p);if(!(interest(p)&2)) return 0;
     auto input=std::make_unique<Input>();input->kind=2;input->rtp=rtp;input->clock=clock;input->hdr=hdr;
     if(!cv) {input->kind=6;return self->enqueue(std::move(input),0);}
-    input->pixel=static_cast<CVPixelBufferRef>(cv);CFRetain(input->pixel);size_t cost=CVPixelBufferGetDataSize(input->pixel);return self->enqueue(std::move(input),cost);
+    input->pixel=static_cast<CVPixelBufferRef>(cv);CFRetain(input->pixel);size_t cost=std::max(CVPixelBufferGetDataSize(input->pixel),CVPixelBufferGetWidth(input->pixel)*CVPixelBufferGetHeight(input->pixel)*size_t(4));return self->enqueue(std::move(input),cost);
 }
 int audioImpl(void* p,const void* bytes,size_t size,uint64_t clock) {
     auto self=static_cast<Recorder*>(p);if(!(interest(p)&4)) return 0;

@@ -249,7 +249,7 @@ import XCTest
                 XCTAssertEqual(resolution.value as? String, "1080p")
             }
             if screen == "settings-recording" {
-                XCTAssertTrue(window.checkBoxes["recording-enabled"].exists, "Recording opt-in missing")
+                XCTAssertTrue(window.descendants(matching: .any)["recording-enabled"].firstMatch.exists, "Recording opt-in missing")
             }
             if screen == "settings-shortcuts" {
                 XCTAssertTrue(window.staticTexts["Close Stream Window"].exists, "Shortcut bindings missing")
