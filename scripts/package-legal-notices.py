@@ -10,6 +10,7 @@ import posixpath
 import re
 import shutil
 import struct
+import subprocess
 import sys
 import tarfile
 import time
@@ -50,6 +51,9 @@ def moltenvk_ref(bundle):
     library = next(bundle.glob('Contents/Frameworks/libMoltenVK*.dylib'), None)
     if library is None:
         raise RuntimeError('Missing packaged MoltenVK for source identification')
+    # macdeployqt may have adjusted load commands. Make this build-time load
+    # valid on Apple Silicon; the complete bundle is signed again afterward.
+    subprocess.run(['codesign', '--force', '--sign', '-', str(library)], check=True)
     driver = ctypes.CDLL(str(library))
     get_version = driver.vkGetVersionStringsMVK
     get_version.argtypes = [ctypes.c_char_p, ctypes.c_uint32, ctypes.c_char_p, ctypes.c_uint32]
@@ -59,6 +63,7 @@ def moltenvk_ref(bundle):
     match = re.search(r'\b(\d+[.]\d+[.]\d+)\b', molten.value.decode())
     if not match:
         raise RuntimeError('Cannot identify the bundled MoltenVK source version')
+    print('Resolved packaged MoltenVK source version:', match[1], flush=True)
     return 'v' + match[1]
 
 

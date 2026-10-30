@@ -15,6 +15,9 @@ on:
       - 'tests/native/NativeUIScreensTests.swift'
       - 'tests/native/BootPlaybackTests.swift'
       - 'scripts/build-xcode-engine.py'
+      - 'scripts/package-legal-notices.py'
+      - 'scripts/package-release-source.py'
+      - 'legal/**'
       - 'scripts/xcode-python.json'
       - 'scripts/xcode-submodules.json'
       - 'tests/native/check_bundle.py'
@@ -89,3 +92,4 @@ jobs:
           name: Xcode-Project-UI-Captures
           path: build/xcode-captures/*
           if-no-files-found: warn
+
