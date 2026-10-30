@@ -46,9 +46,9 @@ static void heldClick(NSWindow* window, NSButton* element) {
     Uint32 before=SDL_GetTicks();
     [window sendEvent:down];
     check(SDL_GetTicks()-before<150,"Connection mouse-down must return without entering an NSCell tracking loop");
-    check(element.highlighted,"Held connection button must show its pressed state");
+    check([element.cell isHighlighted],"Held connection button must show its pressed state");
     drain(.55);
-    check(!element.highlighted,"Mouse-up must clear the pressed state");
+    check(![element.cell isHighlighted],"Mouse-up must clear the pressed state");
 }
 int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching]; SDL_SetMainReady();
