@@ -6,7 +6,9 @@ import subprocess
 import sys
 
 app = pathlib.Path(sys.argv[1])
-required = {"x86_64", "arm64"} if sys.argv[2] == "universal" else {"x86_64"}
+architecture = sys.argv[2]
+assert architecture in {"arm64", "x86_64", "universal"}, "Unknown bundle architecture"
+required = {"x86_64", "arm64"} if architecture == "universal" else {architecture}
 for bundle, identity in [(app, "com.moonlight-stream.NativeGlass"),
                          (app / "Contents/Helpers/MoonlightLGEngine.app", "com.moonlight-stream.NativeGlass.Engine")]:
     info = plistlib.loads((bundle / "Contents/Info.plist").read_bytes())
@@ -54,6 +56,8 @@ for file in app.rglob("*"):
         continue
     slices = set(subprocess.check_output(["lipo", "-archs", str(file)], text=True).split())
     assert required <= slices, f"{file}: missing {required - slices}"
+    if architecture == "arm64":
+        assert slices == {"arm64"}, f"{file}: Apple Silicon-only package contains {slices}"
     dependencies = subprocess.check_output(["otool", "-L", str(file)], text=True)
     # otool -L also lists a dylib's own LC_ID_DYLIB. It is an identity,
     # not an edge that must resolve through this image's runpath list.
@@ -95,3 +99,4 @@ for file in app.rglob("*"):
     checked += 1
 assert checked >= 2, "No native app and engine found"
 print(f"Validated bundle permissions, identities, library dependencies and {checked} Mach-O files: {sorted(required)}")
+

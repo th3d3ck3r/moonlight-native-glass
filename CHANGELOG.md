@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.3.2.0 — release validation — 2026-10-30
+
+- Dedicated Apple Silicon-only (arm64) build for M-series Macs, alongside Intel and Universal packages. All nested Mach-O files are thinned before signing and checked for arm64-only slices.
+- Includes the Continue button event-pump and timeout-recovery fixes from 1.3.1.1U, plus Crimson Glass, stream statistics and optional recording/replay.
+- Internal build 42; stable-channel packages will be published after complete macOS/Xcode validation. Live-host performance and streaming on the owner’s Mac are not verified by CI.
+
 ## 1.3.1.1U — unreleased — 2026-10-30
 
 - Keep Continue/Cancel mouse presses nonblocking inside the Qt/SDL-owned connection window. A press and release arriving on separate event-pump turns no longer require NSCell's nested tracking loop.

@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        architecture: [x86_64, universal]
+        architecture: [arm64, x86_64, universal]
     runs-on: macos-26
     timeout-minutes: 25
     steps:
@@ -138,18 +138,18 @@ jobs:
       - name: Build app and verify bundle
         run: bash scripts/build-native-macos.sh '${{ matrix.architecture }}'
       - name: Verify packaged stream window opens before connecting
-        if: matrix.architecture == 'universal'
-        run: python3 tests/native/connection_window_bridge.py 'build/native-universal/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight'
+        if: matrix.architecture != 'x86_64'
+        run: python3 tests/native/connection_window_bridge.py 'build/native-${{ matrix.architecture }}/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight'
       - name: Test real engine bridge and persistence
-        if: matrix.architecture == 'universal'
+        if: matrix.architecture != 'x86_64'
         env:
           MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB: ${{ github.workspace }}/build/helper-backtrace.dylib
           MOONLIGHT_NATIVE_SHUTDOWN_CYCLES: '100'
         run: |
           mkdir -p build/previews
           xcrun clang++ -std=c++17 -dynamiclib -undefined dynamic_lookup -g tests/native/NativeCrashTrace.cpp -o build/helper-backtrace.dylib
-          python3 tests/native/bridge_smoke.py 'build/native-universal/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
-          env -u MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB python3 tests/native/bridge_smoke.py 'build/native-universal/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight'
+          python3 tests/native/bridge_smoke.py 'build/native-${{ matrix.architecture }}/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
+          env -u MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB python3 tests/native/bridge_smoke.py 'build/native-${{ matrix.architecture }}/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight'
       - name: Test actual menu bar icon state
         if: matrix.architecture == 'universal'
         run: |
@@ -217,3 +217,4 @@ jobs:
           name: Native-UI-Quick-Window-Captures
           path: build/previews/*
           if-no-files-found: warn
+

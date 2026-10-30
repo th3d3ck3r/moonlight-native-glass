@@ -1,13 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-# Usage: scripts/build-native-macos.sh x86_64|universal
+# Usage: scripts/build-native-macos.sh arm64|x86_64|universal
 # Keep the original Qt project, dependencies and streaming build flags.
 arch_set=${1:-universal}
 case "$arch_set" in
+    arm64) qt_archs="arm64"; native_archs=(arm64) ;;
     x86_64) qt_archs="x86_64"; native_archs=(x86_64) ;;
     universal) qt_archs="x86_64 arm64"; native_archs=(x86_64 arm64) ;;
-    *) echo "Expected x86_64 or universal" >&2; exit 1 ;;
+    *) echo "Expected arm64, x86_64 or universal" >&2; exit 1 ;;
 esac
 source_root=$(pwd)
 build_root="$source_root/build/native-$arch_set"
@@ -38,7 +39,7 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Helpers"
 if [ "$arch_set" = universal ]; then
     lipo -create "$build_root/bin/MoonlightLG-x86_64" "$build_root/bin/MoonlightLG-arm64" -output "$app/Contents/MacOS/MoonlightLG"
 else
-    cp "$build_root/bin/MoonlightLG-x86_64" "$app/Contents/MacOS/MoonlightLG"
+    cp "$build_root/bin/MoonlightLG-$arch_set" "$app/Contents/MacOS/MoonlightLG"
 fi
 cp macos-native/Resources/moonlight.icns "$app/Contents/Resources/moonlight.icns"
 cp macos-native/Resources/crimson-moon.png "$app/Contents/Resources/crimson-moon.png"
@@ -63,6 +64,12 @@ info.update(CFBundleIdentifier="com.moonlight-stream.NativeGlass.Engine",
 path.write_bytes(plistlib.dumps(info, sort_keys=False))
 PLIST
 
+if [ "$arch_set" = arm64 ]; then
+    # Imported Qt/dependency frameworks may be fat even for a single-CPU
+    # application build. Thin the complete bundle before its final signature.
+    python3 scripts/thin-macos-bundle.py "$app" arm64
+fi
+
 # Ad-hoc signatures make all nested code verifiable and retain one bundle
 # identity. This is not Developer ID signing or notarization. Verify all code;
 # do not strip signatures or alter entitlements to bypass privacy controls.
@@ -70,3 +77,4 @@ codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 python3 tests/native/check_bundle.py "$app" "$arch_set"
 echo "Built $app"
+
