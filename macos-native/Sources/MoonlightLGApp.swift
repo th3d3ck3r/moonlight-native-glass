@@ -168,7 +168,7 @@ private struct NativeStatusActions: View {
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .center
     let credits = NSMutableAttributedString(
-        string: "SwiftUI/AppKit interface\nMoonlight Qt \(engineVersion) streaming engine\n\nMoonlightLG created and maintained by Th3D3ck3r\nBased on Moonlight Qt and moonlight-common-c by the Moonlight developers and contributors.\n\nUses Qt, SDL, FFmpeg, Opus, OpenSSL, libplacebo, MoltenVK and other open-source components.\nQt © The Qt Company Ltd. and contributors.\nOriginal copyright and license notices are preserved.\n\nFree software under GNU GPL version 3. You may redistribute and modify it under those terms.\nProvided WITHOUT ANY WARRANTY.\n\nLicenses & Notices\nCorresponding Source\nGitHub Repository",
+        string: "Moonlight Qt \(engineVersion) streaming engine\nGPL-3.0 · WITHOUT ANY WARRANTY\nLicenses & Notices\n\nMoonlightLG created and maintained by Th3D3ck3r\nSwiftUI/AppKit interface\n\nBased on Moonlight Qt and moonlight-common-c by the Moonlight developers and contributors.\n\nUses Qt, SDL, FFmpeg, Opus, OpenSSL, libplacebo, MoltenVK and other open-source components.\nQt © The Qt Company Ltd. and contributors.\nOriginal copyright and license notices are preserved.\n\nFree software under GNU GPL version 3. You may redistribute and modify it under those terms.\nProvided WITHOUT ANY WARRANTY.\n\nCorresponding Source\nGitHub Repository",
         attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
                      .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
     for (label, url) in [("GitHub Repository", URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass")!),
