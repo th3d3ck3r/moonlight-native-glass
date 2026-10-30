@@ -22,6 +22,7 @@ class LegalNoticesTests(unittest.TestCase):
             try:
                 attribution = json.dumps({'Name': 'Fixture library', 'Copyright': 'Copyright 1998 Original Author',
                                           'LicenseFile': '../rights/TERMS.txt'}).encode()
+                attribution = attribution.replace(b'Original Author', b'Original "Author"\tand contributors')
                 terms = b'Original copyright and permission notice.\n'
                 with tarfile.open(folder / 'fixture.tar.gz', 'w:gz') as archive:
                     for name, data in [('upstream/src/qt_attribution.json', attribution), ('upstream/rights/TERMS.txt', terms),

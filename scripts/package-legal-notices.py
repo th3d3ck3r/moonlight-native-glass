@@ -106,11 +106,21 @@ def collect_archive(component, destination):
         for path, member in files.items():
             if PurePosixPath(path).name != 'qt_attribution.json':
                 continue
-            data = json.load(archive.extractfile(member))
-            for entry in data if isinstance(data, list) else [data]:
-                names = entry.get('LicenseFile', [])
+            # Preserve copyright metadata verbatim, including nonstandard text
+            # and scanner fixtures. Decode only LicenseFile values; unrelated
+            # malformed copyright strings must not discard original notices.
+            text = archive.extractfile(member).read().decode('utf-8-sig')
+            for match in re.finditer(r'"LicenseFile"\s*:\s*', text):
+                try:
+                    names, _ = json.JSONDecoder(strict=False).raw_decode(text, match.end())
+                except json.JSONDecodeError as error:
+                    raise RuntimeError(f"Cannot read license reference: {component['name']}/{path}") from error
                 if isinstance(names, str):
                     names = [names]
+                if names is None:
+                    names = []
+                if not isinstance(names, list) or not all(isinstance(name, str) for name in names):
+                    raise RuntimeError(f"Invalid license reference: {component['name']}/{path}")
                 for name in names:
                     candidate = posixpath.normpath(str(PurePosixPath(path).parent / name))
                     if candidate in files:
