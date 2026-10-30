@@ -73,15 +73,17 @@ func nativeArgument(_ name: String) -> String? { nil }
                     request = json.loads(line)
                     if request['command'] == 'confirmQuit':
                         emit({'event': 'connected'})
-                        if '\(mode)' == 'owner-continue':
-                            emit({'event': 'streaming'})
-                            emit({'event': 'windowOpened'})
+                        if '\(mode)' in ('owner-continue', 'owner-stalled'):
+                            emit({'event': 'enteringStream'})
+                            if '\(mode)' == 'owner-continue':
+                                emit({'event': 'windowOpened'})
                     elif request['command'] == 'showConnectionWindow':
                         pathlib.Path('restored-connection').write_text('restored')
                     elif request['command'] == 'continueStream':
                         pathlib.Path('continued').write_text('continued')
-                        emit({'event': 'streaming'})
-                        emit({'event': 'windowOpened'})
+                        emit({'event': 'enteringStream'})
+                        if '\(mode)' != 'frontend-stalled':
+                            emit({'event': 'windowOpened'})
                     elif request['command'] == 'cancelStream':
                         emit({'event': 'error', 'message': 'Late error after intentional cancel'})
                         emit({'event': 'windowOpened'})
@@ -159,6 +161,33 @@ func nativeArgument(_ name: String) -> String? { nil }
         owner.confirmQuit()
         try await wait { owner.streamStarted && owner.connectionJourney == nil }
         owner.shutdown()
+
+        // Exercise the hosted Continue event path and frontend command path
+        // when the real process acknowledges entry but never opens a window.
+        for mode in ["owner-stalled", "frontend-stalled"] {
+            let stalled = EngineStore(executable: try fixture(mode), streamHandoffTimeout: .milliseconds(250))
+            let library = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                                   styleMask: [.titled], backing: .buffered, defer: false)
+            library.isReleasedWhenClosed = false
+            stalled.libraryWindow = library
+            library.orderOut(nil)
+            stalled.start(); try await wait { stalled.ready }
+            stalled.startStream(computer, game: game)
+            try await wait { stalled.values["fixtureStep"] as? String == "pause" }
+            stalled.send("release", ["index": 0]); try await wait { stalled.quitRequired != nil }
+            stalled.confirmQuit()
+            if mode == "frontend-stalled" {
+                try await wait { stalled.connectionJourney?.phase == .connected }
+                stalled.continueToStream()
+            }
+            try await wait { stalled.connectionJourney?.phase == .entering }
+            precondition(!stalled.streamStarted && !stalled.streamWindowExists,
+                         "Continue acknowledgement incorrectly reported a running stream")
+            try await wait { stalled.message?.detail.contains("stream window did not open") == true && !stalled.streamActive }
+            precondition(stalled.connectionJourney == nil && library.isVisible,
+                         "Handoff timeout left its error hidden behind the helper")
+            stalled.shutdown(); library.close()
+        }
 
         let brokenHelper = try fixture("broken-pipe")
         for operation in 0..<3 {
@@ -290,3 +319,4 @@ func nativeArgument(_ name: String) -> String? { nil }
         print("PASS: helper exit, missing/broken-pipe sends, busy guard, live rejection, cancelled/replacement replies, confirmation dismissal, quiet cancellation, launch deadline, malformed events")
     }
 }
+

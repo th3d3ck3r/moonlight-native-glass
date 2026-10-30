@@ -182,8 +182,32 @@ struct NativeConnectionView: View {
 // SDL and Qt own this window's event loop. Use AppKit target/action controls
 // so connection actions do not depend on SwiftUI gesture dispatch in that loop.
 private final class ConnectionActionButton: NSButton {
+    private var mousePressed = false
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
+    // NSButton's default mouseDown runs an NSCell tracking loop until mouse-up.
+    // This window is pumped by Qt/SDL rather than NSApplication.run. Keep its
+    // pump free between real press/release events instead of nesting tracking.
+    override func mouseDown(with event: NSEvent) {
+        guard isEnabled else { return }
+        mousePressed = true
+        highlight(true)
+    }
+    override func mouseDragged(with event: NSEvent) {
+        guard mousePressed else { return }
+        highlight(bounds.contains(convert(event.locationInWindow, from: nil)))
+    }
+    override func mouseUp(with event: NSEvent) {
+        guard mousePressed else { return }
+        mousePressed = false
+        highlight(false)
+        guard isEnabled, bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
+        sendAction(action, to: target)
+    }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { mousePressed = false; highlight(false) }
+    }
 }
 private struct NativeConnectionButton: NSViewRepresentable {
     let title: String
@@ -216,3 +240,4 @@ private struct NativeConnectionButton: NSViewRepresentable {
     }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSButton, context: Context) -> CGSize? { nsView.fittingSize }
 }
+

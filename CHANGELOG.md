@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.3.1.1U — unreleased — 2026-10-30
+
+- Keep Continue/Cancel mouse presses nonblocking inside the Qt/SDL-owned connection window. A press and release arriving on separate event-pump turns no longer require NSCell's nested tracking loop.
+- Distinguish Continue acceptance from an opened stream window. Both the hosted Continue button and frontend Continue action use the same 15-second handoff deadline; a stalled handoff cancels the helper and restores the library with a visible error.
+- Add delayed mouse-event button coverage and real-process regressions for both stalled Continue paths. Internal build 41; macOS/Xcode validation pending. Live-host acceptance remains unverified.
+
 ## 1.3.1.0U — unreleased — 2026-10-13
 
 - Stream statistics now match the hardware monitor: Crimson Glass, uppercase labels, bold values and rolling one-minute sparklines. All source readings and metadata are retained.
@@ -138,3 +144,4 @@ Validation: [Native macOS](https://github.com/th3d3ck3r/moonlight-native-glass/a
 and [shutdown sanitizers](https://github.com/th3d3ck3r/moonlight-native-glass/actions/runs/38278138691) passed.
 Both UI suites passed 11 tests. See [audit](docs/MOONLIGHTLG_1.0.00U.md).
 Older previews and Experimental 24 retain their historical names.
+

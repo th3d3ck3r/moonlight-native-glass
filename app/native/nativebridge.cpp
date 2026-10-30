@@ -213,7 +213,9 @@ void NativeBridge::command(const QJsonObject& request) {
         else if (action == "continueStream" && m_Streaming && nativeConnectionWaiting()) {
             nativeSetConnectionWaiting(false);
             m_Input->setEnabled(false);
-            send({{"event", "streaming"}});
+            // Accepted Continue is a handoff, not proof that Session has
+            // attached its stream window. The frontend watches for windowOpened.
+            send({{"event", "enteringStream"}});
         }
         else if (action == "confirmQuit" && m_Launcher && !m_Streaming) m_Launcher->quitRunningApp();
         else error("This command is unavailable during streaming.");
@@ -478,3 +480,4 @@ void NativeBridge::startStream(const QStringList& args) {
     });
     QTimer::singleShot(0,this,[this] { if (!m_Stopping && !m_ConnectionCancelled) m_Launcher->execute(m_Manager.get()); });
 }
+

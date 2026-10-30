@@ -9,7 +9,7 @@ and macOS permissions. Do not rebrand upstream copyright/license attribution.
 ## Versions (user-required)
 
 The user-facing scheme is `redesign.major.minor.hotfix`, without leading zeros.
-The current development version is **1.3.1.0U** (internal build 40). Each component is a nonnegative
+The current development version is **1.3.1.1U** (internal build 41). Each component is a nonnegative
 integer with no decimal rollover: `1.2.9.0` → `1.2.10.0` → `1.2.11.0`.
 
 - `U`: unreleased development work. Share U build links only directly with the user.
@@ -50,3 +50,4 @@ input confinement and finite startup lifecycle. Avoid unrelated streaming-core,
 networking, decoder or settings changes. Existing streaming-boundary hashes may
 change only for reviewed native UI/action hooks. Report physical-host/Intel limits
 honestly; CI cross-builds Intel on Apple Silicon.
+

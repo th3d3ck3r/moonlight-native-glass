@@ -134,15 +134,17 @@ struct PairingRequest: Identifiable {
     private var hostDeadline: Task<Void, Never>?
     private var launchDeadline: Task<Void, Never>?
     private let executableOverride: URL?
+    private let streamHandoffTimeout: Duration
 
     var selected: Computer? { computers.first { $0.id == selectedID } }
     var executable: URL? {
         executableOverride ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight")
     }
 
-    init(preview: Bool = false, executable: URL? = nil) {
+    init(preview: Bool = false, executable: URL? = nil, streamHandoffTimeout: Duration = .seconds(15)) {
         self.preview = preview
         executableOverride = executable
+        self.streamHandoffTimeout = streamHandoffTimeout
         if preview {
             computers = [Computer(id: "preview-computer", name: "Gaming PC", online: true, unknown: false,
                 paired: true, runningApp: 0, address: "192.168.1.20", localAddress: "192.168.1.20",
@@ -360,6 +362,7 @@ struct PairingRequest: Identifiable {
                 self.status = "Connected to \(computer.name)"
             case "windowOpened":
                 self.streamWindowExists = true
+                self.streamStarted = true; self.status = "Streaming \(game.name)"
                 self.menuState.exists = true
                 self.menuAction(210)
                 if self.connectionJourney?.phase == .entering {
@@ -387,10 +390,8 @@ struct PairingRequest: Identifiable {
                 self.menuState.controls = event["controls"] as? Bool ?? false
                 self.menuState.muted = event["muted"] as? Bool ?? false
                 self.menuState.mode = event["mode"] as? Int ?? 0
-            case "streaming":
-                self.streamStarted = true; self.status = "Streaming \(game.name)"
-                self.connectionJourney?.phase = .entering
-                self.connectionJourney?.continueRequested = true
+            case "enteringStream", "streaming":
+                self.beginStreamHandoff()
             case "warning": self.warnings.append(event["message"] as? String ?? "")
             case "quitRequired": self.quitRequired = event["app"] as? String
             case "error": self.connectionFailed(event["message"] as? String ?? "Streaming failed.")
@@ -483,17 +484,28 @@ struct PairingRequest: Identifiable {
         guard connectionJourney?.phase == .connected, let stream else { return }
         do {
             try stream.send(["command": "continueStream"])
-            connectionJourney?.phase = .entering
-            connectionJourney?.continueRequested = true
-            connectionJourney?.detail = "Opening stream window…"
-            connectionDeadline?.cancel()
-            connectionDeadline = Task { [weak self, weak stream] in
-                try? await Task.sleep(for: .seconds(15))
-                guard !Task.isCancelled, let self, self.stream === stream,
-                      self.connectionJourney?.phase == .entering else { return }
-                self.connectionFailed("The stream window did not open. Cancel and try again; save Engine Logs if it happens again.")
-            }
+            beginStreamHandoff()
         } catch { connectionFailed(error.localizedDescription) }
+    }
+    private func beginStreamHandoff() {
+        // Both the hosted connection button and frontend commands reach here.
+        // Duplicate acknowledgements must not extend the deadline.
+        guard connectionJourney?.phase == .connected, let stream else { return }
+        connectionJourney?.phase = .entering
+        connectionJourney?.continueRequested = true
+        connectionJourney?.detail = "Opening stream window…"
+        connectionDeadline?.cancel()
+        connectionDeadline = Task { [weak self, weak stream] in
+            guard let timeout = self?.streamHandoffTimeout else { return }
+            do { try await Task.sleep(for: timeout) } catch { return }
+            guard let self, self.stream === stream,
+                  self.connectionJourney?.phase == .entering, !self.streamWindowExists else { return }
+            // The library is hidden while the helper owns Apollo. Restore it
+            // and cancel the stuck helper so the user can actually see/retry.
+            self.cancelLaunch()
+            self.fail("The stream window did not open. The connection was cancelled; try again.")
+            self.libraryWindow?.makeKeyAndOrderFront(nil)
+        }
     }
     func retryConnection() {
         guard !streamActive, let journey = connectionJourney, journey.phase == .failed else { return }
@@ -536,3 +548,4 @@ struct PairingRequest: Identifiable {
         channel?.stop(); stream?.stop()
     }
 }
+

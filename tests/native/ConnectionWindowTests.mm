@@ -1,4 +1,5 @@
 #import <AppKit/AppKit.h>
+#import <dispatch/dispatch.h>
 #include <SDL.h>
 #include <SDL_syswm.h>
 #include <QGuiApplication>
@@ -29,6 +30,25 @@ static void click(NSWindow* window, NSButton* element) {
         [NSApp postEvent:event atStart:NO];
     }
     drain(.3);
+}
+static void heldClick(NSWindow* window, NSButton* element) {
+    NSRect frame=[element convertRect:element.bounds toView:nil];
+    NSPoint location=NSMakePoint(NSMidX(frame),NSMidY(frame));
+    NSEvent* down=[NSEvent mouseEventWithType:NSEventTypeLeftMouseDown location:location modifierFlags:0
+        timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil eventNumber:2 clickCount:1 pressure:1];
+    NSEvent* up=[NSEvent mouseEventWithType:NSEventTypeLeftMouseUp location:location modifierFlags:0
+        timestamp:NSProcessInfo.processInfo.systemUptime+.35 windowNumber:window.windowNumber context:nil eventNumber:2 clickCount:1 pressure:0];
+    // The old NSCell mouseDown blocks here until this delayed release. A real
+    // click arrives in separate pump turns, unlike the prequeued click helper.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,350*NSEC_PER_MSEC),dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0),^{
+        [NSApp postEvent:up atStart:NO];
+    });
+    Uint32 before=SDL_GetTicks();
+    [window sendEvent:down];
+    check(SDL_GetTicks()-before<150,"Connection mouse-down must return without entering an NSCell tracking loop");
+    check(element.highlighted,"Held connection button must show its pressed state");
+    drain(.55);
+    check(!element.highlighted,"Mouse-up must clear the pressed state");
 }
 int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [NSApp finishLaunching]; SDL_SetMainReady();
@@ -68,7 +88,7 @@ int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepoo
     action=0;
     NSButton* proceed=button(host(content),@"Continue to Stream");
     check(proceed!=nil,"Continue must be a native control inside the real SDL hosting view");
-    click(original,proceed);
+    heldClick(original,proceed);
     check(action==1,"Mouse click on real Continue must invoke the bridge callback");
     check(!nativeConnectionWaiting(),"Actual Continue callback must release the connection gate"); nativeDetachConnectionWindowView();
     check(host(content)==nil && original.contentView==content && SDL_GetWindowID(window)==windowID,"Continue removes only the temporary hosting subview");
@@ -89,3 +109,4 @@ int main(int argc,char** argv) { QGuiApplication app(argc,argv); @autoreleasepoo
     [defaults synchronize]; [previousCrimson release];
     puts("PASS: actual SDL window opens before connection, hosts Apollo, orbits, handles Close/Cancel, and retains the same window/content on Continue");
 } }
+
