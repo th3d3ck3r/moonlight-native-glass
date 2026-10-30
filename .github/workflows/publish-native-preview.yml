@@ -120,7 +120,9 @@ jobs:
               matches = [a for a in attachments if a['suggestedHumanReadableName'].startswith(name + '_0_')]
               assert len(matches) == 1, name
               shutil.copyfile(captures / matches[0]['exportedFileName'], root / (name + '.png'))
-          shutil.copyfile('overlay-assets/overlay-controls-dark.png', root / 'overlay-controls-dark.png')
+          overlays = list(pathlib.Path('overlay-assets').rglob('overlay-controls-dark.png'))
+          assert len(overlays) == 1, overlays
+          shutil.copyfile(overlays[0], root / 'overlay-controls-dark.png')
           PY
       - name: Publish full release with the exact validated assets
         run: |
