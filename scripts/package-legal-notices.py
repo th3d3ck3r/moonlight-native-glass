@@ -114,7 +114,7 @@ def collect_archive(component, destination):
             # and scanner fixtures. Decode only LicenseFile values; unrelated
             # malformed copyright strings must not discard original notices.
             text = archive.extractfile(member).read().decode('utf-8-sig')
-            for match in re.finditer(r'"LicenseFile"\s*:\s*', text):
+            for match in re.finditer(r'"(?:LicenseFiles?|CopyrightFiles?)"\s*:\s*', text):
                 try:
                     names, _ = json.JSONDecoder(strict=False).raw_decode(text, match.end())
                 except json.JSONDecodeError as error:
@@ -207,6 +207,8 @@ def package(bundle):
     summary = ('MoonlightLG modifications: Copyright (c) 2026 Th3D3ck3r.\n'
                'Original Moonlight Qt and moonlight-common-c: the Moonlight developers and contributors.\n'
                'Qt framework: Copyright The Qt Company Ltd. and contributors.\n'
+               'This software is based in part on the work of the FreeType Team.\n'
+               'This software is based in part on the work of the Independent JPEG Group.\n'
                'All original copyright statements are preserved in the component notices below.\n\n'
                'MoonlightLG is free software under GNU GPL version 3. You may redistribute and modify it under that license.\n'
                'This program is provided WITHOUT ANY WARRANTY, including MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n'

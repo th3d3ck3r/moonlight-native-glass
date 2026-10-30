@@ -21,12 +21,14 @@ class LegalNoticesTests(unittest.TestCase):
             legal.CACHE = folder
             try:
                 attribution = json.dumps({'Name': 'Fixture library', 'Copyright': 'Copyright 1998 Original Author',
-                                          'LicenseFile': '../rights/TERMS.txt'}).encode()
+                                          'LicenseFile': '../rights/TERMS.txt', 'LicenseFiles': ['../rights/TERMS.txt'],
+                                          'CopyrightFile': '../rights/ATTRIBUTION.txt'}).encode()
                 attribution = attribution.replace(b'Original Author', b'Original "Author"\tand contributors')
                 terms = b'Original copyright and permission notice.\n'
                 with tarfile.open(folder / 'fixture.tar.gz', 'w:gz') as archive:
                     for name, data in [('upstream/src/qt_attribution.json', attribution), ('upstream/rights/TERMS.txt', terms),
-                                       ('upstream/LICENSES/BSD-3-Clause.txt', terms), ('upstream/build_recipe.py', terms)]:
+                                       ('upstream/LICENSES/BSD-3-Clause.txt', terms), ('upstream/build_recipe.py', terms),
+                                       ('upstream/rights/ATTRIBUTION.txt', terms)]:
                         info = tarfile.TarInfo(name); info.size = len(data)
                         archive.addfile(info, io.BytesIO(data))
                 result = legal.collect_archive({'id': 'fixture', 'name': 'Fixture library', 'archive': 'fixture.tar.gz',
@@ -35,7 +37,8 @@ class LegalNoticesTests(unittest.TestCase):
                 self.assertEqual((folder / 'notices/components/fixture/LICENSES/BSD-3-Clause.txt').read_bytes(), terms)
                 self.assertEqual((folder / 'notices/components/fixture/src/qt_attribution.json').read_bytes(), attribution)
                 self.assertEqual((folder / 'notices/components/fixture/build_recipe.py').read_bytes(), terms)
-                self.assertEqual(len(result['notices']), 4)
+                self.assertEqual((folder / 'notices/components/fixture/rights/ATTRIBUTION.txt').read_bytes(), terms)
+                self.assertEqual(len(result['notices']), 5)
             finally:
                 legal.CACHE = original
 
