@@ -101,6 +101,10 @@ def collect_archive(component, destination):
         chosen = {p for p in files if LEGAL_NAME.search(PurePosixPath(p).name)
                   or any(part.lower() in ('licenses', 'licences') for part in PurePosixPath(p).parts)
                   or PurePosixPath(p).name == 'qt_attribution.json'}
+        for path in component.get('notice_paths', []):
+            if path not in files:
+                raise RuntimeError('Missing explicit original notice: ' + component['name'] + '/' + path)
+            chosen.add(path)
         # Preserve original Qt copyright/license metadata and any custom-named
         # license files it references, as well as conventional license files.
         for path, member in files.items():
@@ -160,6 +164,17 @@ def package(bundle):
     # MoltenVK embeds its own pinned SPIRV-Cross/cereal code. Preserve those
     # exact revisions too, rather than assuming the SDK-wide revisions match.
     extra = []
+    # The SDK shaderc ref is a recipe branch. Its known-good manifest selects
+    # the actual compiler and dependencies; retain those exact sources too.
+    with tarfile.open(CACHE / 'shaderc-sdk-recipes.tar.gz', 'r:gz') as archive:
+        member = next((m for m in archive.getmembers() if m.name.endswith('/known_good.json')), None)
+        if member is None:
+            raise RuntimeError('Missing shaderc SDK source manifest')
+        for entry in json.load(archive.extractfile(member))['commits']:
+            if entry['site'] != 'github' or not re.fullmatch(r'[0-9a-f]{40}', entry['commit']):
+                raise RuntimeError('Unexpected shaderc SDK source entry')
+            extra.append({'id': 'shaderc-' + entry['name'], 'name': entry['name'] + ' (shaderc SDK)',
+                          'repo': entry['subrepo'], 'ref': entry['commit']})
     with tarfile.open(CACHE / 'moltenvk.tar.gz', 'r:gz') as archive:
         for name, repo in [('SPIRV-Cross', 'KhronosGroup/SPIRV-Cross'),
                            ('SPIRV-Tools', 'KhronosGroup/SPIRV-Tools'),

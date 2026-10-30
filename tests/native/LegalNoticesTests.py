@@ -26,14 +26,16 @@ class LegalNoticesTests(unittest.TestCase):
                 terms = b'Original copyright and permission notice.\n'
                 with tarfile.open(folder / 'fixture.tar.gz', 'w:gz') as archive:
                     for name, data in [('upstream/src/qt_attribution.json', attribution), ('upstream/rights/TERMS.txt', terms),
-                                       ('upstream/LICENSES/BSD-3-Clause.txt', terms)]:
+                                       ('upstream/LICENSES/BSD-3-Clause.txt', terms), ('upstream/build_recipe.py', terms)]:
                         info = tarfile.TarInfo(name); info.size = len(data)
                         archive.addfile(info, io.BytesIO(data))
-                result = legal.collect_archive({'id': 'fixture', 'name': 'Fixture library', 'archive': 'fixture.tar.gz'}, folder / 'notices')
+                result = legal.collect_archive({'id': 'fixture', 'name': 'Fixture library', 'archive': 'fixture.tar.gz',
+                                                'notice_paths': ['build_recipe.py']}, folder / 'notices')
                 self.assertEqual((folder / 'notices/components/fixture/rights/TERMS.txt').read_bytes(), terms)
                 self.assertEqual((folder / 'notices/components/fixture/LICENSES/BSD-3-Clause.txt').read_bytes(), terms)
                 self.assertEqual((folder / 'notices/components/fixture/src/qt_attribution.json').read_bytes(), attribution)
-                self.assertEqual(len(result['notices']), 3)
+                self.assertEqual((folder / 'notices/components/fixture/build_recipe.py').read_bytes(), terms)
+                self.assertEqual(len(result['notices']), 4)
             finally:
                 legal.CACHE = original
 

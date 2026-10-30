@@ -102,10 +102,13 @@
     "ref": "97b54ca9e75f5303507699d27c6b4f4efe4641a1"
   },
   {
-    "id": "shaderc",
-    "name": "shaderc (Vulkan SDK 1.4.363.0)",
+    "id": "shaderc-sdk-recipes",
+    "name": "Shaderc SDK build recipes (Vulkan SDK 1.4.363.0)",
     "repo": "google/shaderc",
-    "ref": "75137cca3b41a59b8b3e5c42177da8a9490c042f"
+    "ref": "75137cca3b41a59b8b3e5c42177da8a9490c042f",
+    "notice_paths": [
+      "update_shaderc_sources.py"
+    ]
   },
   {
     "id": "spirv-tools",
