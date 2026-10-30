@@ -65,12 +65,29 @@ jobs:
       - name: Download validated packages and verify checksums
         run: |
           mkdir -p release-assets capture-assets overlay-assets
+          download_artifact() {
+            local name="$1" destination="$2" temporary
+            temporary=$(mktemp -d)
+            for attempt in 1 2 3 4 5; do
+              echo "Downloading $name (attempt $attempt/5)"
+              if gh run download "$BUILD_RUN" -n "$name" -D "$temporary"; then
+                cp -a "$temporary"/. "$destination"/
+                rm -rf "$temporary"
+                return 0
+              fi
+              rm -rf "$temporary"
+              temporary=$(mktemp -d)
+              sleep 8
+            done
+            rm -rf "$temporary"
+            return 1
+          }
           for arch in arm64 x86_64 universal; do
-            gh run download "$BUILD_RUN" -n "MoonlightLG-$VERSION-$arch" -D release-assets
+            download_artifact "MoonlightLG-$VERSION-$arch" release-assets
           done
-          gh run download "$BUILD_RUN" -n "MoonlightLG-$VERSION-source" -D release-assets
-          gh run download "$BUILD_RUN" -n Native-UI-Quick-Window-Captures -D capture-assets
-          gh run download "$BUILD_RUN" -n Native-Stream-Overlay-Previews -D overlay-assets
+          download_artifact "MoonlightLG-$VERSION-source" release-assets
+          download_artifact Native-UI-Quick-Window-Captures capture-assets
+          download_artifact Native-Stream-Overlay-Previews overlay-assets
           python3 - <<'PY'
           import hashlib, json, os, pathlib, shutil, tarfile, zipfile
           root = pathlib.Path('release-assets')
