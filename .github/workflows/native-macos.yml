@@ -19,7 +19,7 @@ jobs:
       matrix:
         architecture: [arm64, x86_64, universal]
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
         with:
@@ -40,6 +40,7 @@ jobs:
       # Exercise process/cancellation failures before the full engine build.
       - name: Test production Apollo connection gate
         run: |
+          python3 tests/native/LegalNoticesTests.py
           python3 tests/native/extract_native_exit_shortcut.py
           c++ -std=c++17 -Ibuild tests/native/ConnectionGateTests.cpp -o build/connection-gate-tests
           build/connection-gate-tests
@@ -168,6 +169,19 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           ditto -c -k --sequesterRsrc --keepParent 'build/native-${{ matrix.architecture }}/MoonlightLG.app' "build/MoonlightLG-$version-${{ matrix.architecture }}.zip"
           shasum -a 256 "build/MoonlightLG-$version-${{ matrix.architecture }}.zip" > 'build/SHA256-${{ matrix.architecture }}.txt'
+      - name: Package corresponding application and dependency sources
+        if: matrix.architecture == 'arm64'
+        run: |
+          python3 scripts/package-release-source.py 'build/MoonlightLG-${{ steps.package.outputs.version }}-source.tar.gz'
+          shasum -a 256 'build/MoonlightLG-${{ steps.package.outputs.version }}-source.tar.gz' > build/SHA256-source.txt
+      - uses: actions/upload-artifact@v6
+        if: matrix.architecture == 'arm64'
+        with:
+          name: MoonlightLG-${{ steps.package.outputs.version }}-source
+          path: |
+            build/MoonlightLG-*-source.tar.gz
+            build/SHA256-source.txt
+          if-no-files-found: error
       - uses: actions/upload-artifact@v6
         with:
           name: MoonlightLG-${{ steps.package.outputs.version }}-${{ matrix.architecture }}

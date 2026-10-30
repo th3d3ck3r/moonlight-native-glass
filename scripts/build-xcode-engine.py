@@ -118,6 +118,7 @@ def main():
         run(["lipo", binary, "-verify_arch", architecture])
     # Build incrementally. Deploy/sign only when the engine or recipe changed.
     fingerprint = hashlib.sha256("\n".join(digest_file(path) for path in (
+        ROOT / "scripts/package-legal-notices.py", ROOT / "legal/components.json",
         binary, raw_app / "Contents/Info.plist", pathlib.Path(__file__),
         *[ROOT / p for p in ["scripts/build-recorder-plugin.py", "recording/Recorder.mm", "recording/RecorderABI.h", "recording/AnnexB.h", "recording/BoundedQueue.h", "scripts/build-connection-view.py", "macos-native/ConnectionHost/NativeConnectionHost.swift", "macos-native/Sources/NativeConnectionView.swift", "macos-native/Sources/NativeCrimsonTheme.swift", "macos-native/Sources/EngineProtocol.swift"]],
         ROOT / "macos-native/Resources/moonlight.icns")).encode()).hexdigest()
@@ -145,6 +146,7 @@ def main():
     info_path.write_bytes(plistlib.dumps(info, sort_keys=False))
     shutil.copy2(ROOT / "macos-native/Resources/moonlight.icns",
                  helper / "Contents/Resources/moonlight.icns")
+    run([python, ROOT / "scripts/package-legal-notices.py", helper])
     run(["codesign", "--force", "--deep", "--sign", "-", helper])
     marker.write_text(fingerprint + "\n")
 
@@ -155,3 +157,4 @@ if __name__ == "__main__":
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
         print("error: Xcode engine setup failed: " + str(error), file=sys.stderr)
         sys.exit(1)
+

@@ -91,6 +91,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 Button("About MoonlightLG") {
                     showNativeAboutPanel()
                 }
+                Button("Licenses & Notices") { NSWorkspace.shared.open(nativeLegalNoticesURL()) }
             }
             CommandGroup(after: .newItem) {
                 Button("Add Computer…") { NotificationCenter.default.post(name: .nativeAddComputer, object: nil) }
@@ -151,6 +152,12 @@ private struct NativeStatusActions: View {
     }
 }
 
+@MainActor func nativeLegalNoticesURL() -> URL {
+    let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightLGEngine.app/Contents/Resources/Legal/index.html")
+    return FileManager.default.fileExists(atPath: bundled.path) ? bundled
+        : URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass/blob/moonlightlg-v1.3.2.0/docs/THIRD_PARTY_NOTICES.md")!
+}
+
 // Keep author and engine attribution across builds. About displays the app
 // version/channel from bundle metadata, separately from the engine version.
 @MainActor func showNativeAboutPanel() {
@@ -161,13 +168,17 @@ private struct NativeStatusActions: View {
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .center
     let credits = NSMutableAttributedString(
-        string: "SwiftUI/AppKit interface\nMoonlight Qt \(engineVersion) streaming engine\nManual updates · GPL-3.0\n\nMoonlightLG created and maintained by Th3D3ck3r\n\nGitHub Repository",
+        string: "SwiftUI/AppKit interface\nMoonlight Qt \(engineVersion) streaming engine\n\nMoonlightLG created and maintained by Th3D3ck3r\nBased on Moonlight Qt and moonlight-common-c by the Moonlight developers and contributors.\n\nUses Qt, SDL, FFmpeg, Opus, OpenSSL, libplacebo, MoltenVK and other open-source components.\nQt © The Qt Company Ltd. and contributors.\nOriginal copyright and license notices are preserved.\n\nFree software under GNU GPL version 3. You may redistribute and modify it under those terms.\nProvided WITHOUT ANY WARRANTY.\n\nLicenses & Notices\nCorresponding Source\nGitHub Repository",
         attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
                      .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
-    credits.addAttributes([.link: URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass")!,
+    for (label, url) in [("GitHub Repository", URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass")!),
+                         ("Licenses & Notices", nativeLegalNoticesURL()),
+                         ("Corresponding Source", URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.2.0/MoonlightLG-1.3.2.0-source.tar.gz")!)] {
+        credits.addAttributes([.link: url,
                            .foregroundColor: NativeCrimsonTheme.enabled ? NSColor(srgbRed: 0.95, green: 0.19, blue: 0.32, alpha: 1) : NSColor.linkColor,
                            .underlineStyle: NSUnderlineStyle.single.rawValue],
-                          range: (credits.string as NSString).range(of: "GitHub Repository"))
+                          range: (credits.string as NSString).range(of: label))
+    }
     NSApp.orderFrontStandardAboutPanel(options: [
         .applicationName: "MoonlightLG",
         .applicationVersion: MoonlightLGVersion.current.display,
@@ -194,3 +205,4 @@ func nativeArgument(_ name: String) -> String? {
     if let i = args.firstIndex(of: name), args.indices.contains(i + 1) { return args[i + 1] }
     return nil
 }
+

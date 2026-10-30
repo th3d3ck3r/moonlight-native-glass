@@ -349,6 +349,9 @@ import XCTest
         let about = app.dialogs["native-about"]
         XCTAssertTrue(about.waitForExistence(timeout: 5))
         XCTAssertTrue(about.links["GitHub Repository"].exists, "About GitHub link is not accessible")
+        XCTAssertTrue(about.links["Licenses & Notices"].exists, "Offline legal notices must be accessible from About")
+        XCTAssertTrue(about.links["Corresponding Source"].exists, "Corresponding source must be accessible from About")
+        XCTAssertTrue(about.textViews.matching(NSPredicate(format: "value CONTAINS %@", "WITHOUT ANY WARRANTY")).firstMatch.exists)
         let attachment = XCTAttachment(screenshot: about.screenshot())
         attachment.name = "about-dark"
         attachment.lifetime = .keepAlways

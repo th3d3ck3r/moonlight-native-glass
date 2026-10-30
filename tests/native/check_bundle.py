@@ -1,5 +1,6 @@
 """Validate the delivered bundle, including every nested Mach-O slice."""
 import pathlib
+import hashlib
 import plistlib
 import re
 import subprocess
@@ -46,6 +47,23 @@ print("Native Dock icon corner transparency verified")
 ''', str(app / "Contents/Resources/crimson.icns")], check=True)
 
 assert (app / "Contents/Helpers/MoonlightLGEngine.app/Contents/Frameworks/libMoonlightLGConnection.dylib").is_file(), "Missing stream-window connection view"
+
+legal = app / "Contents/Helpers/MoonlightLGEngine.app/Contents/Resources/Legal"
+for name in ["index.html", "GPL-3.0.txt", "THIRD_PARTY_NOTICES.txt", "SOURCES.json", "ModeSeven-font.txt"]:
+    assert (legal / name).is_file() and (legal / name).stat().st_size > 0, f"Missing legal notice: {name}"
+import json
+inventory = json.loads((legal / "SOURCES.json").read_text())
+components = {entry["id"] for entry in inventory["components"]}
+assert {"qtbase", "qtdeclarative", "qtsvg", "ffmpeg", "sdl3", "sdl-ttf", "opus", "openssl", "libplacebo", "moltenvk"} <= components
+assert "WITHOUT ANY WARRANTY" in (legal / "THIRD_PARTY_NOTICES.txt").read_text()
+for component in inventory["components"]:
+    assert component["ref"] != "from-binary" and component["sha256"]
+    assert component["notices"], f"Missing original notices for {component['name']}"
+    for notice in component["notices"]:
+        path = legal / notice["path"]
+        assert path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == notice["sha256"], f"Changed legal text: {path}"
+for name in inventory["local_notices"]:
+    assert (legal / name).is_file(), f"Missing original source-submodule notice: {name}"
 
 checked = 0
 for file in app.rglob("*"):

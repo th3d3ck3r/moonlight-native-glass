@@ -64,6 +64,8 @@ info.update(CFBundleIdentifier="com.moonlight-stream.NativeGlass.Engine",
 path.write_bytes(plistlib.dumps(info, sort_keys=False))
 PLIST
 
+python3 scripts/package-legal-notices.py "$app/Contents/Helpers/MoonlightLGEngine.app"
+
 if [ "$arch_set" = arm64 ]; then
     # Imported Qt/dependency frameworks may be fat even for a single-CPU
     # application build. Thin the complete bundle before its final signature.

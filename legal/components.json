@@ -1,0 +1,146 @@
+[
+  {
+    "id": "qtbase",
+    "name": "Qt Base",
+    "repo": "qt/qtbase",
+    "ref": "v6.11.2"
+  },
+  {
+    "id": "qtdeclarative",
+    "name": "Qt Declarative and Qt Quick",
+    "repo": "qt/qtdeclarative",
+    "ref": "v6.11.2"
+  },
+  {
+    "id": "qtsvg",
+    "name": "Qt SVG",
+    "repo": "qt/qtsvg",
+    "ref": "v6.11.2"
+  },
+  {
+    "id": "qtshadertools",
+    "name": "Qt Shader Tools",
+    "repo": "qt/qtshadertools",
+    "ref": "v6.11.2"
+  },
+  {
+    "id": "dependency-recipes",
+    "name": "Moonlight dependency build recipes",
+    "repo": "moonlight-stream/moonlight-qt-deps",
+    "ref": "v19"
+  },
+  {
+    "id": "ffmpeg",
+    "name": "FFmpeg",
+    "repo": "FFmpeg/FFmpeg",
+    "ref": "946fcce07b6dcd0331c8cc609192aeff5e1924f8"
+  },
+  {
+    "id": "sdl3",
+    "name": "SDL 3",
+    "repo": "libsdl-org/SDL",
+    "ref": "829a65d769d935c4852f8159e964312c0957260a"
+  },
+  {
+    "id": "sdl2-compat",
+    "name": "SDL 2 compatibility layer",
+    "repo": "libsdl-org/sdl2-compat",
+    "ref": "e4df8a55f20da762290a78c2bbe8f8d89d01486a"
+  },
+  {
+    "id": "sdl-ttf",
+    "name": "SDL_ttf",
+    "repo": "libsdl-org/SDL_ttf",
+    "ref": "a883e490e30fb44a5336ea3dcb990c6982c5216f"
+  },
+  {
+    "id": "freetype",
+    "name": "FreeType (SDL_ttf source)",
+    "repo": "libsdl-org/freetype",
+    "ref": "535d2993d2cab67cc8b270132b1b1bcb62f269aa"
+  },
+  {
+    "id": "harfbuzz",
+    "name": "HarfBuzz (SDL_ttf source)",
+    "repo": "libsdl-org/harfbuzz",
+    "ref": "950d232cdcd29e2e83a2099307e5624a8f1aa937"
+  },
+  {
+    "id": "openssl",
+    "name": "OpenSSL",
+    "repo": "openssl/openssl",
+    "ref": "c8bd5a57108599ac650bbae77fcabe3109dab2e8"
+  },
+  {
+    "id": "opus",
+    "name": "Opus",
+    "repo": "xiph/opus",
+    "ref": "22244de5a79bd1d6d623c32e72bf1954b56235be"
+  },
+  {
+    "id": "discord-rpc",
+    "name": "Discord RPC",
+    "repo": "cgutman/discord-rpc",
+    "ref": "7bcf3b3fdd02d4d5072971ef1d5b4e6dd3a765dc"
+  },
+  {
+    "id": "dav1d",
+    "name": "dav1d",
+    "repo": "videolan/dav1d",
+    "ref": "54706fc6bc0cdecab7e9593974a4039cc038fca7"
+  },
+  {
+    "id": "libplacebo",
+    "name": "libplacebo",
+    "repo": "haasn/libplacebo",
+    "ref": "92b5ac6db79f4d680eb656692f7bf51e9606f42a"
+  },
+  {
+    "id": "fast-float",
+    "name": "fast_float (libplacebo source)",
+    "repo": "fastfloat/fast_float",
+    "ref": "97b54ca9e75f5303507699d27c6b4f4efe4641a1"
+  },
+  {
+    "id": "shaderc",
+    "name": "shaderc (Vulkan SDK 1.4.363.0)",
+    "repo": "google/shaderc",
+    "ref": "75137cca3b41a59b8b3e5c42177da8a9490c042f"
+  },
+  {
+    "id": "spirv-tools",
+    "name": "SPIR-V Tools (Vulkan SDK 1.4.363.0)",
+    "repo": "KhronosGroup/SPIRV-Tools",
+    "ref": "vulkan-sdk-1.4.363.0"
+  },
+  {
+    "id": "spirv-headers",
+    "name": "SPIR-V Headers (Vulkan SDK 1.4.363.0)",
+    "repo": "KhronosGroup/SPIRV-Headers",
+    "ref": "vulkan-sdk-1.4.363.0"
+  },
+  {
+    "id": "spirv-cross",
+    "name": "SPIRV-Cross (Vulkan SDK 1.4.363.0)",
+    "repo": "KhronosGroup/SPIRV-Cross",
+    "ref": "vulkan-sdk-1.4.363.0"
+  },
+  {
+    "id": "glslang",
+    "name": "glslang (Vulkan SDK 1.4.363.0)",
+    "repo": "KhronosGroup/glslang",
+    "ref": "vulkan-sdk-1.4.363.0"
+  },
+  {
+    "id": "vulkan-headers",
+    "name": "Vulkan Headers",
+    "repo": "KhronosGroup/Vulkan-Headers",
+    "ref": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+  },
+  {
+    "id": "moltenvk",
+    "name": "MoltenVK",
+    "repo": "KhronosGroup/MoltenVK",
+    "ref": "from-binary"
+  }
+]
