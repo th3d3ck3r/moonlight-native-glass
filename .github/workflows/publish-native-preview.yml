@@ -26,9 +26,19 @@ jobs:
       - uses: actions/checkout@v5
       - name: Verify stable metadata and exact validated source
         run: |
-          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN" > /tmp/build-run.json
-          gh api "repos/$GH_REPO/actions/runs/$XCODE_RUN" > /tmp/xcode-run.json
-          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN/jobs?per_page=100" > /tmp/build-jobs.json
+          fetch_json() {
+            local endpoint="$1" destination="$2"
+            echo "Reading validation: $endpoint"
+            for attempt in 1 2 3 4 5; do
+              if gh api "$endpoint" > "$destination"; then return 0; fi
+              echo "GitHub API read failed; retry $attempt/5" >&2
+              sleep 5
+            done
+            return 1
+          }
+          fetch_json "repos/$GH_REPO/actions/runs/$BUILD_RUN" /tmp/build-run.json
+          fetch_json "repos/$GH_REPO/actions/runs/$XCODE_RUN" /tmp/xcode-run.json
+          fetch_json "repos/$GH_REPO/actions/runs/$BUILD_RUN/jobs?per_page=100" /tmp/build-jobs.json
           python3 - <<'PY'
           import json, os, plistlib
           info = plistlib.load(open('macos-native/Info.plist', 'rb'))
