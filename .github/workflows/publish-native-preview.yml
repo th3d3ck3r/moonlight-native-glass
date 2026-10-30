@@ -1,90 +1,113 @@
-name: Publish MoonlightLG Experimental Build
+name: Publish MoonlightLG Release
 on:
   push:
-    branches: [feature/native-boot-animation]
+    branches: [feature/recording-plugin]
     paths: [.github/workflows/publish-native-preview.yml]
 permissions:
   contents: write
   actions: read
+concurrency:
+  group: publish-moonlightlg-stable
+  cancel-in-progress: false
 jobs:
   publish:
-    if: contains(github.event.head_commit.message, '[publish preview]')
+    if: contains(github.event.head_commit.message, '[publish stable]')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VALIDATED_SHA: 4d8ee8a4bab531aaa43ee7a9ccef6b51f8f08053
-      BUILD_RUN: '38219537762'
-      XCODE_RUN: '38219537999'
-      RELEASE_TAG: native-glass-experimental-24
+      VALIDATED_SHA: 1f09e8a58949debacf9fbe9749710c7ca55de50f
+      BUILD_RUN: '41050060725'
+      XCODE_RUN: '41050060748'
+      RELEASE_TAG: moonlightlg-v1.3.2.0
+      VERSION: '1.3.2.0'
     steps:
       - uses: actions/checkout@v5
-      - name: Refuse unreleased development builds
-        run: |
-          python3 - <<'PY'
-          import plistlib
-          with open("macos-native/Info.plist", "rb") as stream:
-              channel = plistlib.load(stream).get("MoonlightLGReleaseChannel")
-          assert channel == "E", "Only validated E builds may use experimental publishing; U builds are never posted."
-          PY
-      - name: Verify exact source, complete builds and Xcode validation
+      - name: Verify stable metadata and exact validated source
         run: |
           gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN" > /tmp/build-run.json
           gh api "repos/$GH_REPO/actions/runs/$XCODE_RUN" > /tmp/xcode-run.json
           gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN/jobs?per_page=100" > /tmp/build-jobs.json
           python3 - <<'PY'
-          import json, os
-          sha = os.environ['VALIDATED_SHA']
-          for path, name in [('/tmp/build-run.json', 'Native macOS Validation'), ('/tmp/xcode-run.json', 'Native Xcode Project Validation')]:
+          import json, os, plistlib
+          info = plistlib.load(open('macos-native/Info.plist', 'rb'))
+          assert info['MoonlightLGReleaseChannel'] == 'stable', 'U/E builds must not be published as stable'
+          assert info['MoonlightLGVersion'] == os.environ['VERSION']
+          assert info['CFBundleVersion'] == '42'
+          for path, name in [('/tmp/build-run.json', 'MoonlightLG macOS Validation'), ('/tmp/xcode-run.json', 'MoonlightLG Xcode Project Validation')]:
               run = json.load(open(path))
-              assert run['head_sha'] == sha and run['head_branch'] == 'feature/native-boot-animation'
+              assert run['head_sha'] == os.environ['VALIDATED_SHA']
+              assert run['head_branch'] == 'feature/recording-plugin'
               assert run['status'] == 'completed' and run['conclusion'] == 'success' and run['name'] == name
           jobs = json.load(open('/tmp/build-jobs.json'))['jobs']
-          for name in ['build (x86_64)', 'build (universal)', 'Native UI window smoke test']:
+          for name in ['build (arm64)', 'build (x86_64)', 'build (universal)', 'MoonlightLG UI window smoke test']:
               matches = [j for j in jobs if j['name'] == name]
               assert len(matches) == 1 and matches[0]['conclusion'] == 'success', name
           universal = next(j for j in jobs if j['name'] == 'build (universal)')
-          for name in ['Test actual SDL stream window hide and restore', 'Audit native window and input lifetime with sanitizers', 'Test actual menu bar icon state', 'Test real engine bridge and persistence']:
+          for name in ['Test Apollo inside the actual stream window', 'Test frontend engine failure recovery', 'Test actual SDL stream window hide and restore', 'Audit native window and input lifetime with sanitizers', 'Test actual menu bar icon state', 'Test real engine bridge and persistence']:
               assert any(s['name'] == name and s['conclusion'] == 'success' for s in universal['steps']), name
+          arm = next(j for j in jobs if j['name'] == 'build (arm64)')
+          for name in ['Build app and verify bundle', 'Verify packaged stream window opens before connecting', 'Test real engine bridge and persistence', 'Package corresponding application and dependency sources']:
+              assert any(s['name'] == name and s['conclusion'] == 'success' for s in arm['steps']), name
           PY
           git fetch --no-tags --depth=1 origin "$VALIDATED_SHA"
           git diff --name-only "$VALIDATED_SHA" "$GITHUB_SHA" > /tmp/release-changes.txt
           python3 - <<'PY'
           paths = open('/tmp/release-changes.txt').read().splitlines()
-          assert all(p == 'README.md' or p.startswith(('docs/', 'readme-assets/', '.github/workflows/')) for p in paths), paths
+          assert all(p in ['README.md', 'CHANGELOG.md'] or p.startswith(('docs/', '.github/workflows/')) for p in paths), paths
           PY
-          test "$(gh api "repos/$GH_REPO/git/ref/heads/feature/native-boot-animation" --jq .object.sha)" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GH_REPO/git/ref/heads/feature/recording-plugin" --jq .object.sha)" = "$GITHUB_SHA"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then echo 'Release already exists; refusing to replace it.' >&2; exit 1; fi
-      - name: Download and verify previously validated packages and captures
+          if gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then echo 'Release tag already exists; refusing to retarget it.' >&2; exit 1; fi
+      - name: Download validated packages and verify checksums
         run: |
           mkdir -p release-assets capture-assets overlay-assets
-          gh run download "$BUILD_RUN" -n Native-Glass-Preview-24-x86_64 -D release-assets
-          gh run download "$BUILD_RUN" -n Native-Glass-Preview-24-universal -D release-assets
+          for arch in arm64 x86_64 universal; do
+            gh run download "$BUILD_RUN" -n "MoonlightLG-$VERSION-$arch" -D release-assets
+          done
+          gh run download "$BUILD_RUN" -n "MoonlightLG-$VERSION-source" -D release-assets
           gh run download "$BUILD_RUN" -n Native-UI-Quick-Window-Captures -D capture-assets
           gh run download "$BUILD_RUN" -n Native-Stream-Overlay-Previews -D overlay-assets
           python3 - <<'PY'
-          import hashlib, json, pathlib, shutil
+          import hashlib, json, os, pathlib, shutil, tarfile, zipfile
           root = pathlib.Path('release-assets')
-          expected = {'x86_64': 'edc02dd8dddf22e9fc79e8a354505dccd247469c611f8939f7f6c73f0d468b8f', 'universal': '5938eb296def4d2fd4b4d5434ab1ccea8ef322c1e1d626741032620ac5e0edbb'}
-          for arch, checksum in expected.items():
-              package = root / ('Moonlight-Native-Glass-Preview-24-' + arch + '.zip')
-              assert (root / ('SHA256-' + arch + '.txt')).read_text().split()[0] == checksum
-              with package.open('rb') as stream: assert hashlib.file_digest(stream, 'sha256').hexdigest() == checksum
-              package.rename(root / ('Moonlight-Native-Glass-Experimental-24-' + arch + '.zip'))
-          source = pathlib.Path('capture-assets')
-          attachments = [a for test in json.loads((source / 'manifest.json').read_text()) for a in test['attachments']]
-          for name in ['main-dark', 'main-compact', 'settings-video', 'settings-audio', 'settings-input', 'settings-network', 'settings-advanced', 'settings-overlay', 'settings-shortcuts', 'about-dark', 'menu-bar', 'crimson-settings-titlebar', 'native-startup-warp', 'native-startup-moon-and-satellites']:
+          lines = []
+          for arch in ['arm64', 'x86_64', 'universal', 'source']:
+              ending = 'source.tar.gz' if arch == 'source' else arch + '.zip'
+              package = root / f"MoonlightLG-{os.environ['VERSION']}-{ending}"
+              recorded = (root / f'SHA256-{arch}.txt').read_text().split()
+              assert len(recorded) == 2 and pathlib.Path(recorded[1]).name == package.name
+              with package.open('rb') as source:
+                  actual = hashlib.file_digest(source, 'sha256').hexdigest()
+              assert actual == recorded[0], f'Checksum mismatch: {package}'
+              lines.append(f'{actual}  {package.name}\n')
+          (root / 'SHA256SUMS.txt').write_text(''.join(lines))
+          with zipfile.ZipFile(root / f"MoonlightLG-{os.environ['VERSION']}-arm64.zip") as package:
+              legal = 'MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/Resources/Legal/'
+              for original, destination in [('GPL-3.0.txt', 'LICENSE.txt'), ('THIRD_PARTY_NOTICES.txt', 'THIRD_PARTY_NOTICES.txt'), ('SOURCES.json', 'SOURCE_MANIFEST.json')]:
+                  (root / destination).write_bytes(package.read(legal + original))
+          with tarfile.open(root / f"MoonlightLG-{os.environ['VERSION']}-source.tar.gz") as source:
+              names = set(source.getnames())
+              files = {m.name for m in source.getmembers() if m.isfile()}
+              prefix = f"MoonlightLG-{os.environ['VERSION']}-source/"
+              for path in ['macos-native/Sources/MoonlightLGApp.swift', 'scripts/build-native-macos.sh', 'third-party-source/qtbase.tar.gz', 'third-party-source/SOURCES.json']:
+                  assert prefix + path in names, 'Incomplete corresponding source: ' + path
+              for path in ['moonlight-common-c/moonlight-common-c/', 'moonlight-common-c/moonlight-common-c/enet/', 'moonlight-common-c/moonlight-common-c/nanors/', 'qmdnsengine/qmdnsengine/', 'app/SDL_GameControllerDB/', 'h264bitstream/']:
+                  assert any(name.startswith(prefix + path) for name in files), 'Missing bundled submodule source: ' + path
+          captures = pathlib.Path('capture-assets')
+          attachments = [a for test in json.loads((captures / 'manifest.json').read_text()) for a in test['attachments']]
+          for name in ['main-dark', 'main-compact', 'settings-video', 'native-startup-warp', 'about-dark']:
               matches = [a for a in attachments if a['suggestedHumanReadableName'].startswith(name + '_0_')]
               assert len(matches) == 1, name
-              shutil.copyfile(source / matches[0]['exportedFileName'], root / (name + '.png'))
+              shutil.copyfile(captures / matches[0]['exportedFileName'], root / (name + '.png'))
           shutil.copyfile('overlay-assets/overlay-controls-dark.png', root / 'overlay-controls-dark.png')
           PY
-          (cd release-assets && sha256sum Moonlight-Native-Glass-Experimental-24-*.zip > SHA256SUMS.txt)
-      - name: Publish experimental pre-release with verified assets
+      - name: Publish full release with the exact validated assets
         run: |
-          gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --draft --prerelease \
-            --title 'Moonlight Native Glass · Experimental Build 24 · Crimson Glass' \
-            --notes-file docs/EXPERIMENTAL_24_RELEASE_NOTES.md \
-            release-assets/*.zip release-assets/SHA256SUMS.txt release-assets/*.png
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --draft \
+            --title "🌙 MoonlightLG $VERSION · Crimson Glass" \
+            --notes-file docs/RELEASE_1.3.2.0.md \
+            release-assets/*.zip release-assets/*.tar.gz release-assets/SHA256SUMS.txt \
+            release-assets/LICENSE.txt release-assets/THIRD_PARTY_NOTICES.txt release-assets/SOURCE_MANIFEST.json release-assets/*.png
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest=true
