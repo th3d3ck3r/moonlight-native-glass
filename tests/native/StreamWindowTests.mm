@@ -29,6 +29,16 @@ static void check(bool value, const char* message) {
     if (!value) { std::fprintf(stderr, "FAIL: %s\n", message); std::exit(1); }
 }
 static Uint32 fixtureStreamWindowID=0;
+static void cancelFixtureZoomHover() {
+    // A previous synthetic focus/resize can leave AppKit's delayed zoom-menu
+    // perform queued after its mouse-exit event. Parking alone cannot cancel
+    // that stale timer on newer macOS. This general fixture does not exercise
+    // the green widget; FullscreenWindowTests covers the actual hover/menu.
+    for (NSWindow* window in NSApp.windows) {
+        NSButton* zoom=[window standardWindowButton:NSWindowZoomButton];
+        if (zoom.cell) [NSObject cancelPreviousPerformRequestsWithTarget:zoom.cell];
+    }
+}
 static void parkFixturePointer() {
     // Focus can be temporarily nil during hide/restore. Resolve the still-live
     // fixture window by ID so a delayed green-widget hover cannot survive it.
@@ -54,8 +64,10 @@ static void pump(double seconds = 0.3) {
     // explicitly exercises actual green-button entry and top-edge hover.
     NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:seconds];
     do {
+        cancelFixtureZoomHover();
         parkFixturePointer();
         SDL_PumpEvents();
+        cancelFixtureZoomHover();
         [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
         SDL_Event restore;
         if (nativeRestoreStreamWindowEventType())
@@ -670,3 +682,4 @@ int main(int argc, char** argv) {
     }
     return 0;
 }
+
