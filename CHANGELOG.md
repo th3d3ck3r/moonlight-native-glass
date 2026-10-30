@@ -4,7 +4,9 @@
 
 - Keep Continue/Cancel mouse presses nonblocking inside the Qt/SDL-owned connection window. A press and release arriving on separate event-pump turns no longer require NSCell's nested tracking loop.
 - Distinguish Continue acceptance from an opened stream window. Both the hosted Continue button and frontend Continue action use the same 15-second handoff deadline; a stalled handoff cancels the helper and restores the library with a visible error.
-- Add delayed mouse-event button coverage and real-process regressions for both stalled Continue paths. Internal build 41; macOS/Xcode validation pending. Live-host acceptance remains unverified.
+- Add delayed mouse-event button coverage and real-process regressions for both stalled Continue paths. Internal build 41; complete Intel/Universal packages, full/incremental Xcode, both 12-test UI suites, delayed-click/recovery, fullscreen/Metal and sanitizer checks passed at source `f1a96a3`. Live-host acceptance remains unverified.
+
+- The general window fixture now cancels stale AppKit zoom-hover timers; dedicated green-button/fullscreen coverage remains active.
 
 ## 1.3.1.0U — unreleased — 2026-10-13
 
