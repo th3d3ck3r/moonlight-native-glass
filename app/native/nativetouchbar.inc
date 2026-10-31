@@ -1,6 +1,7 @@
 // Compiled with nativetitlebar.mm. Touch Bar actions use the existing SDL queue;
 // no decoder, frame-pacing, mouse tracking or recorder ownership lives here.
 #include "nativestreamstats.h"
+#import <objc/message.h>
 
 static NSColor* touchAccent() {
     return crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : NSColor.controlAccentColor;
@@ -214,7 +215,30 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 
 // NSTouchBar owns the actual controls. The same views are rendered by the
 // regression fixture for layout QA on runners without physical Touch Bar hardware.
+// Same optional system-modal AppKit selectors as the frontend. This changes
+// presentation only for the active owner and never writes system preferences.
+static BOOL touchPresentFullWidth(NSTouchBar* bar) {
+    SEL show=NSSelectorFromString(@"presentSystemModalTouchBar:placement:systemTrayItemIdentifier:");
+    SEL hide=NSSelectorFromString(@"dismissSystemModalTouchBar:");
+    if (![NSTouchBar respondsToSelector:show] || ![NSTouchBar respondsToSelector:hide]) return NO;
+    ((void(*)(id,SEL,NSTouchBar*,long long,id))objc_msgSend)(NSTouchBar.class,show,bar,1,nil);
+    return YES;
+}
+static void touchDismissFullWidth(NSTouchBar* bar) {
+    SEL hide=NSSelectorFromString(@"dismissSystemModalTouchBar:");
+    if ([NSTouchBar respondsToSelector:hide]) ((void(*)(id,SEL,NSTouchBar*))objc_msgSend)(NSTouchBar.class,hide,bar);
+}
 @implementation MLStreamTitlebar (TouchBar)
+- (void)updateTouchPresentation {
+    NSUserDefaults* preferences=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass"] autorelease];
+    [preferences synchronize];
+    BOOL wanted=[preferences boolForKey:@"touchBarFullWidth"] && self.streamTouchBar && self.window.touchBar==self.streamTouchBar && self.window.visible && self.window.keyWindow && NSApp.active;
+    if (wanted==self.touchFullWidthPresented) return;
+    if (wanted) self.touchFullWidthPresented=touchPresentFullWidth(self.streamTouchBar);
+    else { touchDismissFullWidth(self.streamTouchBar); self.touchFullWidthPresented=NO; }
+}
+- (void)touchPresentationChanged:(NSNotification*)notification { [self updateTouchPresentation]; }
+
 - (NSTouchBar*)touchBarWithItems:(NSArray*)identifiers {
     NSTouchBar* bar=[[[NSTouchBar alloc] init] autorelease]; bar.delegate=self;
     bar.defaultItemIdentifiers=identifiers;
@@ -230,11 +254,14 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     self.previousTouchBar=self.window.touchBar;
     self.streamTouchBar=[self touchBarWithItems:self.touchLiveStats ? @[@"touch.capture",@"touch.info",@"touch.more"] : @[@"touch.info",@"touch.capture",@"touch.audio",@"touch.record",@"touch.replay",@"touch.more"]];
     self.window.touchBar=self.streamTouchBar;
+    [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(touchPresentationChanged:) name:@"com.moonlight-stream.NativeGlass.touchBarPresentationChanged" object:nil];
+    [self updateTouchPresentation];
     self.touchTimer=[NSTimer timerWithTimeInterval:1 target:self selector:@selector(touchTick:) userInfo:nil repeats:YES];
     [[NSRunLoop mainRunLoop] addTimer:self.touchTimer forMode:NSRunLoopCommonModes];
     [self refreshTouchBar];
 }
 - (void)touchTick:(NSTimer*)timer {
+    [self updateTouchPresentation];
     if (!self.window || !self.window.visible || !NSApp.active || !self.window.keyWindow) return;
     // Local sampling only; the streaming engine still owns the stats cadence.
     [self.touchDashboard sample]; [self refreshTouchBar];
@@ -372,6 +399,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     if (self.touchLiveStats) [info setAccessibilityLabel:[self.touchInlineDashboard.accessibilityLabel stringByAppendingString:@"; tap for more stream information"]];
 }
 - (void)invalidateTouchBar {
+    if (self.touchFullWidthPresented) { touchDismissFullWidth(self.streamTouchBar); self.touchFullWidthPresented=NO; }
     [self.touchTimer invalidate]; self.touchTimer=nil; self.touchDashboard.active=NO; self.touchInlineDashboard.active=NO;
     for (NSPopoverTouchBarItem* item in self.touchPopovers) { [item dismissPopover:nil]; item.popoverTouchBar.delegate=nil; }
     for (NSButton* button in self.touchButtons.allValues) { button.target=nil; button.action=NULL; }

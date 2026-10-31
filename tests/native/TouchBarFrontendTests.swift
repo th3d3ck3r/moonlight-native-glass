@@ -60,29 +60,38 @@ import SwiftUI
         agent.set(originalModes, forKey: "PresentationModePerApp")
         agent.set("appWithControlStrip", forKey: "PresentationModeGlobal")
         agent.set(["appWithControlStrip": "fullControlStrip"], forKey: "PresentationModeFnModes")
-        precondition(NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent))
-        var modes = agent.dictionary(forKey: "PresentationModePerApp")!
-        precondition(modes["example.other"] as? String == "functionKeys")
-        for app in NativeTouchBarPresentation.applications { precondition(modes[app] as? String == "app") }
+        precondition(NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, available: true))
+        precondition(agent.dictionary(forKey: "PresentationModePerApp") as? [String: String] == originalModes, "New full width must not edit the Touch Bar agent")
         precondition(agent.string(forKey: "PresentationModeGlobal") == "appWithControlStrip")
         precondition(agent.dictionary(forKey: "PresentationModeFnModes") as? [String: String] == ["appWithControlStrip": "fullControlStrip"])
         precondition(NativeTouchBarPresentation.apply(false, preferences: prefs, agent: agent))
-        precondition(agent.dictionary(forKey: "PresentationModePerApp") as? [String: String] == originalModes)
-        precondition(!prefs.bool(forKey: NativeTouchBarPresentation.key) && prefs.object(forKey: NativeTouchBarPresentation.backupKey) == nil)
-        precondition(NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent))
-        modes = agent.dictionary(forKey: "PresentationModePerApp")!
-        modes["example.addedLater"] = "fullControlStrip"
-        modes[NativeTouchBarPresentation.applications[1]] = "functionKeys"
-        agent.set(modes, forKey: "PresentationModePerApp")
-        precondition(NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, reapply: true))
-        precondition(NativeTouchBarPresentation.apply(false, preferences: prefs, agent: agent))
-        modes = agent.dictionary(forKey: "PresentationModePerApp")!
-        precondition(modes["example.addedLater"] as? String == "fullControlStrip")
-        precondition(modes[NativeTouchBarPresentation.applications[1]] as? String == "functionKeys", "Respect a later manual change")
+        precondition(!prefs.bool(forKey: NativeTouchBarPresentation.key))
+        // Migrate build 43's saved overrides; leave a later user edit alone.
+        prefs.set(["hadDictionary": true,
+                   NativeTouchBarPresentation.applications[0]: ["present": true, "value": "fullControlStrip"],
+                   NativeTouchBarPresentation.applications[1]: ["present": false]], forKey: NativeTouchBarPresentation.backupKey)
+        agent.set(["example.other": "functionKeys", NativeTouchBarPresentation.applications[0]: "app",
+                   NativeTouchBarPresentation.applications[1]: "functionKeys"], forKey: "PresentationModePerApp")
+        precondition(NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, available: true))
+        let modes = agent.dictionary(forKey: "PresentationModePerApp")!
         precondition(modes[NativeTouchBarPresentation.applications[0]] as? String == "fullControlStrip")
-        agent.set("unexpected format", forKey: "PresentationModePerApp")
-        precondition(!NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent), "Do not overwrite unknown system preference formats")
+        precondition(modes[NativeTouchBarPresentation.applications[1]] as? String == "functionKeys")
+        precondition(modes["example.other"] as? String == "functionKeys" && prefs.object(forKey: NativeTouchBarPresentation.backupKey) == nil)
+        precondition(NativeTouchBarPresentation.apply(false, preferences: prefs, agent: agent))
+        precondition(!NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, available: false))
+        precondition(!prefs.bool(forKey: NativeTouchBarPresentation.key), "Unsupported full width must not claim to be enabled")
+        var shown: [NSTouchBar] = [], hidden: [NSTouchBar] = []
+        let session = NativeTouchBarPresentation.Session(show: { shown.append($0); return true }, hide: { hidden.append($0) })
+        session.update(bar, enabled: false, eligible: true); precondition(shown.isEmpty)
+        session.update(bar, enabled: true, eligible: true); precondition(shown.count == 1 && session.presented === bar)
+        session.update(bar, enabled: true, eligible: true); precondition(shown.count == 1, "Do not repeatedly steal the bar")
+        session.update(bar, enabled: true, eligible: false); precondition(hidden.count == 1 && session.presented == nil, "Restore on app/window focus loss")
+        session.update(engineBar, enabled: true, eligible: true)
+        session.update(engineBar, enabled: false, eligible: true); precondition(hidden.last === engineBar)
+        let unavailable = NativeTouchBarPresentation.Session(show: { _ in false }, hide: { _ in preconditionFailure("Never dismiss an unowned bar") })
+        unavailable.update(bar, enabled: true, eligible: true); precondition(unavailable.presented == nil)
+        unavailable.update(nil, enabled: false, eligible: false)
         window.close()
-        print("PASS: frontend Touch Bar actions, ownership and reversible app-only full-width preferences")
+        print("PASS: frontend Touch Bar actions, physical layout, full-width focus lifetime, unsupported fallback and legacy preference recovery")
     }
 }

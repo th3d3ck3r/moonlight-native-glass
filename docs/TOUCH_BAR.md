@@ -1,7 +1,7 @@
 # 🌙 Touch Bar · private 1.3.4.0U
 
 The native app and embedded stream window each own a native AppKit Touch Bar.
-No global keyboard extension, private API or system Control Strip replacement is used.
+The default layout uses public AppKit controls and preserves the system Control Strip. Optional full width uses runtime-checked undocumented AppKit presentation selectors while the owning window is active.
 The public 1.3.2.0 release stays available. Build 43 (1.3.3.0U) was delivered first; build 44 adds live measurements directly to the main bar. Both are owner-only U builds.
 
 ## Layout
@@ -35,11 +35,11 @@ Labels with host/game names truncate while accessibility descriptions preserve t
 
 ## Optional full width
 
-The full-width toggle uses `PresentationModePerApp` in the macOS Touch Bar agent preference domain, with the value `app` for only `com.moonlight-stream.NativeGlass` and `com.moonlight-stream.NativeGlass.Engine`.
-This is a system preference convention, not a documented NSTouchBar API; physical behavior may vary across macOS versions. No private framework is loaded, and no Touch Bar system process is restarted.
-The app saves each identity’s previous value before applying the override. Turning the toggle off restores those values or removes newly added entries. A subsequent manual change by the user or another utility is preserved.
-Global presentation mode, Fn behavior, other applications’ entries and `com.apple.controlstrip` are unchanged. The change takes effect when returning from Settings to the library or stream. Relaunch does not overwrite a later external edit.
-Preference tests inject isolated disposable suites; they never write the CI runner’s real Touch Bar agent domain.
+The full-width toggle is off by default. The preference-only approach in build 43 did not reliably hide the owner's physical Control Strip. Build 44 instead resolves AppKit's undocumented `presentSystemModalTouchBar:placement:systemTrayItemIdentifier:` and `dismissSystemModalTouchBar:` selectors at runtime. Placement 1 requests the full app region. There is no public API for app-controlled Control Strip visibility.
+
+Presentation is owned only while the corresponding MoonlightLG library, settings, Apollo or stream window is visible, key and active. It is dismissed on focus loss, app deactivation, window close, detach or disabling the setting. Repeated refreshes do not continually steal the bar back. Missing selectors leave the standard bar available and enabling the setting reports unavailable. No DFR private framework is loaded, no system process is restarted, and no global/Fn/other-app preferences are changed. System close/back controls remain available.
+
+The build restores its own two legacy `PresentationModePerApp` entries from build 43's saved backup, preserving later manual edits. New presentation does not write that domain. Preference migration tests inject disposable suites; presentation lifecycle tests inject fake show/hide callbacks instead of taking over the runner's bar. Preview mode does not present full width. Physical Touch Bar acceptance is still required because CI cannot verify the actual Control Strip or touch renderer.
 
 ## State, overhead and input
 

@@ -58,11 +58,11 @@ struct NativeSettingsView: View {
                                 .font(.callout).foregroundStyle(.secondary)
                             Toggle("Use full Touch Bar", isOn: Binding(get: { touchBarFullWidth }, set: changeTouchBarWidth))
                                 .accessibilityIdentifier("touchbar-full-width-toggle")
-                            Text("Off by default: keep the macOS Control Strip. On: give MoonlightLG the full app bar by hiding the strip only for MoonlightLG and its streaming window. Turn off to restore their previous settings. Takes effect when returning to the library or stream.")
+                            Text("Off by default: keep the macOS Control Strip. On: give MoonlightLG the full app bar by hiding the strip only for MoonlightLG and its streaming window. Turn off or switch apps to restore the system strip. Applies to the active library, settings or streaming window.")
                                 .font(.callout).foregroundStyle(.secondary)
-                            Text("Uses a macOS per-app presentation preference. Physical behavior can vary by macOS version.")
+                            Text("Uses an undocumented AppKit presentation hook only while MoonlightLG is active. Compatibility varies by macOS version; other apps keep their normal bar.")
                                 .font(.caption).foregroundStyle(.secondary)
-                            if touchBarError { Text("macOS could not save the Touch Bar presentation setting. Turn the option off to restore its saved per-app values. You can also adjust the Touch Bar in macOS Keyboard settings.").foregroundStyle(.red) }
+                            if touchBarError { Text("Full-width presentation is unavailable on this macOS version, or the previous per-app preference could not be restored. The standard Touch Bar remains available.").foregroundStyle(.red) }
                         }
                     }
                     if pane == .recording { RecordingSettings().disabled(store.streamActive) }

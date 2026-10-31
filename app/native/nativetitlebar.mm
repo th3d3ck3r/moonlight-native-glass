@@ -160,6 +160,7 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic,retain) MLTouchDashboard* touchDashboard;
 @property(nonatomic,retain) MLTouchDashboard* touchInlineDashboard;
 @property(nonatomic,assign) BOOL touchLiveStats;
+@property(nonatomic,assign) BOOL touchFullWidthPresented;
 @property(nonatomic,retain) NSSliderTouchBarItem* touchVolume;
 @property(nonatomic,retain) NSSegmentedControl* touchPages;
 @property(nonatomic,retain) NSTextField* touchVolumeText;
@@ -181,6 +182,8 @@ static MLStreamTitlebar* titlebar;
 - (void)installTouchBar;
 - (void)refreshTouchBar;
 - (void)invalidateTouchBar;
+- (void)updateTouchPresentation;
+- (void)touchPresentationChanged:(NSNotification*)notification;
 @end
 
 static void requestTitlebarInputRepair(NSWindow* window) {
@@ -258,6 +261,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
 }
 - (void)windowChanged:(NSNotification*)notification {
     if (notification.object!=self.window) return;
+    [self updateTouchPresentation];
     [self closeDetails];
     if ([notification.name isEqual:NSWindowDidMoveNotification] || [notification.name isEqual:NSWindowDidEndLiveResizeNotification]) [self requestInputRepair];
     if ([notification.name isEqual:NSWindowWillEnterFullScreenNotification] || [notification.name isEqual:NSWindowWillExitFullScreenNotification])
@@ -277,7 +281,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
 }
 - (void)themeChanged:(NSNotification*)notification { [self updateWindowToolbar]; [self refresh]; }
 - (void)focusChanged:(NSNotification*)notification {
-    if (notification.object==self.window || notification.object==NSApp) [self updateVisibility];
+    if (notification.object==self.window || notification.object==NSApp) { [self updateVisibility]; [self updateTouchPresentation]; }
 }
 - (void)removeAccessory {
     ++self.visibilityRevision;

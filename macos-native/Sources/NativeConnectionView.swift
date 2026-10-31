@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ObjectiveC.runtime
 
 // Procedural Apollo rendezvous: the same TimelineView/Canvas drawing style as
 // Warp Arrival, with no video, external assets, random regeneration or timers.
@@ -392,58 +393,73 @@ struct NativeTouchBarCommand {
     }
 }
 
-// macOS has no public NSTouchBar API that hides the Control Strip. This optional
-// private-build feature uses the system's per-application presentation preference,
-// rather than private DFR APIs, global settings, or restarting system processes.
-// Keep a reversible backup for just our two bundle identities. Other apps and
-// global/Fn settings are never modified. Injected suites keep tests off real prefs.
+// Full width is opt-in and owned only while this app/window is active. AppKit
+// has no public Control Strip hiding API. Resolve its system-modal selectors at
+// runtime; unsupported systems keep the ordinary bar. Never edit global prefs
+// or restart TouchBarServer/ControlStrip. This private-build hook needs hardware QA.
 enum NativeTouchBarPresentation {
     static let key = "touchBarFullWidth"
     static let backupKey = "touchBarPresentationBackup"
     static let applications = ["com.moonlight-stream.NativeGlass", "com.moonlight-stream.NativeGlass.Engine"]
     static let agentDomain = "com.apple.touchbar.agent"
-    static func apply(_ enabled: Bool, preferences: UserDefaults = .standard,
-                      agent: UserDefaults? = UserDefaults(suiteName: agentDomain), reapply: Bool = false) -> Bool {
-        guard let agent else { return false }
-        agent.synchronize()
+    static let changed = Notification.Name("com.moonlight-stream.NativeGlass.touchBarPresentationChanged")
+    private static let showSelector = NSSelectorFromString("presentSystemModalTouchBar:placement:systemTrayItemIdentifier:")
+    private static let hideSelector = NSSelectorFromString("dismissSystemModalTouchBar:")
+    static var supported: Bool { NSTouchBar.responds(to: showSelector) && NSTouchBar.responds(to: hideSelector) }
+    private static func present(_ bar: NSTouchBar) -> Bool {
+        guard supported, let method = class_getClassMethod(NSTouchBar.self, showSelector) else { return false }
+        typealias Show = @convention(c) (AnyClass, Selector, NSTouchBar, Int64, NSString?) -> Void
+        let show = unsafeBitCast(method_getImplementation(method), to: Show.self)
+        show(NSTouchBar.self, showSelector, bar, 1, nil)
+        return true
+    }
+    private static func dismiss(_ bar: NSTouchBar) {
+        guard let method = class_getClassMethod(NSTouchBar.self, hideSelector) else { return }
+        typealias Hide = @convention(c) (AnyClass, Selector, NSTouchBar) -> Void
+        unsafeBitCast(method_getImplementation(method), to: Hide.self)(NSTouchBar.self, hideSelector, bar)
+    }
+    final class Session {
+        private(set) var presented: NSTouchBar?
+        let show: (NSTouchBar) -> Bool
+        let hide: (NSTouchBar) -> Void
+        init(show: @escaping (NSTouchBar) -> Bool = NativeTouchBarPresentation.present,
+             hide: @escaping (NSTouchBar) -> Void = NativeTouchBarPresentation.dismiss) {
+            self.show = show; self.hide = hide
+        }
+        func update(_ bar: NSTouchBar?, enabled: Bool, eligible: Bool) {
+            let next = enabled && eligible ? bar : nil
+            guard presented !== next else { return }
+            if let old = presented { hide(old); presented = nil }
+            if let next, show(next) { presented = next }
+        }
+        deinit { if let presented { hide(presented) } }
+    }
+    // Restore only the two entries written by build 43. Preserve later manual
+    // edits and other apps. New full-width presentation writes no agent prefs.
+    static func restoreLegacy(preferences: UserDefaults, agent: UserDefaults?) -> Bool {
+        guard let backup = preferences.dictionary(forKey: backupKey), !backup.isEmpty else { return true }
+        guard let agent else { return false }; agent.synchronize()
         let raw = agent.object(forKey: "PresentationModePerApp")
         guard raw == nil || raw is [String: Any] else { return false }
         var modes = raw as? [String: Any] ?? [:]
-        var backup = preferences.dictionary(forKey: backupKey) ?? [:]
-        let hadBackup = !backup.isEmpty
-        if enabled {
-            // A manually changed system preference takes precedence on relaunch.
-            // The Settings toggle itself is an explicit new request (reapply=false).
-            if reapply && hadBackup { return true }
-            if backup.isEmpty { backup["hadDictionary"] = raw != nil }
-            for app in applications {
-                if backup[app] == nil {
-                    var entry: [String: Any] = ["present": modes[app] != nil]
-                    if let value = modes[app] { entry["value"] = value }
-                    backup[app] = entry
-                }
-                modes[app] = "app"
-            }
-            // Persist recovery data before changing the agent's presentation map.
-            preferences.set(backup, forKey: backupKey); preferences.synchronize()
-        } else {
-            guard hadBackup else { return true }
-            for app in applications {
-                guard let entry = backup[app] as? [String: Any] else { continue }
-                // Do not undo a later change made by the user or another tool.
-                guard modes[app] as? String == "app" else { continue }
-                if entry["present"] as? Bool == true { modes[app] = entry["value"] }
-                else { modes.removeValue(forKey: app) }
-            }
+        for app in applications {
+            guard let entry = backup[app] as? [String: Any], modes[app] as? String == "app" else { continue }
+            if entry["present"] as? Bool == true { modes[app] = entry["value"] }
+            else { modes.removeValue(forKey: app) }
         }
-        if modes.isEmpty && backup["hadDictionary"] as? Bool == false {
-            agent.removeObject(forKey: "PresentationModePerApp")
-        } else { agent.set(modes, forKey: "PresentationModePerApp") }
-        guard agent.synchronize() else { return false }
-        let saved = agent.dictionary(forKey: "PresentationModePerApp") ?? [:]
-        guard NSDictionary(dictionary: saved).isEqual(to: modes) else { return false }
-        if !enabled { preferences.removeObject(forKey: backupKey) }
-        preferences.set(enabled, forKey: key)
+        if modes.isEmpty && backup["hadDictionary"] as? Bool == false { agent.removeObject(forKey: "PresentationModePerApp") }
+        else { agent.set(modes, forKey: "PresentationModePerApp") }
+        guard agent.synchronize(), NSDictionary(dictionary: agent.dictionary(forKey: "PresentationModePerApp") ?? [:]).isEqual(to: modes) else { return false }
+        preferences.removeObject(forKey: backupKey)
+        return true
+    }
+    static func apply(_ enabled: Bool, preferences: UserDefaults = .standard,
+                      agent: UserDefaults? = UserDefaults(suiteName: agentDomain), reapply: Bool = false,
+                      available: Bool = supported) -> Bool {
+        guard restoreLegacy(preferences: preferences, agent: agent), !enabled || available else { return false }
+        preferences.set(enabled, forKey: key); preferences.synchronize()
+        NotificationCenter.default.post(name: changed, object: nil)
+        DistributedNotificationCenter.default().postNotificationName(changed, object: nil, userInfo: nil, deliverImmediately: true)
         return true
     }
 }
@@ -499,6 +515,12 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         var previous: NSTouchBar?
         var bar: NSTouchBar?
         var buttons: [String: NSButton] = [:]
+        let presentation = NativeTouchBarPresentation.Session()
+        var observers: [NSObjectProtocol] = []
+        func refreshPresentation() {
+            let eligible = window?.isKeyWindow == true && window?.isVisible == true && NSApp.isActive && window?.touchBar === bar
+            presentation.update(bar, enabled: !CommandLine.arguments.contains("--design-preview") && UserDefaults.standard.bool(forKey: NativeTouchBarPresentation.key), eligible: eligible)
+        }
         func attach(_ next: NSWindow?) {
             if window === next, bar != nil { return }
             detach()
@@ -507,8 +529,19 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             let bar = NSTouchBar(); bar.delegate = self
             bar.defaultItemIdentifiers = commands.map { NSTouchBarItem.Identifier($0.id) }
             self.bar = bar; next.touchBar = bar
+            for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                         NSWindow.didMiniaturizeNotification, NSApplication.didBecomeActiveNotification,
+                         NSApplication.didResignActiveNotification, NativeTouchBarPresentation.changed] {
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.refreshPresentation() })
+            }
+            observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: next, queue: .main) { [weak self] _ in
+                self?.presentation.update(nil, enabled: false, eligible: false)
+            })
+            refreshPresentation()
         }
         func detach() {
+            presentation.update(nil, enabled: false, eligible: false)
+            for observer in observers { NotificationCenter.default.removeObserver(observer) }; observers.removeAll()
             if let window, window.touchBar === bar { window.touchBar = previous }
             for button in buttons.values { button.target = nil; button.action = nil }
             buttons.removeAll(); bar?.delegate = nil; bar = nil; previous = nil; window = nil
