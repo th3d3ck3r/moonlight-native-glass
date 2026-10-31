@@ -667,8 +667,6 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             for command in commands {
                 let button = NativeTouchBarButton(title: command.title, target: self, action: #selector(press(_:)))
                 button.identifier = NSUserInterfaceItemIdentifier(command.id)
-                button.widthAnchor.constraint(equalToConstant: command.width).isActive = true
-                button.heightAnchor.constraint(equalToConstant: 30).isActive = true
                 style(button, command); buttons[command.id] = button; views.append((button, command.width))
             }
             let row = NativeTouchBarRow(buttons: views, pinnedStatus: commands.first?.action == nil)

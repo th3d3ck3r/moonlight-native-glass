@@ -9,6 +9,7 @@ final class EngineChannel {
     private let output = Pipe()
     private var decoder = EngineLineDecoder()
     private let readQueue = DispatchQueue(label: "moonlight.native.events")
+    private let exited = DispatchSemaphore(value: 0)
     var onEvent: (([String: Any]) -> Void)?
     var onExit: ((Int32) -> Void)?
     private(set) var diagnosticURL: URL?
@@ -60,6 +61,7 @@ final class EngineChannel {
                 }
             }
             self.process.waitUntilExit()
+            self.exited.signal() // Independent of MainActor/UI callbacks during app termination.
             try? self.diagnosticHandle?.close()
             self.diagnosticHandle = nil
             let code = self.process.terminationStatus
@@ -79,6 +81,10 @@ final class EngineChannel {
         try send(request)
         closed = true // Ignore late messages and classify the eventual exit as intentional.
         try? input.fileHandleForWriting.close()
+    }
+    func waitForExit(timeout: TimeInterval) -> Bool {
+        if !process.isRunning { return true }
+        return exited.wait(timeout: .now() + timeout) == .success
     }
     func stop() {
         guard !closed else { return }
@@ -541,7 +547,7 @@ struct PairingRequest: Identifiable {
             connectionJourney?.detail = "Connection failed"
         } else { fail(detail) }
     }
-    func shutdown() {
+    func shutdown(waitForDiscovery: Bool = false) {
         clearMenuRequests()
         connectionDeadline?.cancel(); connectionJourney = nil
         shuttingDown = true; hostDeadline?.cancel(); launchDeadline?.cancel(); pendingStream = nil
@@ -553,6 +559,13 @@ struct PairingRequest: Identifiable {
             catch { channel.stop() }
         }
         stream?.stop()
+        // Only applicationWillTerminate requests this bounded wait. Keep the
+        // stdout reader alive until discovery finishes queued saves: closing it
+        // first makes the real Qt helper stop on EPIPE after an earlier reply.
+        // The reader signals directly from its queue, never through MainActor.
+        if waitForDiscovery, let channel, !channel.waitForExit(timeout: 2), channel.process.isRunning {
+            channel.process.terminate()
+        }
     }
 }
 

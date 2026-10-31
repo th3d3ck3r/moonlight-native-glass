@@ -46,7 +46,7 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
         store?.shutdown()
         return .terminateNow
     }
-    func applicationWillTerminate(_ notification: Notification) { boot?.finishImmediately(); store?.shutdown() }
+    func applicationWillTerminate(_ notification: Notification) { boot?.finishImmediately(); store?.shutdown(waitForDiscovery: true) }
 }
 
 @main struct MoonlightLGApp: App {

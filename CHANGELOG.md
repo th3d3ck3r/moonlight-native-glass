@@ -7,6 +7,9 @@
 - Refined Warp Arrival and Apollo animations, preserving the native Continue/Cancel controls and Touch Bar integration. Startup Preview build/run, UI Preview tests and real Qt/SDL interaction checks passed on the isolated uploaded-animation branch at a9680117 before integration. Apollo retains the uploaded 60 fps schedule.
 - Correct physical Touch Bar label clipping with explicit 30-point native button drawing, bounded two-line host status and readable action widths.
 - Fix the ineffective preference-only full-width option with runtime-guarded AppKit system-modal presentation scoped to the active app/window; restore legacy per-app entries and leave system preferences unchanged.
+- Preserve numeric settings while typing and drain queued discovery writes during app termination, so bandwidth survives restart and reaches the next stream. Other saved preferences and automatic bitrate adjustment semantics remain intact.
+- Keep host status pinned with a horizontal control strip for narrow library/connection layouts. A single detailed-statistics panel holds a compact six-page pager and visible measurements; no oversized segmented selector competes with or hides the dashboard.
+- Full-width presentation reads the shared frontend preference in both app and engine-hosted Apollo, observes distributed updates, and releases ownership safely during reentrant focus/close callbacks. Unsupported persisted full width is disabled.
 - Optional original controls layout; full-width presentation stays off by default. Internal build 44; validation pending.
 
 

@@ -16,14 +16,19 @@ static bool reenterShow=false,reenterHide=false,loseFocusDuringShow=false;
 static int shown=0,hidden=0;
 static NSTouchBar* presented=nil;
 static NSWindow* fixtureWindow=nil;
+static IMP originalKeyGetter=nullptr,originalVisibleGetter=nullptr;
 
 static void refresh(NSTouchBar* bar) {
     id owner=bar.delegate;
     check(owner && [owner respondsToSelector:@selector(updateTouchPresentation)],"Presentation owner must remain reachable while attached");
     [owner performSelector:@selector(updateTouchPresentation)];
 }
-static BOOL fakeKey(id receiver,SEL selector) { return mockKey; }
-static BOOL fakeVisible(id receiver,SEL selector) { return mockVisible; }
+static BOOL fakeKey(id receiver,SEL selector) {
+    return receiver==fixtureWindow ? mockKey : ((BOOL(*)(id,SEL))originalKeyGetter)(receiver,selector);
+}
+static BOOL fakeVisible(id receiver,SEL selector) {
+    return receiver==fixtureWindow ? mockVisible : ((BOOL(*)(id,SEL))originalVisibleGetter)(receiver,selector);
+}
 static BOOL fakeActive(id receiver,SEL selector) { return mockActive; }
 static void fakeShow(id receiver,SEL selector,NSTouchBar* bar,long long placement,id tray) {
     if (cleaning) return;
@@ -51,9 +56,11 @@ static void pump() {
 struct Fixture {
     NSUserDefaults* preferences=nil;
     id savedValue=nil;
-    Class meta=Nil,applicationClass=Nil,originalWindowClass=Nil,mockWindowClass=Nil;
+    Class meta=Nil,applicationClass=Nil,windowGetterClass=Nil;
     IMP originalShow=nullptr,originalHide=nullptr,originalActive=nullptr;
     const char* activeEncoding=nullptr;
+    const char* keyEncoding=nullptr;
+    const char* visibleEncoding=nullptr;
     SEL showSelector=NSSelectorFromString(@"presentSystemModalTouchBar:placement:systemTrayItemIdentifier:");
     SEL hideSelector=NSSelectorFromString(@"dismissSystemModalTouchBar:");
     SDL_Window* stream=nullptr;
@@ -87,10 +94,10 @@ struct Fixture {
         cleaning=true;
         nativeOverlayDetach();
         [retainedBar release]; [originalBar release];
-        if (fixtureWindow && originalWindowClass) object_setClass(fixtureWindow,originalWindowClass);
+        if (windowGetterClass && originalKeyGetter) class_replaceMethod(windowGetterClass,@selector(isKeyWindow),originalKeyGetter,keyEncoding);
+        if (windowGetterClass && originalVisibleGetter) class_replaceMethod(windowGetterClass,@selector(isVisible),originalVisibleGetter,visibleEncoding);
         if (stream) SDL_DestroyWindow(stream);
         fixtureWindow=nil;
-        if (mockWindowClass) objc_disposeClassPair(mockWindowClass);
         if (sdlReady) SDL_Quit();
         if (originalActive) class_replaceMethod(applicationClass,@selector(isActive),originalActive,activeEncoding);
         if (originalShow) class_replaceMethod(meta,showSelector,originalShow,"v@:@q@");
@@ -112,17 +119,24 @@ static void run(Fixture& fixture) {
     SDL_SysWMinfo info; SDL_VERSION(&info.version);
     check(SDL_GetWindowWMInfo(fixture.stream,&info),"Resolve SDL Cocoa window");
     fixtureWindow=info.info.cocoa.window;
-    fixture.originalWindowClass=object_getClass(fixtureWindow);
-    fixture.mockWindowClass=objc_allocateClassPair(fixture.originalWindowClass,"MLTouchPresentationFixtureWindow",0);
-    check(fixture.mockWindowClass!=Nil,"Create test-only focus getter overrides");
-    class_addMethod(fixture.mockWindowClass,@selector(isKeyWindow),(IMP)fakeKey,method_getTypeEncoding(class_getInstanceMethod(fixture.originalWindowClass,@selector(isKeyWindow))));
-    class_addMethod(fixture.mockWindowClass,@selector(isVisible),(IMP)fakeVisible,method_getTypeEncoding(class_getInstanceMethod(fixture.originalWindowClass,@selector(isVisible))));
-    objc_registerClassPair(fixture.mockWindowClass); object_setClass(fixtureWindow,fixture.mockWindowClass);
+    // Keep AppKit's original isa/computed-property metadata intact. Override
+    // these getters only on the existing class and forward all other windows.
+    fixture.windowGetterClass=object_getClass(fixtureWindow);
+    Method key=class_getInstanceMethod(fixture.windowGetterClass,@selector(isKeyWindow));
+    Method visible=class_getInstanceMethod(fixture.windowGetterClass,@selector(isVisible));
+    check(key && visible,"Locate the native focus/visibility getters");
+    originalKeyGetter=method_getImplementation(key); originalVisibleGetter=method_getImplementation(visible);
+    fixture.keyEncoding=method_getTypeEncoding(key); fixture.visibleEncoding=method_getTypeEncoding(visible);
+    class_replaceMethod(fixture.windowGetterClass,@selector(isKeyWindow),(IMP)fakeKey,fixture.keyEncoding);
+    class_replaceMethod(fixture.windowGetterClass,@selector(isVisible),(IMP)fakeVisible,fixture.visibleEncoding);
+    fprintf(stderr,"Presentation fixture: original window class %s, getter overrides installed\n",class_getName(fixture.windowGetterClass));
     fixture.originalBar=[[NSTouchBar alloc] init]; fixtureWindow.touchBar=fixture.originalBar;
+    fprintf(stderr,"Presentation fixture: attaching normal bar\n");
     nativeOverlayAttach(fixtureWindow,"presentation-fixture"); pump(); fixture.retainCurrentBar();
     NSTouchBar* bar=fixture.retainedBar;
     check(bar && bar!=fixture.originalBar && shown==0 && hidden==0,"Missing full-width preference must retain normal Control Strip presentation");
 
+    fprintf(stderr,"Presentation fixture: enable and focus transitions\n");
     reenterShow=true; fixture.enable(true);
     check(shown==1 && hidden==0 && presented==bar,"Enabling must invoke full-width presentation exactly once despite synchronous refresh");
     refresh(bar); refresh(bar); check(shown==1,"Repeated state refresh must not steal presentation again");
@@ -141,12 +155,14 @@ static void run(Fixture& fixture) {
     reenterHide=true; fixture.enable(false);
     check(hidden==4 && presented==nil,"Disabling must release ownership once despite synchronous refresh");
 
+    fprintf(stderr,"Presentation fixture: focus loss inside show callback\n");
     loseFocusDuringShow=true; fixture.enable(true);
     check(shown==5 && hidden==5 && presented==nil,"Focus loss during presentation must cancel ownership rather than restoring stale state");
     check(![[(id)bar.delegate valueForKey:@"touchFullWidthPresented"] boolValue],"Reentrant focus loss must clear the native ownership flag");
     mockKey=true; notify(NSWindowDidBecomeKeyNotification,fixtureWindow);
     check(shown==6 && presented==bar,"Reentrant cancellation must not prevent a later genuine focus gain");
 
+    fprintf(stderr,"Presentation fixture: detach and reconnect\n");
     nativeOverlayDetach(); pump();
     check(hidden==6 && presented==nil && fixtureWindow.touchBar==fixture.originalBar,"Detach must dismiss full width and restore the previous responder bar");
     check(bar.delegate==nil,"Detach must remove the old presentation owner");

@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Darwin
 
 func nativeArgument(_ name: String) -> String? { nil }
 
@@ -15,6 +16,20 @@ func nativeArgument(_ name: String) -> String? { nil }
     }
     @MainActor static func main() async throws {
         _ = NSApplication.shared
+        if CommandLine.arguments.count == 3 && CommandLine.arguments[1] == "--parent-exit-child" {
+            let helper = URL(fileURLWithPath: CommandLine.arguments[2]).appendingPathComponent("settings-engine")
+            let store = EngineStore(executable: helper)
+            store.start()
+            try await wait { store.ready && store.values["bitrateKbps"] != nil }
+            // Several valid edits queue separate acknowledgments. Close the
+            // real frontend process immediately after its termination path;
+            // keeping this parent alive previously hid stdout/EPIPE data loss.
+            store.set("bitrateKbps", 61000)
+            store.set("fps", 90)
+            store.set("bitrateKbps", 128000)
+            store.shutdown(waitForDiscovery: true)
+            exit(0)
+        }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("MoonlightLG-Settings-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -75,6 +90,20 @@ func nativeArgument(_ name: String) -> String? { nil }
         precondition(loaded["bitrateKbps"] as? Int == 64000, "The next stream process did not load the saved bandwidth")
         second.shutdown()
         try await wait { FileManager.default.fileExists(atPath: stopped.path) }
-        print("PASS: last numeric setting drains on quit, survives fresh store/helper, preserves unrelated values and reaches the next stream process")
+        let exitDirectory = directory.appendingPathComponent("parent-exit")
+        try FileManager.default.createDirectory(at: exitDirectory, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: executable, to: exitDirectory.appendingPathComponent("settings-engine"))
+        let parent = Process()
+        parent.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
+        parent.arguments = ["--parent-exit-child", exitDirectory.path]
+        try parent.run()
+        parent.waitUntilExit()
+        precondition(parent.terminationStatus == 0, "Frontend termination fixture failed")
+        let final = try JSONSerialization.jsonObject(with: Data(contentsOf: exitDirectory.appendingPathComponent("settings.json"))) as! [String: Any]
+        precondition(final["bitrateKbps"] as? Int == 128000 && final["fps"] as? Int == 90,
+                     "Closing the frontend stdout reader discarded the final queued settings")
+        precondition(FileManager.default.fileExists(atPath: exitDirectory.appendingPathComponent("discovery-stopped").path),
+                     "Actual frontend exit must let discovery finish ordered shutdown")
+        print("PASS: queued settings survive immediate frontend process exit, fresh store/helper and next stream; unrelated values preserved")
     }
 }

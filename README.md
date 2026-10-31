@@ -21,7 +21,7 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
-Private development: **1.3.4.0U · Live Touch Bar statistics** is in validation. U packages are shared only with the owner; the stable downloads below remain 1.3.2.0.
+Private development: **1.3.4.0U · Adaptive Touch Bar and persistent bandwidth settings** is in validation. U packages are shared only with the owner; the stable downloads below remain 1.3.2.0.
 
 ## 📦 Download
 

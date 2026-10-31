@@ -66,6 +66,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     NSWindow* window=info.info.cocoa.window;
     NSUserDefaults* preferences=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
     id oldLayout=[[preferences objectForKey:@"touchBarLiveStats"] retain];
+    id oldVolume=[[preferences objectForKey:@"playbackVolume"] retain];
     [preferences setBool:YES forKey:@"touchBarLiveStats"]; [preferences synchronize];
     NSTouchBar* original=[[[NSTouchBar alloc] init] autorelease]; window.touchBar=original;
     nativeOverlayAttach(window,"touchbar-fixture"); pump(); NSTouchBar* bar=[window.touchBar retain];
@@ -84,6 +85,17 @@ int main(int argc,char** argv) { @autoreleasepool {
     [button(windowControls,@"touch.fullscreen") performClick:nil]; check(action(2),"Fullscreen queues the existing stream handler");
     [button(more,@"touch.stats") performClick:nil]; check(action(3),"Statistics action routing");
     [button(audio,@"touch.mute") performClick:nil]; check(action(207),"Mute action routing");
+    [button(windowControls,@"touch.controls") performClick:nil]; check(action(11),"Stream controls routing");
+    [button(windowControls,@"touch.hide") performClick:nil]; check(action(0),"Hide uses the existing stream action");
+    [button(more,@"touch.disconnect") performClick:nil]; check(action(12),"Disconnect uses the existing stream action");
+    NSSliderTouchBarItem* slider=(NSSliderTouchBarItem*)[audio itemForIdentifier:@"touch.volume"];
+    slider.slider.doubleValue=.37; [(id)slider.target performSelector:slider.action withObject:slider]; pump();
+    check([volumeText.stringValue isEqual:@"37%"],"Volume slider updates the real playback value and visible percentage");
+    slider.slider.doubleValue=1; [(id)slider.target performSelector:slider.action withObject:slider]; pump();
+    [button(windowControls,@"touch.hardware") performClick:nil]; pump();
+    check([button(windowControls,@"touch.hardware").title isEqual:@"Hide Mac"],"Hardware monitor action opens the local monitor");
+    [button(windowControls,@"touch.hardware") performClick:nil]; pump();
+    check([button(windowControls,@"touch.hardware").title isEqual:@"Monitor"],"Hardware monitor action closes the local monitor");
     check(SDL_GetRelativeMouseMode()==relative,"Touch Bar actions must not directly mutate mouse confinement");
     nativeTitlebarSetRecording(true,true,true,true,false,false,125,"Original Stream Quality"); pump();
     check([button(more,@"touch.record").title isEqual:@"2:05"] && button(more,@"touch.replay").enabled,"Recording time and replay readiness must synchronize");
@@ -139,6 +151,8 @@ int main(int argc,char** argv) { @autoreleasepool {
     capture(window.touchBar,[directory stringByAppendingPathComponent:@"touchbar-controls-layout.png"]);
     nativeOverlayDetach();
     if (oldLayout) [preferences setObject:oldLayout forKey:@"touchBarLiveStats"]; else [preferences removeObjectForKey:@"touchBarLiveStats"];
+    if (oldVolume) [preferences setObject:oldVolume forKey:@"playbackVolume"]; else [preferences removeObjectForKey:@"playbackVolume"];
+    [oldVolume release];
     [preferences synchronize]; [oldLayout release];
     SDL_DestroyWindow(stream); SDL_Quit(); fprintf(stderr,"PASS: Touch Bar actions, state, stale data, fit, previews and lifetime\n");
     return 0;

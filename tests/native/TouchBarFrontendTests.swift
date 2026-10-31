@@ -23,11 +23,11 @@ import SwiftUI
         precondition(window.touchBar === bar, "State updates must preserve the current bar and its focus")
         button.performClick(nil); precondition(presses == 1)
         precondition(button.image != nil && button.contentTintColor != nil, "Use native symbols and Crimson Glass tint")
-        precondition(button.constraints.contains { $0.firstAttribute == .width && $0.constant == 150 })
+        precondition(button.frame.width == 150 && button.frame.height == 30)
         // Reproduce the two-line status and narrow labels from the owner's
         // physical M1 bar at its actual 30-point height, not a regular cell.
         let status = NativeTouchBarCommand("library.status", "Th3D3ck3r-R7\nReady to stream · 4 games", "moon.fill", width: 178, enabled: false)
-        let labels: [(String, String, CGFloat)] = [("Refresh", "arrow.clockwise", 82), ("Add", "plus", 58), ("Settings", "gearshape", 86)]
+        let labels: [(String, String, CGFloat)] = [("", "chevron.left", 36), ("", "chevron.right", 36), ("Refresh", "arrow.clockwise", 82), ("Select a game", "play.fill", 126), ("Add", "plus", 58), ("Settings", "gearshape", 86)]
         owner.update([status] + labels.enumerated().map { index, value in
             NativeTouchBarCommand("layout.\(index)", value.0, value.1, width: value.2) {}
         }, crimson: true)
@@ -36,6 +36,7 @@ import SwiftUI
         _ = window.touchBar!.item(forIdentifier: .init("native.commandRow"))
         for command in owner.commands {
             let view = owner.buttons[command.id] as! NativeTouchBarButton
+            let originalFrame = view.frame
             view.frame = NSRect(x: 0, y: 0, width: command.width, height: 30)
             precondition(view.labelRects.allSatisfy { view.bounds.contains($0) }, "All status lines must fit inside the physical bar height")
             if !command.title.contains("\n") {
@@ -45,8 +46,14 @@ import SwiftUI
             let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
             view.cacheDisplay(in: view.bounds, to: bitmap)
             try! bitmap.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent("touchbar-\(command.id).png"))
+            view.frame = originalFrame
         }
         let row = owner.row!
+        var previousEnd: CGFloat = -6
+        for (control, _) in row.controls {
+            precondition(control.frame.minX >= previousEnd + 6, "Scrollable controls must retain distinct non-overlapping document frames")
+            previousEnd = control.frame.maxX
+        }
         for width in [CGFloat(685), 400, 1085] {
             row.frame = NSRect(x: 0, y: 0, width: width, height: 30)
             let bitmap = row.bitmapImageRepForCachingDisplay(in: row.bounds)!
@@ -124,6 +131,7 @@ import SwiftUI
         prefs.set(true, forKey: NativeTouchBarPresentation.key)
         precondition(!NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, available: false))
         precondition(!prefs.bool(forKey: NativeTouchBarPresentation.key), "Unsupported persisted ON must be cleared")
+        reentrant = nil; interrupted = nil
         window.close()
         print("PASS: frontend Touch Bar actions, physical layout, full-width focus lifetime, unsupported fallback and legacy preference recovery")
     }
