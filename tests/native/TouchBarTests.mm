@@ -78,7 +78,8 @@ int main(int argc,char** argv) { @autoreleasepool {
     check([readings.accessibilityLabel containsString:@"Enable Statistics"],"Statistics off must discard old measurements");
     NSString* directory=argc>1 ? [NSString stringWithUTF8String:argv[1]] : @"build/touchbar-previews";
     [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
-    nativeTitlebarSetStatistics(true); nativeOverlayPresent(0,true,"Incoming frame rate from network: 60.00 FPS\nAverage network latency: 4 ms\nBitrate: 25 Mbps"); pump();
+    nativeTitlebarSetStatistics(true); nativeOverlayPresent(0,true,"Video stream: 2560x1440 60 FPS\nVideo codec: HEVC Main10\nHost processing latency: 1.1/2.0/1.5 ms\nIncoming frame rate from network: 60.00 FPS\nAverage network latency: 4 ms\nBitrate: 25 Mbps\nAverage decoding time: 1.2 ms\nAverage frame queue delay: 0.4 ms\nAverage rendering time: 0.8 ms\nFrames dropped by network: 0.00%\nFrames dropped due to jitter: 0.01%\nRendering frame rate: 59.98 FPS"); pump();
+    for (int i=0;i<3;++i) { [readings performSelector:@selector(sample)]; pump(); }
     capture(bar,[directory stringByAppendingPathComponent:@"touchbar-main.png"]);
     capture(audio,[directory stringByAppendingPathComponent:@"touchbar-audio.png"]);
     capture(more,[directory stringByAppendingPathComponent:@"touchbar-more.png"]);

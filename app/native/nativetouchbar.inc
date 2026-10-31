@@ -184,7 +184,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     if ([identifier isEqual:@"touch.volume"]) {
         NSSliderTouchBarItem* item=[[[NSSliderTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
         item.slider.minValue=0; item.slider.maxValue=1; item.slider.continuous=YES;
-        item.slider.doubleValue=nativePlaybackVolume(); item.target=self; item.action=@selector(touchVolume:);
+        item.slider.doubleValue=nativePlaybackVolume(); item.slider.trackFillColor=touchAccent(); item.target=self; item.action=@selector(touchVolume:);
         NSLayoutConstraint* constraint=[item.slider.widthAnchor constraintGreaterThanOrEqualToConstant:220];
         constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES;
         [item.slider setAccessibilityLabel:@"Local playback volume; recording audio unchanged"];
@@ -195,13 +195,14 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     else if ([identifier isEqual:@"touch.pages"]) {
         NSSegmentedControl* pages=[NSSegmentedControl segmentedControlWithLabels:@[@"Live",@"Video",@"Time",@"Drops",@"Mac",@"I/O"] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(touchPage:)];
         pages.font=[NSFont systemFontOfSize:10.5 weight:NSFontWeightMedium];
+        pages.selectedSegmentBezelColor=touchAccent();
         pages.selectedSegment=self.touchDashboard.page; pages.segmentStyle=NSSegmentStyleRounded;
         NSLayoutConstraint* constraint=[pages.widthAnchor constraintEqualToConstant:234];
         constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES; self.touchPages=pages; item.view=pages;
     } else {
         NSDictionary* titles=@{@"touch.capture":@"Capture",@"touch.record":@"Record",@"touch.replay":@"Replay",@"touch.stats":@"Stats",@"touch.hardware":@"Monitor",@"touch.fullscreen":@"Full Screen",@"touch.controls":@"Controls",@"touch.hide":@"Hide",@"touch.disconnect":@"Disconnect",@"touch.mute":@"Mute",@"touch.volumeLabel":@"100%"};
         NSDictionary* symbols=@{@"touch.capture":@"cursorarrow",@"touch.record":@"record.circle",@"touch.replay":@"arrow.counterclockwise",@"touch.stats":@"chart.xyaxis.line",@"touch.hardware":@"cpu",@"touch.fullscreen":@"arrow.up.left.and.arrow.down.right",@"touch.controls":@"slider.horizontal.3",@"touch.hide":@"eye.slash",@"touch.disconnect":@"power",@"touch.mute":@"speaker.slash.fill",@"touch.volumeLabel":@"speaker.wave.2"};
-        CGFloat width=[identifier isEqual:@"touch.record"] ? 98 : [identifier isEqual:@"touch.disconnect"] ? 100 : [identifier isEqual:@"touch.fullscreen"] ? 100 : 74;
+        CGFloat width=[identifier isEqual:@"touch.stats"] ? 90 : [identifier isEqual:@"touch.controls"] ? 94 : [identifier isEqual:@"touch.record"] ? 98 : [identifier isEqual:@"touch.disconnect"] ? 100 : [identifier isEqual:@"touch.fullscreen"] ? 100 : 74;
         NSButton* button=touchButton(titles[identifier] ?: identifier,symbols[identifier] ?: @"circle",self,@selector(touchAction:),width);
         button.identifier=identifier; self.touchButtons[identifier]=button; item.view=button;
     }
@@ -259,7 +260,8 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     self.touchButtons[@"touch.mute"].title=copy.muted ? @"Unmute" : @"Mute";
     self.touchButtons[@"touch.volumeLabel"].title=[NSString stringWithFormat:@"%.0f%%",nativePlaybackVolume()*100];
     self.touchButtons[@"touch.volumeLabel"].enabled=NO;
-    if (self.touchVolume) self.touchVolume.slider.doubleValue=nativePlaybackVolume();
+    self.touchPages.selectedSegmentBezelColor=touchAccent();
+    if (self.touchVolume) { self.touchVolume.slider.doubleValue=nativePlaybackVolume(); self.touchVolume.slider.trackFillColor=touchAccent(); }
     for (NSString* key in self.touchButtons) {
         NSButton* button=self.touchButtons[key];
         [button setAccessibilityLabel:button.toolTip.length ? [NSString stringWithFormat:@"%@ · %@",button.title,button.toolTip] : button.title];
