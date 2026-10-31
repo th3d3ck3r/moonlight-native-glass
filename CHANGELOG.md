@@ -4,7 +4,7 @@
 
 - Native Crimson Glass Touch Bar controls for the library, Apollo connection and stream window. Stream actions share existing SDL handlers.
 - Live status, capture/release, local audio/mute/volume, recording time and replay readiness; secondary controls for statistics, hardware overlay, fullscreen, stream controls, hide and disconnect.
-- Four information pages: incoming FPS/RTT/bitrate, decode/drop/render readings, local CPU/RAM/GPU sparklines, and network/thermal/controller status. Unavailable and stale measurements are labeled.
+- Six information pages: incoming FPS/RTT/bitrate, resolution/codec/host latency, decode/queue/render delays, network/jitter drops and rendering FPS, local CPU/RAM/GPU sparklines, and network/thermal/controller status. Unavailable and stale measurements are labeled.
 - Internal build 43. Private U artifacts only; stable 1.3.2.0 remains available. Validation pending.
 
 

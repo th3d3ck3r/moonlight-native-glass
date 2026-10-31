@@ -79,7 +79,7 @@ int main(int argc,char** argv) { @autoreleasepool {
     capture(audio,[directory stringByAppendingPathComponent:@"touchbar-audio.png"]);
     capture(more,[directory stringByAppendingPathComponent:@"touchbar-more.png"]);
     NSSegmentedControl* pages=(NSSegmentedControl*)((NSCustomTouchBarItem*)[dashboard itemForIdentifier:@"touch.pages"]).view;
-    for (int i=0;i<4;++i) { pages.selectedSegment=i; [pages sendAction:pages.action to:pages.target]; capture(dashboard,[directory stringByAppendingPathComponent:[NSString stringWithFormat:@"touchbar-info-%d.png",i]]); }
+    for (int i=0;i<6;++i) { pages.selectedSegment=i; [pages sendAction:pages.action to:pages.target]; capture(dashboard,[directory stringByAppendingPathComponent:[NSString stringWithFormat:@"touchbar-info-%d.png",i]]); }
     NSButton* stale=[button(bar,@"touch.record") retain];
     nativeOverlayDetach(); check(window.touchBar==original,"Restore the previous responder bar at handoff/detach");
     [stale performClick:nil]; check(!action(217),"A retained old button must not target a detached or later session");

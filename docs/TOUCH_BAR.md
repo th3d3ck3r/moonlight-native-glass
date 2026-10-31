@@ -13,12 +13,14 @@ The public 1.3.2.0 release stays available. Build 43 is an owner-only U build.
 | Apollo | Host and connection detail, Continue, Retry, Cancel/Library; availability follows real connection state |
 | Stream | Live status, Capture/Release, Audio percentage/mute state, Record/time, Replay readiness, More |
 
-Stream status expands into four selectable pages:
+Stream status expands into six selectable pages:
 
-- **Stream:** incoming FPS, network round-trip latency and bitrate from the engine's Statistics output.
-- **Decode:** decoding time, network drops and rendering FPS from the same measured output.
+- **Live:** incoming FPS, network round-trip latency and bitrate from the engine's Statistics output.
+- **Video:** video resolution/rate, codec and host-processing latency.
+- **Time:** decoding, frame queue and rendering delays.
+- **Drops:** network drops, jitter drops and rendering FPS.
 - **Mac:** local CPU, memory and optional driver-reported GPU load, with up to 60 one-second samples. These are client measurements, not host measurements.
-- **Devices:** local Ethernet/Wi-Fi throughput, thermal pressure and controller count/battery category. No unsupported temperature or exact controller battery percentage is invented.
+- **I/O:** local Ethernet/Wi-Fi throughput, thermal pressure and controller count/battery category. No unsupported temperature or exact controller battery percentage is invented.
 
 Audio expands into local playback mute, volume slider and percentage. The recorder's source audio is unchanged.
 More expands into Statistics, the hardware overlay, fullscreen, controls, hide and disconnect.

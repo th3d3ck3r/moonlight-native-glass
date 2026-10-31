@@ -44,7 +44,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     if ((self=[super initWithFrame:frame])) {
         self.active=YES; self.cpu=self.ram=self.gpu=self.rx=self.tx=-1;
         self.identifier=@"TouchDashboard"; self.streamText=@""; self.devicesText=@"No controller connected";
-        [self.widthAnchor constraintEqualToConstant:370].active=YES;
+        [self.widthAnchor constraintEqualToConstant:350].active=YES;
         [self.heightAnchor constraintEqualToConstant:30].active=YES;
         [self refreshCards];
     }
@@ -65,10 +65,16 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         case 0: self.cards=@[@[@"INCOMING FPS",[self metric:@"Incoming frame rate" fallback:missing]],
                             @[@"NETWORK RTT",[self metric:@"Average network latency" fallback:missing]],
                             @[@"BITRATE",[self metric:@"Bitrate" fallback:missing]]]; break;
-        case 1: self.cards=@[@[@"DECODE",[self metric:@"Average decoding time" fallback:missing]],
-                            @[@"NETWORK DROPS",[self metric:@"Frames dropped by" fallback:missing]],
+        case 1: self.cards=@[@[@"VIDEO",[self metric:@"Video stream" fallback:missing]],
+                            @[@"CODEC",[self metric:@"Video codec" fallback:missing]],
+                            @[@"HOST LATENCY",[self metric:@"Host processing latency" fallback:missing]]]; break;
+        case 2: self.cards=@[@[@"DECODE",[self metric:@"Average decoding time" fallback:missing]],
+                            @[@"FRAME QUEUE",[self metric:@"Average frame queue delay" fallback:missing]],
+                            @[@"RENDER TIME",[self metric:@"Average rendering time" fallback:missing]]]; break;
+        case 3: self.cards=@[@[@"NETWORK DROPS",[self metric:@"Frames dropped by" fallback:missing]],
+                            @[@"JITTER DROPS",[self metric:@"Frames dropped due" fallback:missing]],
                             @[@"RENDER FPS",[self metric:@"Rendering frame rate" fallback:missing]]]; break;
-        case 2: self.cards=@[@[@"LOCAL CPU",self.cpu<0 ? @"Sampling…" : [NSString stringWithFormat:@"%.0f%%",self.cpu]],
+        case 4: self.cards=@[@[@"LOCAL CPU",self.cpu<0 ? @"Sampling…" : [NSString stringWithFormat:@"%.0f%%",self.cpu]],
                             @[@"LOCAL RAM",self.ram<0 ? @"Unavailable" : [NSString stringWithFormat:@"%.1f / %.0f GB",self.ram/100.*NSProcessInfo.processInfo.physicalMemory/1073741824.,NSProcessInfo.processInfo.physicalMemory/1073741824.]],
                             @[@"LOCAL GPU",self.gpu<0 ? @"Unavailable" : [NSString stringWithFormat:@"%.0f%%",self.gpu]]]; break;
         default: {
@@ -115,7 +121,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         NSRect cell=NSMakeRect(i*width,0,width-4,30);
         [[NSColor colorWithSRGBRed:.09 green:.025 blue:.04 alpha:1] setFill];
         [[NSBezierPath bezierPathWithRoundedRect:cell xRadius:5 yRadius:5] fill];
-        if (self.page==2) {
+        if (self.page==4) {
             NSBezierPath* graph=[NSBezierPath bezierPath]; BOOL started=NO;
             for (size_t n=0;n<samples[i].size();++n) {
                 double value=samples[i][n]; if (value<0) { started=NO; continue; }
@@ -147,7 +153,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 }
 - (void)installTouchBar {
     self.touchButtons=[NSMutableDictionary dictionary]; self.touchPopovers=[NSMutableArray array];
-    self.touchDashboard=[[[MLTouchDashboard alloc] initWithFrame:NSMakeRect(0,0,370,30)] autorelease];
+    self.touchDashboard=[[[MLTouchDashboard alloc] initWithFrame:NSMakeRect(0,0,350,30)] autorelease];
     self.previousTouchBar=self.window.touchBar;
     self.streamTouchBar=[self touchBarWithItems:@[@"touch.info",@"touch.capture",@"touch.audio",@"touch.record",@"touch.replay",@"touch.more"]];
     self.window.touchBar=self.streamTouchBar;
@@ -183,9 +189,10 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     NSCustomTouchBarItem* item=[[[NSCustomTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
     if ([identifier isEqual:@"touch.dashboard"]) item.view=self.touchDashboard;
     else if ([identifier isEqual:@"touch.pages"]) {
-        NSSegmentedControl* pages=[NSSegmentedControl segmentedControlWithLabels:@[@"Stream",@"Decode",@"Mac",@"Devices"] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(touchPage:)];
+        NSSegmentedControl* pages=[NSSegmentedControl segmentedControlWithLabels:@[@"Live",@"Video",@"Time",@"Drops",@"Mac",@"I/O"] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(touchPage:)];
+        pages.font=[NSFont systemFontOfSize:10.5 weight:NSFontWeightMedium];
         pages.selectedSegment=self.touchDashboard.page; pages.segmentStyle=NSSegmentStyleRounded;
-        [pages.widthAnchor constraintEqualToConstant:214].active=YES; item.view=pages;
+        [pages.widthAnchor constraintEqualToConstant:234].active=YES; item.view=pages;
     } else {
         NSDictionary* titles=@{@"touch.capture":@"Capture",@"touch.record":@"Record",@"touch.replay":@"Replay",@"touch.stats":@"Stats",@"touch.hardware":@"Monitor",@"touch.fullscreen":@"Full Screen",@"touch.controls":@"Controls",@"touch.hide":@"Hide",@"touch.disconnect":@"Disconnect",@"touch.mute":@"Mute",@"touch.volumeLabel":@"100%"};
         NSDictionary* symbols=@{@"touch.capture":@"cursorarrow",@"touch.record":@"record.circle",@"touch.replay":@"arrow.counterclockwise",@"touch.stats":@"chart.xyaxis.line",@"touch.hardware":@"cpu",@"touch.fullscreen":@"arrow.up.left.and.arrow.down.right",@"touch.controls":@"slider.horizontal.3",@"touch.hide":@"eye.slash",@"touch.disconnect":@"power",@"touch.mute":@"speaker.slash.fill",@"touch.volumeLabel":@"speaker.wave.2"};
