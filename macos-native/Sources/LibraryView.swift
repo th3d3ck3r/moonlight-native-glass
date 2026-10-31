@@ -39,7 +39,7 @@ struct LibraryView: View {
             .init("library.next", "", "chevron.right", width: 36, enabled: controlsEnabled && index + 1 < store.computers.count) {
                 store.selectedID = store.computers[index + 1].id
             },
-            .init("library.refresh", "Refresh", "arrow.clockwise", width: 72, enabled: controlsEnabled) { store.refresh() }
+            .init("library.refresh", "Refresh", "arrow.clockwise", width: 82, enabled: controlsEnabled) { store.refresh() }
         ]
         if let selected, !selected.online {
             commands.append(.init("library.host", "Wake", "power", width: 126, enabled: controlsEnabled) { store.send("wake", ["host": selected.id]) })
@@ -52,7 +52,7 @@ struct LibraryView: View {
             })
         }
         commands.append(.init("library.add", "Add", "plus", width: 58, enabled: controlsEnabled) { addPresented = true })
-        commands.append(.init("library.settings", "Settings", "gearshape", width: 80) { openSettings() })
+        commands.append(.init("library.settings", "Settings", "gearshape", width: 86) { openSettings() })
         return commands
     }
 
