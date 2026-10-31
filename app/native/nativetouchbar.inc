@@ -387,7 +387,10 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
 - (void)touchAction:(NSButton*)sender {
     if (!self.window || self.window.touchBar!=self.streamTouchBar || !sender.enabled) return;
     NSString* name=sender.identifier;
-    NSDictionary* actions=@{@"touch.capture":@1,@"touch.record":@217,@"touch.replay":@219,@"touch.stats":@3,@"touch.mute":@207,@"touch.fullscreen":@2,@"touch.controls":@11,@"touch.hide":@0,@"touch.disconnect":@12};
+    // Explicit UI commands must not depend on whether the matching keyboard
+    // shortcut is enabled. The stream keeps ownership of all state changes.
+    TitleState copy; { std::lock_guard<std::mutex> lock(stateMutex); copy=state; }
+    NSDictionary* actions=@{@"touch.capture":@(copy.captured ? 202 : 201),@"touch.record":@217,@"touch.replay":@219,@"touch.stats":@(copy.statistics ? 208 : 203),@"touch.mute":@207,@"touch.fullscreen":@221,@"touch.controls":@100,@"touch.hide":@200,@"touch.disconnect":@12};
     if ([name isEqual:@"touch.hardware"]) [self perform:hardwareID anchor:nil];
     else if (actions[name]) nativeOverlayPerformAction([actions[name] intValue]);
     if ([name isEqual:@"touch.hide"] || [name isEqual:@"touch.disconnect"])

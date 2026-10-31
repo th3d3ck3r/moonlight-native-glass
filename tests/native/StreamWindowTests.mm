@@ -95,7 +95,14 @@ static bool fixtureFullscreenTransition(SDL_Window* window, Uint32 flags) {
 // their decisions. Capture uses real SDL; key releases have no host in this test.
 // No host/network exists in this fixture; only focus and action routing run.
 namespace Overlay { enum { OverlayDebug }; }
-struct FixtureOverlays { void setOverlayState(int, bool) {} };
+struct FixtureOverlays {
+    bool enabled=false;
+    unsigned updates=0;
+    void setOverlayState(int kind, bool visible) {
+        check(kind==Overlay::OverlayDebug,"Native statistics actions must address the debug overlay only");
+        enabled=visible; ++updates;
+    }
+};
 struct Session { static Session* get() { static Session value; return &value; } FixtureOverlays& getOverlayManager() { return overlays; } FixtureOverlays overlays; };
 static constexpr int BUTTON_LEFT=1,BUTTON_MIDDLE=2,BUTTON_RIGHT=3,BUTTON_X1=4,BUTTON_X2=5,BUTTON_ACTION_RELEASE=0;
 static void LiSendMouseButtonEvent(int,int) {}
@@ -113,7 +120,11 @@ public:
 #include "NativeKeyCombos.inc"
     struct Combo { bool enabled = true; };
     Combo m_SpecialKeyCombos[KeyComboMax];
-    void performSpecialKeyCombo(KeyCombo) { check(false,"Native disconnect must not request stock process quit"); }
+    unsigned m_FullscreenToggleCalls=0,m_KeyReleaseCalls=0;
+    void performSpecialKeyCombo(KeyCombo combo) {
+        check(combo==KeyComboToggleFullScreen,"Native UI routing must never request stock process quit or unrelated keyboard actions");
+        ++m_FullscreenToggleCalls;
+    }
     void handleNativeOverlayAction(int action);
     bool nativeMenuCaptureIntent();
     bool m_FakeMouseCaptureActive = false;
@@ -127,7 +138,7 @@ public:
     void updateKeyboardGrabState() {} // No system-key preferences in this fixture.
     bool isMouseInVideoRegion(int, int) { return false; } // No remote host cursor sync.
     void handleMouseMotionEvent(SDL_MouseMotionEvent*) {}
-    void raiseAllKeys() {}
+    void raiseAllKeys() { ++m_KeyReleaseCalls; }
     void notifyFocusLost();
     void notifyFocusGained();
 };
@@ -272,6 +283,36 @@ int main(int argc, char** argv) {
         routing.handleNativeOverlayAction(213); routing.handleNativeOverlayAction(214);
         check(!routing.isCaptureActive(),"Menu must respect explicitly released input");
         check(!routing.nativeMenuCaptureIntent(),"Explicitly released input must keep Capture Input command stable");
+        // Explicit Touch Bar/menu buttons must work with all keyboard
+        // shortcuts disabled. This executes the extracted production handler.
+        bool savedShortcuts[SdlInputHandler::KeyComboMax];
+        for (int index=0;index<SdlInputHandler::KeyComboMax;++index) {
+            savedShortcuts[index]=routing.m_SpecialKeyCombos[index].enabled;
+            routing.m_SpecialKeyCombos[index].enabled=false;
+        }
+        routing.handleNativeOverlayAction(201);
+        check(routing.isCaptureActive(),"Explicit native Capture must work when its shortcut is disabled");
+        routing.handleNativeOverlayAction(202);
+        check(!routing.isCaptureActive(),"Explicit native Release must work when its shortcut is disabled");
+        FixtureOverlays& overlays=Session::get()->getOverlayManager();
+        const unsigned originalUpdates=overlays.updates;
+        routing.handleNativeOverlayAction(203);
+        check(overlays.enabled && overlays.updates==originalUpdates+1,"Explicit native Stats On must work when its shortcut is disabled");
+        routing.handleNativeOverlayAction(208);
+        check(!overlays.enabled && overlays.updates==originalUpdates+2,"Explicit native Stats Off must work when its shortcut is disabled");
+        routing.handleNativeOverlayAction(100);
+        check(routing.m_NativeControlsVisible && nativeOverlayControlsVisible(),"Explicit native Controls must open when shortcuts are disabled");
+        routing.handleNativeOverlayAction(100);
+        check(!routing.m_NativeControlsVisible && !nativeOverlayControlsVisible(),"Explicit native Controls must also close when shortcuts are disabled");
+        const unsigned releasesBeforeFullscreen=routing.m_KeyReleaseCalls;
+        routing.handleNativeOverlayAction(221);
+        check(routing.m_FullscreenToggleCalls==1 && routing.m_KeyReleaseCalls>releasesBeforeFullscreen,"Explicit native Fullscreen must dispatch the stock transition and release host keys with its shortcut disabled");
+        const unsigned releasesAfterFullscreen=routing.m_KeyReleaseCalls;
+        routing.handleNativeOverlayAction(SdlInputHandler::KeyComboToggleFullScreen);
+        check(routing.m_FullscreenToggleCalls==1 && routing.m_KeyReleaseCalls==releasesAfterFullscreen,"The disabled fullscreen keyboard binding must remain disabled");
+        for (int index=0;index<SdlInputHandler::KeyComboMax;++index)
+            routing.m_SpecialKeyCombos[index].enabled=savedShortcuts[index];
+        std::puts("Explicit native capture, statistics, Controls and fullscreen work independently of disabled keyboard shortcuts");
         for (int action : {int(SdlInputHandler::KeyComboQuitAndExit),12,209,212}) {
             SDL_FlushEvent(nativeOverlayEventType());
             routing.handleNativeOverlayAction(action);

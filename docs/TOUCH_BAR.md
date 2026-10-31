@@ -71,13 +71,15 @@ Physical-bar photos from the owner revealed that standard NSButtonCell rendering
 | Previous/next host, Refresh, Play/Pair/Wake, Add, Settings | Library action row; horizontal swipe/More reveals overflow |
 | Continue, Retry, Cancel/Library | Apollo row; original phase/action gating and nonblocking button handling |
 | Startup Skip; Settings Back and full-width toggle | Context action row |
-| Capture/release input | Main stream button; existing SDL action 1 |
-| Live and detailed statistics | Main cards and six-page information panel; separate window toggle uses action 3 |
+| Capture/release input | Main stream button; explicit UI capture/release actions 201/202 |
+| Live and detailed statistics | Main cards and six-page information panel; separate window toggle uses explicit on/off actions 203/208 |
 | Playback mute/volume | Controls → Audio; action 207 and existing playback gain, recorder source unchanged |
 | Record/stop; replay save | Controls; existing actions 217/219, readiness/saving/error states retained |
 | Local hardware monitor | Controls → Window → Monitor |
-| Fullscreen; stream controls; hide | Controls → Window; existing actions 2/11/0 |
+| Fullscreen; stream controls; hide | Controls → Window; explicit native UI actions 221/100/200 |
 | Disconnect | Controls → Disconnect; existing action 12 |
 | Existing keyboard/controller/menu routes | Unchanged; Touch Bar calls the existing handlers |
 
 `TouchBarFrontendTests` renders the host tile and full/narrow action row, checks overflow access and full-width lifecycle with fake callbacks. `TouchBarTests` checks all six detailed pages remain reachable with a visible measurement area and exercises action routing, playback slider, local monitor and cleanup. `TouchBarPresentationTests` replaces only process-local presentation methods and focus getters to verify native ownership without touching CI's actual bar. Physical swipe/touch rendering and Control Strip behavior on the owner's M1 remain hardware acceptance checks.
+
+Touch Bar actions use explicit UI routes, independent of keyboard shortcut enable flags. The former Controls value 11 was outside the handler enum and could do nothing; it now uses the existing controls command 100. Fullscreen command 221 delegates to the unchanged stock fullscreen operation after native controls/input cleanup. Keyboard binding enable flags and shortcut behavior are unchanged. The real production handler is exercised by StreamWindowTests with shortcuts disabled.

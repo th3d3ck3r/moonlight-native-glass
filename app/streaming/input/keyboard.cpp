@@ -271,6 +271,13 @@ void SdlInputHandler::handleNativeOverlayAction(int action)
         if (m_NativeCaptureBeforeControls) nativeOverlayRestoreStreamFocus(m_Window);
         setCaptureActive(m_NativeCaptureBeforeControls);
     }
+    if (action == 221) {
+        // Native UI commands are independent of whether their keyboard shortcut
+        // is enabled. Reuse the stock fullscreen transition and key cleanup.
+        raiseAllKeys();
+        performSpecialKeyCombo(KeyComboToggleFullScreen);
+        return;
+    }
     // Explicit menu actions remain available when a shortcut binding is disabled.
     if (action == 201 || action == 202 || action == 203 || action == 208) {
         raiseAllKeys();
