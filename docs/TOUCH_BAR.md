@@ -30,7 +30,7 @@ More expands into Statistics, the hardware overlay, fullscreen, controls, hide a
 Every expanded page has AppKit's native close/back control. The default layout keeps the system Control Strip and physical Escape behavior. Expanded layouts reserve an additional 64 points for the native close/back control. No system brightness, system volume or Fn preference entries are changed.
 
 Crimson SF Symbols, near-black surfaces, monospaced numeric values and restrained active fills match Crimson Glass. Active capture and recording use stronger fills plus distinct labels/glyphs. No blinking effects are used.
-The live stream layout requires about 534 points; the original controls layout requires about 524 points. Expanded layouts fit the standard 685-point app region and reserve the native Back button. The information view and standard audio slider grow with the space macOS makes available, including a full-width app region when the system Control Strip is hidden by the user’s own macOS settings. The optional **Settings → Appearance → Touch Bar → Use full Touch Bar** setting is off by default.
+The live stream layout requires about 544 points; the original controls layout requires about 534 points. Expanded layouts fit the standard 685-point app region and reserve the native Back button. The information view and standard audio slider grow with the space macOS makes available, including a full-width app region when the system Control Strip is hidden by the user’s own macOS settings. The optional **Settings → Appearance → Touch Bar → Use full Touch Bar** setting is off by default.
 Labels with host/game names truncate while accessibility descriptions preserve their full text.
 
 ## Optional full width
@@ -58,3 +58,5 @@ These view previews are layout evidence, not screenshots of the physical Touch B
 Physical Touch Bar touch/hold behavior on an M1 MacBook Pro remains a hardware acceptance limit of CI.
 
 The complete corresponding source archive is uploaded alongside the owner-only arm64 app artifact. About retains the offline legal notices and points private builds to the validation artifacts for their matching source archive.
+
+Physical-bar photos from the owner revealed that standard NSButtonCell rendering substituted larger metrics than ordinary-window previews. Native buttons now draw their own fixed-size symbols/text within 30 points while keeping target/action and accessibility semantics. Two-line host status uses separate bounded line rectangles; static action labels are checked against the real drawing font and symbol padding.

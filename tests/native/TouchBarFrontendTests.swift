@@ -24,6 +24,28 @@ import SwiftUI
         button.performClick(nil); precondition(presses == 1)
         precondition(button.image != nil && button.contentTintColor != nil, "Use native symbols and Crimson Glass tint")
         precondition(button.constraints.contains { $0.firstAttribute == .width && $0.constant == 150 })
+        // Reproduce the two-line status and narrow labels from the owner's
+        // physical M1 bar at its actual 30-point height, not a regular cell.
+        let status = NativeTouchBarCommand("library.status", "Th3D3ck3r-R7\nReady to stream · 4 games", "moon.fill", width: 178, enabled: false)
+        let labels: [(String, String, CGFloat)] = [("Refresh", "arrow.clockwise", 72), ("Add", "plus", 58), ("Settings", "gearshape", 80)]
+        owner.update([status] + labels.enumerated().map { index, value in
+            NativeTouchBarCommand("layout.\(index)", value.0, value.1, width: value.2) {}
+        }, crimson: true)
+        let folder = URL(fileURLWithPath: "build/touchbar-previews")
+        try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for command in owner.commands {
+            let item = window.touchBar!.item(forIdentifier: .init(command.id)) as! NSCustomTouchBarItem
+            let view = item.view as! NativeTouchBarButton
+            view.frame = NSRect(x: 0, y: 0, width: command.width, height: 30)
+            precondition(view.labelRects.allSatisfy { view.bounds.contains($0) }, "All status lines must fit inside the physical bar height")
+            if !command.title.contains("\n") {
+                let textWidth = (command.title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).width
+                precondition(textWidth <= view.labelRects[0].width, "Static action labels must fit beside the symbol without truncation")
+            }
+            let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            try! bitmap.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent("touchbar-\(command.id).png"))
+        }
         owner.detach(); precondition(window.touchBar === previous)
         button.performClick(nil); precondition(presses == 1, "Detached controls must not invoke an old connection")
         owner.update([connected], crimson: true); owner.attach(window)

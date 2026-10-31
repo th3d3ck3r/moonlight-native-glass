@@ -12,10 +12,41 @@ static NSImage* touchSymbol(NSString* name) {
     NSImage* image=[NSImage imageWithSystemSymbolName:name accessibilityDescription:nil];
     return [image imageWithSymbolConfiguration:[NSImageSymbolConfiguration configurationWithPointSize:15 weight:NSFontWeightMedium]];
 }
+// The physical Touch Bar substitutes its own NSButtonCell metrics. Draw the
+// compact content ourselves inside a native button so its font/padding agree
+// with our width budget on both a real bar and preview fixtures.
+@interface MLTouchButton : NSButton
+@end
+@implementation MLTouchButton
+- (BOOL)isFlipped { return YES; }
+- (NSSize)intrinsicContentSize { return NSMakeSize(74,30); }
+- (void)drawRect:(NSRect)dirty {
+    NSColor* background=self.bezelColor ?: touchSurface();
+    [(self.cell.highlighted ? [background blendedColorWithFraction:.2 ofColor:NSColor.whiteColor] : background) setFill];
+    [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:6 yRadius:6] fill];
+    NSFont* font=[NSFont systemFontOfSize:11 weight:NSFontWeightSemibold];
+    CGFloat textWidth=[self.title sizeWithAttributes:@{NSFontAttributeName:font}].width;
+    CGFloat icon=self.image ? 15 : 0,gap=icon && self.title.length ? 5 : 0;
+    CGFloat total=MIN(self.bounds.size.width-12,textWidth+icon+gap);
+    CGFloat x=(self.bounds.size.width-total)/2;
+    if (self.image) {
+        NSColor* tint=self.contentTintColor ?: touchAccent();
+        NSImage* image=[self.image imageWithSymbolConfiguration:[NSImageSymbolConfiguration configurationWithHierarchicalColor:tint]];
+        [image drawInRect:NSMakeRect(x,(self.bounds.size.height-15)/2,15,15) fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:self.enabled ? 1 : .4 respectFlipped:YES hints:nil];
+        x+=icon+gap;
+    }
+    NSMutableParagraphStyle* paragraph=[[[NSMutableParagraphStyle alloc] init] autorelease];
+    paragraph.lineBreakMode=NSLineBreakByTruncatingTail;
+    [self.title drawInRect:NSMakeRect(x,(self.bounds.size.height-14)/2,total-icon-gap,14)
+        withAttributes:@{NSFontAttributeName:font,NSForegroundColorAttributeName:[NSColor.whiteColor colorWithAlphaComponent:self.enabled ? 1 : .4],NSParagraphStyleAttributeName:paragraph}];
+}
+@end
+
 static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL action,CGFloat width) {
-    NSButton* button=[NSButton buttonWithTitle:title target:target action:action];
+    NSButton* button=[MLTouchButton buttonWithTitle:title target:target action:action];
     button.image=touchSymbol(symbol); button.imagePosition=NSImageLeft;
     button.font=[NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightMedium];
+    [button.heightAnchor constraintEqualToConstant:30].active=YES;
     button.bezelColor=touchSurface();
     button.contentTintColor=touchAccent(); button.lineBreakMode=NSLineBreakByTruncatingTail;
     NSLayoutConstraint* constraint=[button.widthAnchor constraintEqualToConstant:width];
@@ -261,7 +292,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     } else {
         NSDictionary* titles=@{@"touch.capture":@"Capture",@"touch.record":@"Record",@"touch.replay":@"Replay",@"touch.stats":@"Stats",@"touch.hardware":@"Monitor",@"touch.fullscreen":@"Full Screen",@"touch.controls":@"Controls",@"touch.hide":@"Hide",@"touch.disconnect":@"Disconnect",@"touch.mute":@"Mute",@"touch.volumeLabel":@"100%"};
         NSDictionary* symbols=@{@"touch.capture":@"cursorarrow",@"touch.record":@"record.circle",@"touch.replay":@"arrow.counterclockwise",@"touch.stats":@"chart.xyaxis.line",@"touch.hardware":@"cpu",@"touch.fullscreen":@"arrow.up.left.and.arrow.down.right",@"touch.controls":@"slider.horizontal.3",@"touch.hide":@"eye.slash",@"touch.disconnect":@"power",@"touch.mute":@"speaker.slash.fill",@"touch.volumeLabel":@"speaker.wave.2"};
-        CGFloat width=[identifier isEqual:@"touch.stats"] ? 90 : [identifier isEqual:@"touch.controls"] ? 94 : [identifier isEqual:@"touch.record"] ? 98 : [identifier isEqual:@"touch.disconnect"] ? 100 : [identifier isEqual:@"touch.fullscreen"] ? 100 : 74;
+        CGFloat width=[identifier isEqual:@"touch.capture"] ? 84 : [identifier isEqual:@"touch.stats"] ? 90 : [identifier isEqual:@"touch.controls"] ? 94 : [identifier isEqual:@"touch.record"] ? 98 : [identifier isEqual:@"touch.disconnect"] ? 100 : [identifier isEqual:@"touch.fullscreen"] ? 100 : 74;
         NSButton* button=touchButton(titles[identifier] ?: identifier,symbols[identifier] ?: @"circle",self,@selector(touchAction:),width);
         button.identifier=identifier; self.touchButtons[identifier]=button; item.view=button;
     }
@@ -337,6 +368,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         NSButton* button=self.touchButtons[key];
         [button setAccessibilityLabel:button.toolTip.length ? [NSString stringWithFormat:@"%@ · %@",button.title,button.toolTip] : button.title];
     }
+    for (NSButton* button in self.touchButtons.allValues) button.needsDisplay=YES;
     if (self.touchLiveStats) [info setAccessibilityLabel:[self.touchInlineDashboard.accessibilityLabel stringByAppendingString:@"; tap for more stream information"]];
 }
 - (void)invalidateTouchBar {

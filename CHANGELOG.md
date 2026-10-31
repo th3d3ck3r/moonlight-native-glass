@@ -5,6 +5,7 @@
 - FPS, network RTT and bitrate appear directly on the main Touch Bar beside Capture and Controls. Wider layouts add timing, network drops and local Mac hardware readings.
 - Touch Bar telemetry uses the unchanged one-second statistics calculations independently of the on-screen statistics overlay. Audio, recording/replay and window actions remain available under Controls.
 - Refined Warp Arrival and Apollo animations, preserving the native Continue/Cancel controls and Touch Bar integration. Startup Preview build/run, UI Preview tests and real Qt/SDL interaction checks passed on the isolated uploaded-animation branch at a9680117 before integration. Apollo retains the uploaded 60 fps schedule.
+- Correct physical Touch Bar label clipping with explicit 30-point native button drawing, bounded two-line host status and readable action widths.
 - Optional original controls layout; full-width presentation stays off by default. Internal build 44; validation pending.
 
 

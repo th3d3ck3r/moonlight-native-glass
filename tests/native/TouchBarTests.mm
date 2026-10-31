@@ -25,6 +25,13 @@ static void capture(NSTouchBar* bar,NSString* path,CGFloat available=685) {
         else if ([item isKindOfClass:NSSliderTouchBarItem.class]) view=((NSSliderTouchBarItem*)item).slider;
         else if ([item isKindOfClass:NSCustomTouchBarItem.class]) view=((NSCustomTouchBarItem*)item).view;
         check(view!=nil,"Every declared Touch Bar item must resolve on a Mac without hardware");
+        if ([view isKindOfClass:NSClassFromString(@"MLTouchButton")]) {
+            NSButton* control=(NSButton*)view;
+            CGFloat text=[control.title sizeWithAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:11 weight:NSFontWeightSemibold]}].width;
+            CGFloat assigned=0;
+            for (NSLayoutConstraint* constraint in control.constraints) if ([constraint.identifier isEqual:@"MoonlightLG.TouchWidth"]) assigned=constraint.constant;
+            check(text+(control.image ? 20 : 0)+12<=assigned,"Static action text and symbol must fit the physical Touch Bar drawing width");
+        }
         view.translatesAutoresizingMaskIntoConstraints=NO;
         [stack addArrangedSubview:view];
         if ([identifier isEqual:@"touch.dashboard"] || [identifier isEqual:@"touch.volume"] || ([identifier isEqual:@"touch.info"] && [view isKindOfClass:NSClassFromString(@"MLTouchStatsButton")])) flexible=YES;

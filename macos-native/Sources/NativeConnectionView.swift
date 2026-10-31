@@ -447,6 +447,44 @@ enum NativeTouchBarPresentation {
         return true
     }
 }
+// A fixed 30-point canvas avoids the larger NSButtonCell font/insets applied
+// by the physical Touch Bar. Keep NSButton actions/accessibility and the same
+// nonblocking event handling used by Apollo; only presentation is custom.
+final class NativeTouchBarButton: ConnectionActionButton {
+    var statusOnly = false
+    override var isFlipped: Bool { true }
+    override var intrinsicContentSize: NSSize { NSSize(width: 70, height: 30) }
+    var labelRects: [NSRect] {
+        let count = title.contains("\n") ? 2 : 1
+        let x: CGFloat = image == nil ? 7 : 29
+        return (0..<count).map { row in
+            NSRect(x: x, y: count == 1 ? 8 : CGFloat(3 + row * 12),
+                   width: max(0, bounds.width - x - 7), height: count == 1 ? 15 : 12)
+        }
+    }
+    override func draw(_ dirtyRect: NSRect) {
+        let background = bezelColor ?? NSColor(white: 0.13, alpha: 1)
+        (cell?.isHighlighted == true ? background.blended(withFraction: 0.2, of: .white)! : background).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6).fill()
+        let opacity: CGFloat = isEnabled || statusOnly ? 1 : 0.4
+        if let image {
+            let tint = (contentTintColor ?? .controlAccentColor).withAlphaComponent(opacity)
+            let icon = image.withSymbolConfiguration(.init(hierarchicalColor: tint)) ?? image
+            let x = title.isEmpty ? (bounds.width - 15) / 2 : 7
+            icon.draw(in: NSRect(x: x, y: (bounds.height - 15) / 2, width: 15, height: 15),
+                      from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+        let lines = title.components(separatedBy: "\n")
+        for (row, rect) in labelRects.enumerated() {
+            let paragraph = NSMutableParagraphStyle(); paragraph.lineBreakMode = .byTruncatingMiddle
+            let font = NSFont.systemFont(ofSize: lines.count > 1 ? (row == 0 ? 10.5 : 9) : 11, weight: .semibold)
+            (lines[row] as NSString).draw(in: rect, withAttributes: [
+                .font: font, .foregroundColor: NSColor.white.withAlphaComponent(opacity * (row == 0 ? 1 : 0.8)),
+                .paragraphStyle: paragraph])
+        }
+    }
+}
+
 struct NativeTouchBarAccessory: NSViewRepresentable {
     var commands: [NativeTouchBarCommand]
     var crimson = true
@@ -492,13 +530,16 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             button.contentTintColor = crimson ? NSColor(srgbRed: 0.95, green: 0.19, blue: 0.32, alpha: 1) : nil
             button.setAccessibilityLabel(command.title.replacingOccurrences(of: "\n", with: "; "))
             button.toolTip = command.title
+            (button as? NativeTouchBarButton)?.statusOnly = command.action == nil
+            button.needsDisplay = true
         }
         func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
             guard let command = commands.first(where: { $0.id == identifier.rawValue }) else { return nil }
             let item = NSCustomTouchBarItem(identifier: identifier)
-            let button = ConnectionActionButton(title: command.title, target: self, action: #selector(press(_:)))
+            let button = NativeTouchBarButton(title: command.title, target: self, action: #selector(press(_:)))
             button.identifier = NSUserInterfaceItemIdentifier(command.id)
             button.widthAnchor.constraint(equalToConstant: command.width).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 30).isActive = true
             style(button, command); buttons[command.id] = button; item.view = button
             return item
         }
@@ -521,7 +562,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
 
 // SDL and Qt own this window's event loop. Use AppKit target/action controls
 // so connection actions do not depend on SwiftUI gesture dispatch in that loop.
-private final class ConnectionActionButton: NSButton {
+class ConnectionActionButton: NSButton {
     private var mousePressed = false
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
