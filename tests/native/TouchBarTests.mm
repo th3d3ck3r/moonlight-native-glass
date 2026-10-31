@@ -114,6 +114,11 @@ int main(int argc,char** argv) { @autoreleasepool {
     check([readings.accessibilityLabel containsString:@"60.00 FPS"] && [button(more,@"touch.stats").title isEqual:@"Stats off"],"Touch Bar telemetry must update while the on-screen Statistics window remains off");
     NSButton* mainStats=((NSPopoverTouchBarItem*)[bar itemForIdentifier:@"touch.info"]).collapsedRepresentation;
     check([mainStats.accessibilityLabel containsString:@"60.00 FPS"],"Live measurements must be visible directly on the main bar");
+    nativeTitlebarSetConnection(NativeConnectionState::Poor); pump();
+    check([mainStats.accessibilityLabel containsString:@"poor connection"],"Live stats must preserve the original connection warning");
+    NSArray* liveCards=[[mainStats valueForKey:@"dashboard"] valueForKey:@"cards"];
+    check([liveCards[0][0] containsString:@"Poor link"],"Connection warnings remain visible on the main live bar");
+    nativeTitlebarSetConnection(NativeConnectionState::Connected); pump();
     NSString* directory=argc>1 ? [NSString stringWithUTF8String:argv[1]] : @"build/touchbar-previews";
     [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
     const char* fixture="Video stream: 2560x1440 60 FPS\nVideo codec: HEVC Main10\nHost processing latency: 1.1/2.0/1.5 ms\nIncoming frame rate from network: 60.00 FPS\nAverage network latency: 4 ms\nBitrate: 25 Mbps\nAverage decoding time: 1.2 ms\nAverage frame queue delay: 0.4 ms\nAverage rendering time: 0.8 ms\nFrames dropped by network: 0.00%\nFrames dropped due to jitter: 0.01%\nRendering frame rate: 59.98 FPS"; nativeOverlayPresentStatistics(fixture); pump();

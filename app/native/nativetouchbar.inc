@@ -64,6 +64,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 @property(nonatomic,assign) BOOL active;
 @property(nonatomic,assign) BOOL inlineMode;
 @property(nonatomic,assign) NSInteger page;
+@property(nonatomic,assign) NSInteger connectionState;
 @property(nonatomic,copy) NSArray* cards;
 @property(nonatomic,copy) NSString* streamText;
 @property(nonatomic,copy) NSString* devicesText;
@@ -109,7 +110,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         NSString* bitrate=[self metric:@"Bitrate" fallback:missing];
         bitrate=[[bitrate componentsSeparatedByString:@","] firstObject];
         NSMutableArray* cards=[NSMutableArray arrayWithArray:@[
-            @[@"FPS",[self metric:@"Incoming frame rate" fallback:missing]],
+            @[(self.connectionState==2 ? @"FPS" : [NSString stringWithFormat:@"FPS · %@",@[@"Idle",@"Connecting",@"Connected",@"Poor link",@"Disconnected"][MIN(4,MAX(0,self.connectionState))]]),[self metric:@"Incoming frame rate" fallback:missing]],
             @[@"NETWORK RTT",[self metric:@"Average network latency" fallback:missing]],
             @[@"BITRATE",bitrate]]];
         if (self.bounds.size.width>=840) {
@@ -400,6 +401,7 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     self.touchDashboard.streamUpdated=copy.streamUpdated;
     self.touchDashboard.devicesText=self.controllerCount ? [NSString stringWithFormat:@"%lu · %@",(unsigned long)self.controllerCount,powerDescription(self.batteryLevel)] : @"None connected";
     [self.touchDashboard refreshCards];
+    self.touchInlineDashboard.connectionState=(NSInteger)copy.connection;
     self.touchInlineDashboard.streamText=self.touchDashboard.streamText;
     self.touchInlineDashboard.streamUpdated=copy.streamUpdated;
     self.touchInlineDashboard.devicesText=self.touchDashboard.devicesText;
@@ -407,10 +409,10 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     NSButton* info=self.touchButtons[@"touch.info"];
     NSString* fps=[self.touchDashboard metric:@"Incoming frame rate" fallback:@""];
     if (!self.touchLiveStats) {
-        info.title=copy.connection==NativeConnectionState::Connected ? (fps.length ? [NSString stringWithFormat:@"%.0f FPS",fps.doubleValue] : @"Connected") : connectionDescription(copy.connection);
+        info.title=copy.connection==NativeConnectionState::Connected ? (fps.length ? [NSString stringWithFormat:@"%.0f FPS",fps.doubleValue] : @"Connected") : @[@"Idle",@"Connecting",@"Connected",@"Poor link",@"Disconnected"][(NSInteger)copy.connection];
         info.image=touchSymbol(copy.connection==NativeConnectionState::Poor || copy.connection==NativeConnectionState::Disconnected ? @"exclamationmark.circle" : @"moon.fill");
     }
-    info.toolTip=@"Stream measurements, decoding, local hardware and controllers";
+    info.toolTip=[NSString stringWithFormat:@"%@ · Stream measurements, decoding, local hardware and controllers",connectionDescription(copy.connection)];
     NSButton* capture=self.touchButtons[@"touch.capture"]; capture.title=copy.captured ? @"Release" : @"Capture";
     capture.image=touchSymbol(copy.captured ? @"cursorarrow.motionlines" : @"cursorarrow");
     capture.bezelColor=copy.captured ? [touchAccent() colorWithAlphaComponent:.45] : [NSColor colorWithWhite:.13 alpha:1];
@@ -448,7 +450,7 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
         [button setAccessibilityLabel:button.toolTip.length ? [NSString stringWithFormat:@"%@ · %@",button.title,button.toolTip] : button.title];
     }
     for (NSButton* button in self.touchButtons.allValues) button.needsDisplay=YES;
-    if (self.touchLiveStats) [info setAccessibilityLabel:[self.touchInlineDashboard.accessibilityLabel stringByAppendingString:@"; tap for more stream information"]];
+    if (self.touchLiveStats) [info setAccessibilityLabel:[NSString stringWithFormat:@"%@; %@; tap for more stream information",connectionDescription(copy.connection),self.touchInlineDashboard.accessibilityLabel]];
 }
 - (void)invalidateTouchBar {
     self.touchInvalidating=YES;

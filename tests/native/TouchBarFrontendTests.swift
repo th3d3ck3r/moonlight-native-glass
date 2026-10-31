@@ -28,8 +28,9 @@ import SwiftUI
         // physical M1 bar at its actual 30-point height, not a regular cell.
         let status = NativeTouchBarCommand("library.status", "Th3D3ck3r-R7\nReady to stream · 4 games", "moon.fill", width: 178, enabled: false)
         let labels: [(String, String, CGFloat)] = [("", "chevron.left", 36), ("", "chevron.right", 36), ("Refresh", "arrow.clockwise", 82), ("Select a game", "play.fill", 126), ("Add", "plus", 58), ("Settings", "gearshape", 86)]
+        var scrollPresses = 0
         owner.update([status] + labels.enumerated().map { index, value in
-            NativeTouchBarCommand("layout.\(index)", value.0, value.1, width: value.2) {}
+            NativeTouchBarCommand("layout.\(index)", value.0, value.1, width: value.2) { scrollPresses += 1 }
         }, crimson: true)
         let folder = URL(fileURLWithPath: "build/touchbar-previews")
         try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -68,6 +69,25 @@ import SwiftUI
             }
             if width == 1085 { precondition(row.more.isHidden && row.status!.frame.width == 178, "Full width restores the balanced host width") }
         }
+        row.frame = NSRect(x: 0, y: 0, width: 400, height: 30)
+        window.contentView!.addSubview(row)
+        let scrollButton = owner.buttons["layout.2"] as! NativeTouchBarButton
+        func pointer(_ kind: NSEvent.EventType) -> NSEvent {
+            let point = scrollButton.convert(NSPoint(x: scrollButton.bounds.midX, y: scrollButton.bounds.midY), to: nil)
+            return NSEvent.mouseEvent(with: kind, location: point, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1)!
+        }
+        scrollButton.mouseDown(with: pointer(.leftMouseDown))
+        row.scrollMore()
+        scrollButton.mouseUp(with: pointer(.leftMouseUp))
+        precondition(scrollPresses == 0, "Scrolling must cancel a pending action instead of treating release as a tap")
+        scrollButton.mouseDown(with: pointer(.leftMouseDown))
+        row.scroll.contentView.scroll(to: .zero)
+        NotificationCenter.default.post(name: NSView.boundsDidChangeNotification, object: row.scroll.contentView)
+        scrollButton.mouseUp(with: pointer(.leftMouseUp))
+        precondition(scrollPresses == 0, "Gesture-driven clip scrolling must cancel pending actions too")
+        owner.update(owner.commands, crimson: false)
+        precondition(row.more.contentTintColor == nil && row.more.bezelColor == nil, "Overflow navigation must respect disabling Crimson Glass")
+        row.removeFromSuperview()
         owner.detach(); precondition(window.touchBar === previous)
         button.performClick(nil); precondition(presses == 1, "Detached controls must not invoke an old connection")
         owner.update([connected], crimson: true); owner.attach(window)
@@ -102,6 +122,10 @@ import SwiftUI
         precondition(NativeTouchBarPresentation.apply(false, preferences: prefs, agent: agent))
         precondition(!NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, available: false))
         precondition(!prefs.bool(forKey: NativeTouchBarPresentation.key), "Unsupported full width must not claim to be enabled")
+        prefs.set(["hadDictionary": true, NativeTouchBarPresentation.applications[0]: ["present": true, "value": "fullControlStrip"]], forKey: NativeTouchBarPresentation.backupKey)
+        agent.set(["example.other": "functionKeys", NativeTouchBarPresentation.applications[0]: "app"], forKey: "PresentationModePerApp")
+        precondition(!NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, available: false))
+        precondition(agent.dictionary(forKey: "PresentationModePerApp")?[NativeTouchBarPresentation.applications[0]] as? String == "fullControlStrip", "Unsupported full width must still restore legacy overrides")
         var shown: [NSTouchBar] = [], hidden: [NSTouchBar] = []
         let session = NativeTouchBarPresentation.Session(show: { shown.append($0); return true }, hide: { hidden.append($0) })
         session.update(bar, enabled: false, eligible: true); precondition(shown.isEmpty)

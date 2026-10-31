@@ -10,7 +10,7 @@
 - Preserve numeric settings while typing and drain queued discovery writes during app termination, so bandwidth survives restart and reaches the next stream. Other saved preferences and automatic bitrate adjustment semantics remain intact.
 - Keep host status pinned with a horizontal control strip for narrow library/connection layouts. A single detailed-statistics panel holds a compact six-page pager and visible measurements; no oversized segmented selector competes with or hides the dashboard.
 - Full-width presentation reads the shared frontend preference in both app and engine-hosted Apollo, observes distributed updates, and releases ownership safely during reentrant focus/close callbacks. Unsupported persisted full width is disabled.
-- Optional original controls layout; full-width presentation stays off by default. Internal build 44; validation pending.
+- Optional original controls layout; full-width presentation stays off by default. Internal build 44; complete macOS/Xcode validation is required before delivery. Physical Touch Bar acceptance remains outside CI.
 
 
 ## 1.3.3.0U — private Touch Bar build

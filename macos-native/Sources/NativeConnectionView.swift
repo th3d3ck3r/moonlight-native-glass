@@ -468,12 +468,13 @@ enum NativeTouchBarPresentation {
     static func apply(_ enabled: Bool, preferences: UserDefaults = .standard,
                       agent: UserDefaults? = UserDefaults(suiteName: agentDomain), reapply: Bool = false,
                       available: Bool = supported) -> Bool {
+        let recoveredLegacy = restoreLegacy(preferences: preferences, agent: agent)
         if enabled && !available {
             preferences.set(false, forKey: key); preferences.synchronize()
             NotificationCenter.default.post(name: changed, object: nil)
             return false
         }
-        guard restoreLegacy(preferences: preferences, agent: agent) else { return false }
+        guard recoveredLegacy else { return false }
         preferences.set(enabled, forKey: key); preferences.synchronize()
         NotificationCenter.default.post(name: changed, object: nil)
         DistributedNotificationCenter.default().postNotificationName(changed, object: nil, userInfo: nil, deliverImmediately: true)
@@ -532,6 +533,7 @@ final class NativeTouchBarRow: NSView {
     let more = NativeTouchBarButton(title: "", target: nil, action: nil)
     var status: NSButton?
     var statusWidth: CGFloat = 0
+    private var scrollObserver: NSObjectProtocol?
     var controls: [(NSButton, CGFloat)] = []
     override var intrinsicContentSize: NSSize {
         NSSize(width: statusWidth + (status == nil ? 0 : 6) + document.frame.width, height: 30)
@@ -549,6 +551,8 @@ final class NativeTouchBarRow: NSView {
         more.target = self; more.action = #selector(scrollMore)
         more.setAccessibilityLabel("Scroll to more Touch Bar controls; tap again at the end to return")
         more.toolTip = "Swipe controls or tap for more"; addSubview(more)
+        scroll.contentView.postsBoundsChangedNotifications = true
+        scrollObserver = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main) { [weak self] _ in self?.cancelPendingPresses(); self?.updateOverflowHint() }
         var remaining = buttons
         if pinnedStatus, let first = remaining.first {
             status = first.0; statusWidth = first.1; first.0.frame = NSRect(x: 0, y: 0, width: first.1, height: 30)
@@ -581,11 +585,33 @@ final class NativeTouchBarRow: NSView {
         scroll.contentView.scroll(to: NSPoint(x: min(limit, scroll.contentView.bounds.origin.x), y: 0))
         scroll.reflectScrolledClipView(scroll.contentView)
     }
+    func setCrimson(_ enabled: Bool) {
+        more.bezelColor = enabled ? NSColor(srgbRed: 0.12, green: 0.035, blue: 0.055, alpha: 1) : nil
+        more.contentTintColor = enabled ? NSColor(srgbRed: 0.95, green: 0.19, blue: 0.32, alpha: 1) : nil
+        more.needsDisplay = true
+    }
+    func updateOverflowHint() {
+        let end = max(0, document.frame.width - scroll.contentView.bounds.width)
+        let atEnd = end > 0 && scroll.contentView.bounds.origin.x >= end - 1
+        more.image = NSImage(systemSymbolName: atEnd ? "chevron.left" : "chevron.right", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 15, weight: .medium))
+        more.setAccessibilityLabel(atEnd ? "Return to first Touch Bar controls" : "Scroll to more Touch Bar controls")
+        more.needsDisplay = true
+    }
+    func cancelPendingPresses() {
+        for (button, _) in controls { (button as? ConnectionActionButton)?.cancelPress() }
+        more.cancelPress()
+    }
     @objc func scrollMore() {
+        cancelPendingPresses()
         let clip = scroll.contentView
         let end = max(0, document.frame.width - clip.bounds.width)
         let next = clip.bounds.origin.x >= end - 1 ? 0 : min(end, clip.bounds.origin.x + max(100, clip.bounds.width * 0.75))
         clip.scroll(to: NSPoint(x: next, y: 0)); scroll.reflectScrolledClipView(clip)
+    }
+    deinit {
+        if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver) }
+        more.target = nil; more.action = nil
     }
 }
 
@@ -645,6 +671,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             self.commands = commands; self.crimson = crimson
             if identifiersChanged { let current = window; detach(); attach(current) }
             for command in commands { if let button = buttons[command.id] { style(button, command) } }
+            row?.setCrimson(crimson)
         }
         func style(_ button: NSButton, _ command: NativeTouchBarCommand) {
             button.title = command.title; button.isEnabled = command.enabled && command.action != nil
@@ -670,6 +697,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
                 style(button, command); buttons[command.id] = button; views.append((button, command.width))
             }
             let row = NativeTouchBarRow(buttons: views, pinnedStatus: commands.first?.action == nil)
+            row.setCrimson(crimson)
             self.row = row; item.view = row
             return item
         }
