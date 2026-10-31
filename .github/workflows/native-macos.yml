@@ -10,6 +10,34 @@ concurrency:
   group: native-macos-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  touchbar:
+    name: Touch Bar layout, controls and ownership
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - name: Test library and Apollo Touch Bar action gating
+        run: |
+          mkdir -p build
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeConnectionView.swift tests/native/TouchBarFrontendTests.swift -o build/touchbar-frontend-tests
+          build/touchbar-frontend-tests
+      - name: Test stream Touch Bar routing, state, layout and lifetime
+        run: |
+          python3 setup-deps.py
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
+            app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/TouchBarTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/touchbar-tests
+          build/touchbar-tests build/touchbar-previews
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: Native-Touch-Bar-Previews
+          path: build/touchbar-previews/*.png
+          if-no-files-found: warn
   build:
     # UI probes compile/render the actual native frontend quickly. A final
     # ordinary push must pass both complete builds before any release.
@@ -83,21 +111,6 @@ jobs:
             -framework VideoToolbox -framework CoreMedia -framework CoreVideo -framework AudioToolbox \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/recorder-tests
           DYLD_LIBRARY_PATH="$PWD/libs/mac/lib" build/recorder-tests "$PWD/build/libMoonlightLGRecorder.dylib" "$PWD/build/recording-fixtures"
-      - name: Test Touch Bar routing, state, layout and lifetime
-        if: matrix.architecture == 'universal'
-        run: |
-          python3 setup-deps.py
-          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
-            app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/TouchBarTests.mm \
-            -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore \
-            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/touchbar-tests
-          build/touchbar-tests build/touchbar-previews
-      - uses: actions/upload-artifact@v6
-        if: always() && matrix.architecture == 'universal'
-        with:
-          name: Native-Touch-Bar-Previews
-          path: build/touchbar-previews/*.png
-          if-no-files-found: warn
       - name: Test native overlays and capture composited previews
         if: matrix.architecture == 'universal'
         run: |
@@ -215,11 +228,6 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
-      - name: Test library and Apollo Touch Bar action gating
-        run: |
-          mkdir -p build
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeConnectionView.swift tests/native/TouchBarFrontendTests.swift -o build/touchbar-frontend-tests
-          build/touchbar-frontend-tests
       - name: Test menu, restore and removed hover before UI capture
         run: |
           mkdir -p build

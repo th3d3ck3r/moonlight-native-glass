@@ -24,7 +24,7 @@ Stream status expands into six selectable pages:
 
 Audio expands into local playback mute, volume slider and percentage. The recorder's source audio is unchanged.
 More expands into Statistics, the hardware overlay, fullscreen, controls, hide and disconnect.
-Every expanded page has AppKit's native close/back control. The system Control Strip and physical Escape key retain their normal roles.
+Every expanded page has AppKit's native close/back control. The system Control Strip and physical Escape key retain their normal roles. Expanded layouts reserve an additional 64 points for the native close/back control. The app does not change com.apple.controlstrip preferences, system brightness, system volume, Fn behavior or the user’s Touch Bar visibility settings.
 
 Crimson SF Symbols, near-black surfaces, monospaced numeric values and restrained active fills match Crimson Glass. Active capture and recording use stronger fills plus distinct labels/glyphs. No blinking effects are used.
 The default stream controls require about 524 points; expanded layouts stay below the standard 685-point app region.

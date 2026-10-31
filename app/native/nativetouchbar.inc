@@ -5,6 +5,9 @@
 static NSColor* touchAccent() {
     return crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : NSColor.controlAccentColor;
 }
+static NSColor* touchSurface() {
+    return crimsonEnabled() ? [NSColor colorWithSRGBRed:.12 green:.035 blue:.055 alpha:1] : [NSColor colorWithWhite:.13 alpha:1];
+}
 static NSImage* touchSymbol(NSString* name) {
     NSImage* image=[NSImage imageWithSystemSymbolName:name accessibilityDescription:nil];
     return [image imageWithSymbolConfiguration:[NSImageSymbolConfiguration configurationWithPointSize:15 weight:NSFontWeightMedium]];
@@ -13,7 +16,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     NSButton* button=[NSButton buttonWithTitle:title target:target action:action];
     button.image=touchSymbol(symbol); button.imagePosition=NSImageLeft;
     button.font=[NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightMedium];
-    button.bezelColor=[NSColor colorWithSRGBRed:.12 green:.035 blue:.055 alpha:1];
+    button.bezelColor=touchSurface();
     button.contentTintColor=touchAccent(); button.lineBreakMode=NSLineBreakByTruncatingTail;
     [button.widthAnchor constraintEqualToConstant:width].active=YES;
     return button;
@@ -119,7 +122,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     CGFloat width=self.bounds.size.width/3;
     for (NSUInteger i=0;i<self.cards.count;++i) {
         NSRect cell=NSMakeRect(i*width,0,width-4,30);
-        [[NSColor colorWithSRGBRed:.09 green:.025 blue:.04 alpha:1] setFill];
+        [touchSurface() setFill];
         [[NSBezierPath bezierPathWithRoundedRect:cell xRadius:5 yRadius:5] fill];
         if (self.page==4) {
             NSBezierPath* graph=[NSBezierPath bezierPath]; BOOL started=NO;
@@ -140,11 +143,6 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 
 // NSTouchBar owns the actual controls. The same views are rendered by the
 // regression fixture for layout QA on runners without physical Touch Bar hardware.
-@interface MLStreamTitlebar (TouchBar) <NSTouchBarDelegate>
-- (void)installTouchBar;
-- (void)refreshTouchBar;
-- (void)invalidateTouchBar;
-@end
 @implementation MLStreamTitlebar (TouchBar)
 - (NSTouchBar*)touchBarWithItems:(NSArray*)identifiers {
     NSTouchBar* bar=[[[NSTouchBar alloc] init] autorelease]; bar.delegate=self;
@@ -192,7 +190,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         NSSegmentedControl* pages=[NSSegmentedControl segmentedControlWithLabels:@[@"Live",@"Video",@"Time",@"Drops",@"Mac",@"I/O"] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(touchPage:)];
         pages.font=[NSFont systemFontOfSize:10.5 weight:NSFontWeightMedium];
         pages.selectedSegment=self.touchDashboard.page; pages.segmentStyle=NSSegmentStyleRounded;
-        [pages.widthAnchor constraintEqualToConstant:234].active=YES; item.view=pages;
+        [pages.widthAnchor constraintEqualToConstant:234].active=YES; self.touchPages=pages; item.view=pages;
     } else {
         NSDictionary* titles=@{@"touch.capture":@"Capture",@"touch.record":@"Record",@"touch.replay":@"Replay",@"touch.stats":@"Stats",@"touch.hardware":@"Monitor",@"touch.fullscreen":@"Full Screen",@"touch.controls":@"Controls",@"touch.hide":@"Hide",@"touch.disconnect":@"Disconnect",@"touch.mute":@"Mute",@"touch.volumeLabel":@"100%"};
         NSDictionary* symbols=@{@"touch.capture":@"cursorarrow",@"touch.record":@"record.circle",@"touch.replay":@"arrow.counterclockwise",@"touch.stats":@"chart.xyaxis.line",@"touch.hardware":@"cpu",@"touch.fullscreen":@"arrow.up.left.and.arrow.down.right",@"touch.controls":@"slider.horizontal.3",@"touch.hide":@"eye.slash",@"touch.disconnect":@"power",@"touch.mute":@"speaker.slash.fill",@"touch.volumeLabel":@"speaker.wave.2"};
@@ -222,6 +220,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 - (void)refreshTouchBar {
     if (!self.streamTouchBar) return;
     TitleState copy; { std::lock_guard<std::mutex> lock(stateMutex); copy=state; }
+    for (NSButton* button in self.touchButtons.allValues) { button.bezelColor=touchSurface(); button.contentTintColor=touchAccent(); }
     self.touchDashboard.streamText=[NSString stringWithUTF8String:copy.streamText.c_str()] ?: @"";
     self.touchDashboard.streamUpdated=copy.streamUpdated;
     self.touchDashboard.devicesText=self.controllerCount ? [NSString stringWithFormat:@"%lu · %@",(unsigned long)self.controllerCount,powerDescription(self.batteryLevel)] : @"None connected";
@@ -264,6 +263,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     for (NSPopoverTouchBarItem* item in self.touchPopovers) { [item dismissPopover:nil]; item.popoverTouchBar.delegate=nil; }
     for (NSButton* button in self.touchButtons.allValues) { button.target=nil; button.action=NULL; }
     self.touchVolume.target=nil; self.touchVolume.action=NULL;
+    self.touchPages.target=nil; self.touchPages.action=NULL; self.touchPages=nil;
     if (self.window.touchBar==self.streamTouchBar) self.window.touchBar=self.previousTouchBar;
     self.streamTouchBar.delegate=nil; self.streamTouchBar=nil; self.previousTouchBar=nil;
     self.touchButtons=nil; self.touchPopovers=nil; self.touchDashboard=nil; self.touchVolume=nil;

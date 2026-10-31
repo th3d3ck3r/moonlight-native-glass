@@ -159,10 +159,8 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic,retain) NSMutableArray<NSPopoverTouchBarItem*>* touchPopovers;
 @property(nonatomic,retain) MLTouchDashboard* touchDashboard;
 @property(nonatomic,retain) NSSliderTouchBarItem* touchVolume;
+@property(nonatomic,retain) NSSegmentedControl* touchPages;
 @property(nonatomic,retain) NSTimer* touchTimer;
-- (void)installTouchBar;
-- (void)refreshTouchBar;
-- (void)invalidateTouchBar;
 - (void)requestInputRepair;
 - (void)repairInput:(NSTimer*)timer;
 - (void)refresh;
@@ -176,6 +174,11 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 - (void)updateVisibility;
 @end
 static MLStreamTitlebar* titlebar;
+@interface MLStreamTitlebar (TouchBar) <NSTouchBarDelegate>
+- (void)installTouchBar;
+- (void)refreshTouchBar;
+- (void)invalidateTouchBar;
+@end
 
 static void requestTitlebarInputRepair(NSWindow* window) {
     if (window && (titlebar.window==window || (window.parentWindow && window.parentWindow==titlebar.window) || titlebar.details.contentViewController.view.window==window)) [titlebar requestInputRepair];
@@ -690,7 +693,13 @@ void nativeTitlebarSetRecording(bool available,bool recording,bool buffering,boo
     scheduleRefresh();
 }
 void nativeTitlebarSetCapture(bool captured) { std::lock_guard<std::mutex> lock(stateMutex); if (state.captured!=captured) { state.captured=captured; scheduleRefresh(); } }
-void nativeTitlebarSetStatistics(bool visible) { std::lock_guard<std::mutex> lock(stateMutex); if (!visible) { state.streamText.clear(); state.streamUpdated=0; } if (state.statistics!=visible) { state.statistics=visible; scheduleRefresh(); } }
+void nativeTitlebarSetStatistics(bool visible) {
+    std::lock_guard<std::mutex> lock(stateMutex);
+    bool changed=state.statistics!=visible || (!visible && !state.streamText.empty());
+    state.statistics=visible;
+    if (!visible) { state.streamText.clear(); state.streamUpdated=0; }
+    if (changed) scheduleRefresh();
+}
 void nativeTitlebarSetStreamInformation(const char* text) {
     std::lock_guard<std::mutex> lock(stateMutex);
     state.streamText=text ? std::string(text).substr(0,4096) : "";
