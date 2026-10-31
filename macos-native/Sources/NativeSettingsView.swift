@@ -24,6 +24,7 @@ struct NativeSettingsView: View {
     @ObservedObject var store: EngineStore
     @AppStorage(NativeCrimsonTheme.key) private var crimson = true
     @AppStorage(NativeTouchBarPresentation.key) private var touchBarFullWidth = false
+    @AppStorage("touchBarLiveStats", store: UserDefaults(suiteName: NativeCrimsonTheme.suite)) private var touchBarLiveStats = true
     @State private var touchBarError = false
     @State private var pane = SettingsPane.video
     @State private var nativeSize: VideoResolution?
@@ -50,6 +51,11 @@ struct NativeSettingsView: View {
                             Text("Near-black surfaces, crimson accents and matching moon artwork. Native Liquid Glass remains active on supported macOS versions. Turn off to use the original appearance.").foregroundStyle(.secondary)
                         }
                         Section("Touch Bar") {
+                            Toggle("Show live stats on the main Touch Bar", isOn: $touchBarLiveStats)
+                                .accessibilityIdentifier("touchbar-live-stats-toggle")
+                                .disabled(store.streamActive)
+                            Text("FPS, network latency and bitrate stay visible beside Capture and Controls. Full-width mode adds timing, drops and local hardware readings as space permits. The on-screen Statistics window is separate. Applies to the next stream.")
+                                .font(.callout).foregroundStyle(.secondary)
                             Toggle("Use full Touch Bar", isOn: Binding(get: { touchBarFullWidth }, set: changeTouchBarWidth))
                                 .accessibilityIdentifier("touchbar-full-width-toggle")
                             Text("Off by default: keep the macOS Control Strip. On: give MoonlightLG the full app bar by hiding the strip only for MoonlightLG and its streaming window. Turn off to restore their previous settings. Takes effect when returning to the library or stream.")

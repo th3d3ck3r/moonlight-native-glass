@@ -69,6 +69,7 @@ jobs:
       - name: Test production Apollo connection gate
         run: |
           python3 tests/native/LegalNoticesTests.py
+          python3 tests/native/TouchBarTelemetryTests.py
           python3 tests/native/extract_native_exit_shortcut.py
           c++ -std=c++17 -Ibuild tests/native/ConnectionGateTests.cpp -o build/connection-gate-tests
           build/connection-gate-tests

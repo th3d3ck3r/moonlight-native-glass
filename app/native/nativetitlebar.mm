@@ -22,7 +22,7 @@ static NSString* const batteryID = @"NativeControllerBattery";
 static NSString* const recordID = @"NativeRecord";
 static NSString* const replayID = @"NativeReplay";
 static NSString* const connectionID = @"NativeConnection";
-struct TitleState { bool recorder=false,recording=false,buffering=false,replayReady=false,saving=false,recorderFailed=false; uint64_t seconds=0; std::string recordingMessage="Recording disabled",streamText; double streamUpdated=0; bool captured=false; bool statistics=false; bool muted=false; NativeConnectionState connection=NativeConnectionState::Connecting; };
+struct TitleState { bool telemetryActive=false,recorder=false,recording=false,buffering=false,replayReady=false,saving=false,recorderFailed=false; uint64_t seconds=0; std::string recordingMessage="Recording disabled",streamText; double streamUpdated=0; bool captured=false; bool statistics=false; bool muted=false; NativeConnectionState connection=NativeConnectionState::Connecting; };
 static TitleState state;
 static std::mutex stateMutex;
 static unsigned epoch=0;
@@ -158,6 +158,8 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic,retain) NSMutableDictionary<NSString*,NSButton*>* touchButtons;
 @property(nonatomic,retain) NSMutableArray<NSPopoverTouchBarItem*>* touchPopovers;
 @property(nonatomic,retain) MLTouchDashboard* touchDashboard;
+@property(nonatomic,retain) MLTouchDashboard* touchInlineDashboard;
+@property(nonatomic,assign) BOOL touchLiveStats;
 @property(nonatomic,retain) NSSliderTouchBarItem* touchVolume;
 @property(nonatomic,retain) NSSegmentedControl* touchPages;
 @property(nonatomic,retain) NSTextField* touchVolumeText;
@@ -696,13 +698,11 @@ void nativeTitlebarSetRecording(bool available,bool recording,bool buffering,boo
 void nativeTitlebarSetCapture(bool captured) { std::lock_guard<std::mutex> lock(stateMutex); if (state.captured!=captured) { state.captured=captured; scheduleRefresh(); } }
 void nativeTitlebarSetStatistics(bool visible) {
     std::lock_guard<std::mutex> lock(stateMutex);
-    bool changed=state.statistics!=visible || (!visible && !state.streamText.empty());
-    state.statistics=visible;
-    if (!visible) { state.streamText.clear(); state.streamUpdated=0; }
-    if (changed) scheduleRefresh();
+    if (state.statistics!=visible) { state.statistics=visible; scheduleRefresh(); }
 }
 void nativeTitlebarSetStreamInformation(const char* text) {
     std::lock_guard<std::mutex> lock(stateMutex);
+    if (!state.telemetryActive) return;
     state.streamText=text ? std::string(text).substr(0,4096) : "";
     state.streamUpdated=NSProcessInfo.processInfo.systemUptime;
     scheduleRefresh();
@@ -775,9 +775,10 @@ void nativeTitlebarAttach(void* window) {
     titlebar.overflow.bordered=NO; titlebar.overflow.identifier=@"NativeOverflow";
     titlebar.overflow.toolTip=@"More Stream Controls"; [titlebar.overflow setAccessibilityLabel:titlebar.overflow.toolTip];
     [titlebar updateWindowToolbar]; [titlebar readControllers]; [titlebar installTouchBar];
+    { std::lock_guard<std::mutex> lock(stateMutex); state.telemetryActive=true; }
 }
 void nativeTitlebarDetach() {
-    { std::lock_guard<std::mutex> lock(stateMutex); epoch++; pending=false; }
+    { std::lock_guard<std::mutex> lock(stateMutex); epoch++; pending=false; state.telemetryActive=false; state.streamText.clear(); state.streamUpdated=0; }
     [titlebar invalidate]; [titlebar release]; titlebar=nil;
 }
 void nativeTitlebarSetWindowTransition(bool transitioning) {

@@ -1,4 +1,7 @@
 #include "native/nativerecorder.h"
+#ifdef Q_OS_MACOS
+#include "native/nativeoverlay.h"
+#endif
 #include <Limelight.h>
 #include "ffmpeg.h"
 #include "utils.h"
@@ -2127,8 +2130,15 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
 
     // Flip stats windows roughly every second
     if (LiGetMicroseconds() > m_ActiveWndVideoStats.measurementStartUs + 1000000) {
-        // Update overlay stats if it's enabled
-        if (Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug)) {
+        // Reuse the existing one-second measurements for native Touch Bar UI.
+        // Collection and on-screen overlay visibility are independent.
+        const bool windowStatistics = Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug);
+#ifdef Q_OS_MACOS
+        const bool touchBarStatistics = nativeOverlayConfigured();
+#else
+        const bool touchBarStatistics = false;
+#endif
+        if (windowStatistics || touchBarStatistics) {
             VIDEO_STATS lastTwoWndStats = {};
             addVideoStats(m_LastWndVideoStats, lastTwoWndStats);
             addVideoStats(m_ActiveWndVideoStats, lastTwoWndStats);
@@ -2136,7 +2146,14 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
             stringifyVideoStats(lastTwoWndStats,
                                 Session::get()->getOverlayManager().getOverlayText(Overlay::OverlayDebug),
                                 Session::get()->getOverlayManager().getOverlayMaxTextLength());
-            Session::get()->getOverlayManager().setOverlayTextUpdated(Overlay::OverlayDebug);
+#ifdef Q_OS_MACOS
+            if (touchBarStatistics && !windowStatistics) {
+                nativeOverlayPresentStatistics(Session::get()->getOverlayManager().getOverlayText(Overlay::OverlayDebug));
+            }
+#endif
+            if (windowStatistics) {
+                Session::get()->getOverlayManager().setOverlayTextUpdated(Overlay::OverlayDebug);
+            }
         }
 
         // Accumulate these values into the global stats

@@ -96,9 +96,9 @@ struct MoonlightLGVersion {
     }
     var display: String { "\(redesign).\(major).\(minor).\(hotfix)" + (channel == "stable" ? "" : channel) }
     static var current: MoonlightLGVersion {
-        MoonlightLGVersion(numeric: Bundle.main.object(forInfoDictionaryKey: "MoonlightLGVersion") as? String ?? "1.3.3.0",
+        MoonlightLGVersion(numeric: Bundle.main.object(forInfoDictionaryKey: "MoonlightLGVersion") as? String ?? "1.3.4.0",
                            channel: Bundle.main.object(forInfoDictionaryKey: "MoonlightLGReleaseChannel") as? String ?? "U")
-            ?? MoonlightLGVersion(numeric: "1.3.3.0", channel: "U")!
+            ?? MoonlightLGVersion(numeric: "1.3.4.0", channel: "U")!
     }
 }
 

@@ -333,9 +333,12 @@ int nativeOverlayShortcut(const SDL_KeyboardEvent* event) {
     return -1;
 }
 bool nativeOverlayPerformAction(int action, Uint32 requestID) { return pushAction(action, requestID); }
+void nativeOverlayPresentStatistics(const char* text) {
+    if (configured) nativeTitlebarSetStreamInformation(text);
+}
 bool nativeOverlayPresent(int type, bool enabled, const char* text) {
     if (!configured || type<0 || type>1) return false;
-    if (type==0) { nativeTitlebarSetStatistics(enabled); nativeTitlebarSetStreamInformation(enabled ? text : nullptr); }
+    if (type==0) { nativeTitlebarSetStatistics(enabled); if (enabled) nativeTitlebarSetStreamInformation(text); }
     std::lock_guard<std::mutex> lock(snapshotMutex); snapshots[type].enabled=enabled; ++snapshots[type].revision; SDL_strlcpy(snapshots[type].text,text ?: "",sizeof(snapshots[type].text));
     if (!updatePending) { updatePending=true; unsigned current=generation; dispatch_async(dispatch_get_main_queue(), ^{ { std::lock_guard<std::mutex> guard(snapshotMutex); if (generation!=current) return; updatePending=false; } [controller layoutPanels]; }); }
     return true;
@@ -350,8 +353,8 @@ void nativeOverlayAttach(void* window, const char* token) {
 }
 void nativeOverlayDetach() {
     nativeOverlayEndControlsInput();
-    nativeTitlebarDetach();
-    configured=false; { std::lock_guard<std::mutex> lock(snapshotMutex); generation++; updatePending=false; snapshots[0]={}; snapshots[1]={}; }
+    configured=false;
+    nativeTitlebarDetach(); { std::lock_guard<std::mutex> lock(snapshotMutex); generation++; updatePending=false; snapshots[0]={}; snapshots[1]={}; }
     if (actionEvent != (Uint32)-1) SDL_FlushEvent(actionEvent);
     // AppKit can retain notification targets until its current event drains.
     // Detach now rather than relying on eventual object destruction.

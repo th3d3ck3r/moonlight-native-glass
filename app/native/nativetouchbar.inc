@@ -30,6 +30,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     std::array<std::vector<double>,3> samples;
 }
 @property(nonatomic,assign) BOOL active;
+@property(nonatomic,assign) BOOL inlineMode;
 @property(nonatomic,assign) NSInteger page;
 @property(nonatomic,copy) NSArray* cards;
 @property(nonatomic,copy) NSString* streamText;
@@ -42,6 +43,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 @property(nonatomic,assign) double tx;
 - (void)sample;
 - (void)refreshCards;
+- (void)copyHardwareFrom:(MLTouchDashboard*)source;
 @end
 @implementation MLTouchDashboard
 - (instancetype)initWithFrame:(NSRect)frame {
@@ -58,6 +60,8 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     return self;
 }
 - (BOOL)isFlipped { return YES; }
+- (NSView*)hitTest:(NSPoint)point { return self.inlineMode ? nil : [super hitTest:point]; }
+- (void)setFrameSize:(NSSize)size { [super setFrameSize:size]; if (self.inlineMode) [self refreshCards]; }
 - (NSSize)intrinsicContentSize { return NSMakeSize(350,30); }
 - (NSString*)metric:(NSString*)prefix fallback:(NSString*)fallback {
     // Never present a sample as current once the source stops updating.
@@ -68,8 +72,25 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     return fallback;
 }
 - (void)refreshCards {
-    NSString* missing=self.streamText.length ? @"Unavailable / stale" : @"Enable Statistics";
-    switch (self.page) {
+    NSString* missing=self.streamText.length ? @"Unavailable / stale" : @"Waiting for data";
+    if (self.inlineMode) {
+        NSString* bitrate=[self metric:@"Bitrate" fallback:missing];
+        bitrate=[[bitrate componentsSeparatedByString:@","] firstObject];
+        NSMutableArray* cards=[NSMutableArray arrayWithArray:@[
+            @[@"FPS",[self metric:@"Incoming frame rate" fallback:missing]],
+            @[@"NETWORK RTT",[self metric:@"Average network latency" fallback:missing]],
+            @[@"BITRATE",bitrate]]];
+        if (self.bounds.size.width>=840) {
+            [cards addObject:@[@"DECODE",[self metric:@"Average decoding time" fallback:missing]]];
+            [cards addObject:@[@"DROPS",[self metric:@"Frames dropped by" fallback:missing]]];
+        }
+        if (self.bounds.size.width>=620) {
+            [cards addObject:@[@"MAC CPU",self.cpu<0 ? @"Sampling…" : [NSString stringWithFormat:@"%.0f%%",self.cpu]]];
+            [cards addObject:@[@"MAC RAM",self.ram<0 ? @"Unavailable" : [NSString stringWithFormat:@"%.1f GB",self.ram/100.*NSProcessInfo.processInfo.physicalMemory/1073741824.]]];
+            [cards addObject:@[@"MAC GPU",self.gpu<0 ? @"Unavailable" : [NSString stringWithFormat:@"%.0f%%",self.gpu]]];
+        }
+        self.cards=cards;
+    } else switch (self.page) {
         case 0: self.cards=@[@[@"INCOMING FPS",[self metric:@"Incoming frame rate" fallback:missing]],
                             @[@"NETWORK RTT",[self metric:@"Average network latency" fallback:missing]],
                             @[@"BITRATE",[self metric:@"Bitrate" fallback:missing]]]; break;
@@ -96,6 +117,10 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     for (NSArray* card in self.cards) [spoken addObject:[card componentsJoinedByString:@": "]];
     [self setAccessibilityLabel:[spoken componentsJoinedByString:@"; "]];
     self.needsDisplay=YES;
+}
+- (void)copyHardwareFrom:(MLTouchDashboard*)source {
+    self.cpu=source.cpu; self.ram=source.ram; self.gpu=source.gpu; self.rx=source.rx; self.tx=source.tx;
+    samples=source->samples;
 }
 - (void)sample {
     if (!self.active || busy) return;
@@ -124,16 +149,17 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 }
 - (void)drawRect:(NSRect)dirty {
     [NSColor.blackColor setFill]; NSRectFill(self.bounds);
-    CGFloat width=self.bounds.size.width/3;
+    CGFloat width=self.bounds.size.width/MAX((NSUInteger)1,self.cards.count);
     for (NSUInteger i=0;i<self.cards.count;++i) {
         NSRect cell=NSMakeRect(i*width,0,width-4,30);
         [touchSurface() setFill];
         [[NSBezierPath bezierPathWithRoundedRect:cell xRadius:5 yRadius:5] fill];
-        if (self.page==4) {
+        NSInteger channel=self.inlineMode ? (NSInteger)i-(NSInteger)self.cards.count+3 : (NSInteger)i;
+        if ((!self.inlineMode && self.page==4) || (self.inlineMode && self.cards.count>=6 && channel>=0 && channel<3)) {
             NSBezierPath* graph=[NSBezierPath bezierPath]; BOOL started=NO;
-            for (size_t n=0;n<samples[i].size();++n) {
-                double value=samples[i][n]; if (value<0) { started=NO; continue; }
-                NSPoint point=NSMakePoint(NSMaxX(cell)-3-double(samples[i].size()-1-n)/59.*(cell.size.width-6),29-MIN(100.,value)/100.*12);
+            for (size_t n=0;n<samples[channel].size();++n) {
+                double value=samples[channel][n]; if (value<0) { started=NO; continue; }
+                NSPoint point=NSMakePoint(NSMaxX(cell)-3-double(samples[channel].size()-1-n)/59.*(cell.size.width-6),29-MIN(100.,value)/100.*12);
                 if (started) [graph lineToPoint:point]; else [graph moveToPoint:point]; started=YES;
             }
             [[touchAccent() colorWithAlphaComponent:.45] setStroke]; graph.lineWidth=1; [graph stroke];
@@ -144,6 +170,15 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     }
 }
 - (void)dealloc { self.active=NO; [_cards release]; [_streamText release]; [_devicesText release]; [super dealloc]; }
+@end
+
+@interface MLTouchStatsButton : NSButton
+@property(nonatomic,retain) MLTouchDashboard* dashboard;
+@end
+@implementation MLTouchStatsButton
+- (NSSize)intrinsicContentSize { return NSMakeSize(350,30); }
+- (void)setFrameSize:(NSSize)size { [super setFrameSize:size]; self.dashboard.frame=self.bounds; }
+- (void)dealloc { [_dashboard release]; [super dealloc]; }
 @end
 
 // NSTouchBar owns the actual controls. The same views are rendered by the
@@ -157,8 +192,12 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 - (void)installTouchBar {
     self.touchButtons=[NSMutableDictionary dictionary]; self.touchPopovers=[NSMutableArray array];
     self.touchDashboard=[[[MLTouchDashboard alloc] initWithFrame:NSMakeRect(0,0,350,30)] autorelease];
+    NSUserDefaults* preferences=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
+    self.touchLiveStats=[preferences objectForKey:@"touchBarLiveStats"] ? [preferences boolForKey:@"touchBarLiveStats"] : YES;
+    self.touchInlineDashboard=[[[MLTouchDashboard alloc] initWithFrame:NSMakeRect(0,0,350,30)] autorelease];
+    self.touchInlineDashboard.inlineMode=YES;
     self.previousTouchBar=self.window.touchBar;
-    self.streamTouchBar=[self touchBarWithItems:@[@"touch.info",@"touch.capture",@"touch.audio",@"touch.record",@"touch.replay",@"touch.more"]];
+    self.streamTouchBar=[self touchBarWithItems:self.touchLiveStats ? @[@"touch.capture",@"touch.info",@"touch.more"] : @[@"touch.info",@"touch.capture",@"touch.audio",@"touch.record",@"touch.replay",@"touch.more"]];
     self.window.touchBar=self.streamTouchBar;
     self.touchTimer=[NSTimer timerWithTimeInterval:1 target:self selector:@selector(touchTick:) userInfo:nil repeats:YES];
     [[NSRunLoop mainRunLoop] addTimer:self.touchTimer forMode:NSRunLoopCommonModes];
@@ -170,15 +209,26 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     [self.touchDashboard sample]; [self refreshTouchBar];
 }
 - (NSTouchBarItem*)touchBar:(NSTouchBar*)bar makeItemForIdentifier:(NSTouchBarItemIdentifier)identifier {
-    if ([identifier isEqual:@"touch.info"] || [identifier isEqual:@"touch.audio"] || [identifier isEqual:@"touch.more"]) {
+    if ([identifier isEqual:@"touch.info"] || [identifier isEqual:@"touch.audio"] || [identifier isEqual:@"touch.more"] || [identifier isEqual:@"touch.window"]) {
         NSPopoverTouchBarItem* item=[[[NSPopoverTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
         BOOL info=[identifier isEqual:@"touch.info"],audio=[identifier isEqual:@"touch.audio"];
-        item.collapsedRepresentationLabel=info ? @"Live Status" : audio ? @"Audio" : @"More";
+        BOOL window=[identifier isEqual:@"touch.window"];
+        item.collapsedRepresentationLabel=info ? @"Live Status" : audio ? @"Audio" : window ? @"Window" : self.touchLiveStats ? @"Controls" : @"More";
         item.collapsedRepresentationImage=touchSymbol(info ? @"moon.fill" : audio ? @"speaker.wave.2.fill" : @"ellipsis.circle");
-        NSButton* button=touchButton(item.collapsedRepresentationLabel,info ? @"moon.fill" : audio ? @"speaker.wave.2.fill" : @"ellipsis.circle",item,@selector(showPopover:),info ? 116 : 66);
+        NSButton* button;
+        if (info && self.touchLiveStats) {
+            MLTouchStatsButton* stats=[[[MLTouchStatsButton alloc] initWithFrame:NSMakeRect(0,0,350,30)] autorelease];
+            stats.title=@""; stats.bordered=NO; stats.target=item; stats.action=@selector(showPopover:);
+            stats.dashboard=self.touchInlineDashboard; [stats addSubview:self.touchInlineDashboard];
+            NSLayoutConstraint* constraint=[stats.widthAnchor constraintGreaterThanOrEqualToConstant:350];
+            constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES;
+            [stats.heightAnchor constraintEqualToConstant:30].active=YES;
+            [stats setContentHuggingPriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+            button=stats;
+        } else button=touchButton(item.collapsedRepresentationLabel,info ? @"moon.fill" : audio ? @"speaker.wave.2.fill" : window ? @"display" : @"slider.horizontal.3",item,@selector(showPopover:),info ? 116 : (!audio && self.touchLiveStats && !window) ? 98 : window ? 80 : 66);
         button.identifier=identifier; item.collapsedRepresentation=button;
         self.touchButtons[identifier]=button; [self.touchPopovers addObject:item]; item.showsCloseButton=YES;
-        item.popoverTouchBar=[self touchBarWithItems:info ? @[@"touch.pages",@"touch.dashboard"] : audio ? @[@"touch.mute",@"touch.volume",@"touch.volumeLabel"] : @[@"touch.stats",@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide",@"touch.disconnect"]];
+        item.popoverTouchBar=[self touchBarWithItems:info ? @[@"touch.pages",@"touch.dashboard"] : audio ? @[@"touch.mute",@"touch.volume",@"touch.volumeLabel"] : window ? @[@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide"] : self.touchLiveStats ? @[@"touch.audio",@"touch.record",@"touch.replay",@"touch.stats",@"touch.window",@"touch.disconnect"] : @[@"touch.stats",@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide",@"touch.disconnect"]];
         [self refreshTouchBar]; return item;
     }
     if ([identifier isEqual:@"touch.volume"]) {
@@ -242,10 +292,16 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     self.touchDashboard.streamUpdated=copy.streamUpdated;
     self.touchDashboard.devicesText=self.controllerCount ? [NSString stringWithFormat:@"%lu · %@",(unsigned long)self.controllerCount,powerDescription(self.batteryLevel)] : @"None connected";
     [self.touchDashboard refreshCards];
+    self.touchInlineDashboard.streamText=self.touchDashboard.streamText;
+    self.touchInlineDashboard.streamUpdated=copy.streamUpdated;
+    self.touchInlineDashboard.devicesText=self.touchDashboard.devicesText;
+    [self.touchInlineDashboard copyHardwareFrom:self.touchDashboard]; [self.touchInlineDashboard refreshCards];
     NSButton* info=self.touchButtons[@"touch.info"];
     NSString* fps=[self.touchDashboard metric:@"Incoming frame rate" fallback:@""];
-    info.title=copy.connection==NativeConnectionState::Connected ? (fps.length ? [NSString stringWithFormat:@"%.0f FPS",fps.doubleValue] : @"Connected") : connectionDescription(copy.connection);
-    info.image=touchSymbol(copy.connection==NativeConnectionState::Poor || copy.connection==NativeConnectionState::Disconnected ? @"exclamationmark.circle" : @"moon.fill");
+    if (!self.touchLiveStats) {
+        info.title=copy.connection==NativeConnectionState::Connected ? (fps.length ? [NSString stringWithFormat:@"%.0f FPS",fps.doubleValue] : @"Connected") : connectionDescription(copy.connection);
+        info.image=touchSymbol(copy.connection==NativeConnectionState::Poor || copy.connection==NativeConnectionState::Disconnected ? @"exclamationmark.circle" : @"moon.fill");
+    }
     info.toolTip=@"Stream measurements, decoding, local hardware and controllers";
     NSButton* capture=self.touchButtons[@"touch.capture"]; capture.title=copy.captured ? @"Release" : @"Capture";
     capture.image=touchSymbol(copy.captured ? @"cursorarrow.motionlines" : @"cursorarrow");
@@ -264,6 +320,13 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     replay.title=copy.saving ? @"Saving" : copy.replayReady ? @"Save" : copy.buffering ? @"Buffer" : @"Replay";
     replay.enabled=copy.recorder && copy.replayReady && !copy.saving;
     replay.image=touchSymbol(copy.saving ? @"hourglass" : @"arrow.counterclockwise");
+    if (self.touchLiveStats) {
+        NSButton* controls=self.touchButtons[@"touch.more"];
+        controls.title=copy.recording ? [NSString stringWithFormat:@"REC %llu:%02llu",(unsigned long long)(copy.seconds/60),(unsigned long long)(copy.seconds%60)] : copy.saving ? @"Saving" : copy.recorderFailed ? @"Rec error" : @"Controls";
+        controls.image=touchSymbol(copy.recording ? @"record.circle.fill" : @"slider.horizontal.3");
+        controls.bezelColor=copy.recording ? [touchAccent() colorWithAlphaComponent:.7] : touchSurface();
+        controls.contentTintColor=copy.recording ? NSColor.whiteColor : touchAccent();
+    }
     self.touchButtons[@"touch.stats"].title=copy.statistics ? @"Stats on" : @"Stats off";
     self.touchButtons[@"touch.hardware"].title=self.hardware ? @"Hide Mac" : @"Monitor";
     self.touchButtons[@"touch.mute"].title=copy.muted ? @"Unmute" : @"Mute";
@@ -274,15 +337,16 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         NSButton* button=self.touchButtons[key];
         [button setAccessibilityLabel:button.toolTip.length ? [NSString stringWithFormat:@"%@ · %@",button.title,button.toolTip] : button.title];
     }
+    if (self.touchLiveStats) [info setAccessibilityLabel:[self.touchInlineDashboard.accessibilityLabel stringByAppendingString:@"; tap for more stream information"]];
 }
 - (void)invalidateTouchBar {
-    [self.touchTimer invalidate]; self.touchTimer=nil; self.touchDashboard.active=NO;
+    [self.touchTimer invalidate]; self.touchTimer=nil; self.touchDashboard.active=NO; self.touchInlineDashboard.active=NO;
     for (NSPopoverTouchBarItem* item in self.touchPopovers) { [item dismissPopover:nil]; item.popoverTouchBar.delegate=nil; }
     for (NSButton* button in self.touchButtons.allValues) { button.target=nil; button.action=NULL; }
     self.touchVolume.target=nil; self.touchVolume.action=NULL;
     self.touchPages.target=nil; self.touchPages.action=NULL; self.touchPages=nil;
     if (self.window.touchBar==self.streamTouchBar) self.window.touchBar=self.previousTouchBar;
     self.streamTouchBar.delegate=nil; self.streamTouchBar=nil; self.previousTouchBar=nil;
-    self.touchButtons=nil; self.touchPopovers=nil; self.touchDashboard=nil; self.touchVolume=nil; self.touchVolumeText=nil;
+    self.touchButtons=nil; self.touchPopovers=nil; self.touchDashboard=nil; self.touchInlineDashboard=nil; self.touchVolume=nil; self.touchVolumeText=nil;
 }
 @end

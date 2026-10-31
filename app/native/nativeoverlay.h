@@ -14,6 +14,8 @@ void nativeOverlayEndControlsInput();
 // Re-establish SDL's mouse focus after an AppKit child panel is dismissed.
 void nativeOverlayRestoreStreamFocus(SDL_Window* window);
 bool nativeOverlayConfigured();
+// Measurement-only publication: never toggles or opens an on-screen overlay.
+void nativeOverlayPresentStatistics(const char* text);
 int nativeOverlayShortcut(const SDL_KeyboardEvent* event);
 bool nativeOverlayControlsEnabled();
 bool nativeOverlayConsumeKeyRelease(bool& consumed, Uint8 state);

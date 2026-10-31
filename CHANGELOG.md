@@ -1,12 +1,20 @@
 # MoonlightLG changelog
 
+## 1.3.4.0U — private live Touch Bar statistics
+
+- FPS, network RTT and bitrate appear directly on the main Touch Bar beside Capture and Controls. Wider layouts add timing, network drops and local Mac hardware readings.
+- Touch Bar telemetry uses the unchanged one-second statistics calculations independently of the on-screen statistics overlay. Audio, recording/replay and window actions remain available under Controls.
+- Refined Warp Arrival and Apollo animations, preserving the native Continue/Cancel controls and Touch Bar integration. Startup Preview build/run, UI Preview tests and real Qt/SDL interaction checks passed on the isolated uploaded-animation branch at a9680117 before integration. Apollo retains the uploaded 60 fps schedule.
+- Optional original controls layout; full-width presentation stays off by default. Internal build 44; validation pending.
+
+
 ## 1.3.3.0U — private Touch Bar build
 
 - Native Crimson Glass Touch Bar controls for the library, Apollo connection and stream window. Stream actions share existing SDL handlers.
 - Live status, capture/release, local audio/mute/volume, recording time and replay readiness; secondary controls for statistics, hardware overlay, fullscreen, stream controls, hide and disconnect.
 - Six information pages: incoming FPS/RTT/bitrate, resolution/codec/host latency, decode/queue/render delays, network/jitter drops and rendering FPS, local CPU/RAM/GPU sparklines, and network/thermal/controller status. Unavailable and stale measurements are labeled.
 - Optional full-width Touch Bar setting in Appearance, off by default; backs up and restores only MoonlightLG’s per-app presentation entries.
-- Internal build 43. Private U artifacts only; stable 1.3.2.0 remains available. Validation pending.
+- Internal build 43. Private U artifacts delivered to the owner; stable 1.3.2.0 remains available. ARM/Intel/Universal, Xcode, both UI suites, window/Metal/sanitizer and shutdown tests passed at 989a9a0; corrected AppKit alignment-rectangle preview fixture passed at 116989f6. Physical Touch Bar behavior remains unverified by CI.
 
 
 ## 🌙 1.3.2.0 — stable — 2026-10-30

@@ -3,6 +3,17 @@ import SwiftUI
 
 // Procedural Apollo rendezvous: the same TimelineView/Canvas drawing style as
 // Warp Arrival, with no video, external assets, random regeneration or timers.
+//
+// Refinement pass (same layout, panel, buttons, palette and star lanes):
+// - Braking is integrated from speed, so the star field slows smoothly
+//   instead of jumping backwards when the connection completes.
+// - Parallax dust and a faint nebula behind the warp lanes.
+// - Apollo pitches gently with its motion, engine fades out (no pop),
+//   flickering two-layer flame, exhaust particles and a blinking nav light.
+// - Curved approach into orbit starting on the near side of the moon,
+//   perspective scaling around the orbit and a correctly layered orbit path.
+// - Shaded full moon with maria, limb-darkened craters and a rim light,
+//   plus a one-time lock-on pulse when the connection is ready.
 struct NativeConnectionView: View {
     let journey: ConnectionJourney
     var warnings: [String] = []
@@ -17,7 +28,9 @@ struct NativeConnectionView: View {
     @Environment(\.crimsonGlassEnabled) private var crimson
     @State private var startedAt = Date()
     private var accent: Color { crimson ? NativeCrimsonTheme.highlight : Color(red: 0.4, green: 0.8, blue: 1) }
+    private var deep: Color { crimson ? NativeCrimsonTheme.ruby : Color(red: 0.16, green: 0.3, blue: 0.85) }
     private var ready: Bool { journey.phase == .connected || journey.phase == .entering }
+    private static let arrivalDuration = 2.2
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,12 +39,14 @@ struct NativeConnectionView: View {
                 Spacer()
                 Text("APOLLO RENDEZVOUS").font(.caption).tracking(2).foregroundStyle(.secondary)
             }.padding(.horizontal, 28).padding(.top, 24)
-            TimelineView(.animation(minimumInterval: 1 / 30,
+            TimelineView(.animation(minimumInterval: 1 / 60,
                 paused: reduceMotion || journey.phase == .failed || previewTime != nil)) { timeline in
                 let time = reduceMotion ? 0 : previewTime ?? max(0, timeline.date.timeIntervalSince(startedAt))
-                let arrival = journey.connectedAt != nil ? (reduceMotion ? 1 : smooth(max(0, timeline.date.timeIntervalSince(journey.connectedAt ?? timeline.date)) / 1.8)) : 0
+                let sinceConnect: Double? = journey.connectedAt.map {
+                    reduceMotion ? 60 : max(0, timeline.date.timeIntervalSince($0))
+                }
                 Canvas { context, size in
-                    drawSpace(context, size: size, time: time, arrival: arrival)
+                    drawSpace(context, size: size, time: time, since: sinceConnect)
                 }
                 .accessibilityLabel(ready ? "Apollo spacecraft orbiting the full moon" : "Apollo spacecraft flying through space")
                 .accessibilityIdentifier("connection-apollo-scene")
@@ -88,20 +103,87 @@ struct NativeConnectionView: View {
         ], crimson: crimson).frame(width: 0, height: 0))
     }
 
-    private func smooth(_ value: Double) -> Double {
-        let p = min(1, max(0, value)); return p * p * (3 - 2 * p)
+    // MARK: - Timing
+
+    private func smoother(_ value: Double) -> Double {
+        let p = min(1, max(0, value)); return p * p * p * (p * (6 * p - 15) + 10)
     }
-    private func drawSpace(_ context: GraphicsContext, size: CGSize, time: Double, arrival: Double) {
+    private func fract(_ value: Double) -> Double { value - floor(value) }
+    private func arrival(_ since: Double?) -> Double {
+        since.map { smoother($0 / Self.arrivalDuration) } ?? 0
+    }
+    // Integral of arrival over time since connection (closed form of the
+    // smootherstep integral), so the brake reduces speed rather than distance.
+    private func brakedTime(_ since: Double?) -> Double {
+        guard let since else { return 0 }
+        let d = Self.arrivalDuration
+        let p = min(1, max(0, since / d))
+        let p4 = p * p * p * p
+        return d * (p4 * p * p - 3 * p4 * p + 2.5 * p4) + max(0, since - d)
+    }
+    private func ellipsePoint(_ center: CGPoint, _ rx: Double, _ ry: Double, _ angle: Double) -> CGPoint {
+        CGPoint(x: center.x + cos(angle) * rx, y: center.y + sin(angle) * ry)
+    }
+
+    // MARK: - Scene
+
+    private struct Layout {
+        let scale: Double
+        let center: CGPoint
+        let moonRadius: Double
+        let orbitX: Double
+        let orbitY: Double
+    }
+    private func layout(_ size: CGSize) -> Layout {
         let scale = min(size.width / 800, size.height / 400)
-        let center = CGPoint(x: size.width * 0.56, y: size.height * 0.48)
-        // Use the startup warp's golden-angle lanes and depth distribution.
-        // Translate sideways for Apollo's flight instead of moving radially.
+        let moonRadius = max(24, min(66 * scale, size.width * 0.12))
+        return Layout(scale: scale, center: CGPoint(x: size.width * 0.56, y: size.height * 0.48),
+                      moonRadius: moonRadius, orbitX: min(size.width * 0.29, moonRadius * 2.5), orbitY: moonRadius * 0.78)
+    }
+    private func orbitAngle(_ since: Double?) -> Double { Double.pi + (since ?? 0) * 0.48 }
+    private func shipPosition(_ l: Layout, size: CGSize, time: Double, since: Double?) -> CGPoint {
+        let a = arrival(since)
+        let flight = CGPoint(x: size.width * 0.38 + sin(time * 0.35) * 18 * l.scale,
+                             y: l.center.y + sin(time * 0.9) * 8 * l.scale)
+        let orbit = ellipsePoint(l.center, l.orbitX, l.orbitY, orbitAngle(since))
+        // Slight upward arc on the approach rather than a straight slide.
+        let lift = sin(a * .pi) * 16 * l.scale
+        return CGPoint(x: flight.x + (orbit.x - flight.x) * a,
+                       y: flight.y + (orbit.y - flight.y) * a - lift)
+    }
+
+    private func drawSpace(_ context: GraphicsContext, size: CGSize, time: Double, since: Double?) {
+        let l = layout(size)
+        let arrive = arrival(since)
+        let speed = 1 - arrive
         let fieldScale = Double(min(size.width, size.height)) / 640
         let fieldCenter = CGPoint(x: size.width / 2, y: size.height / 2)
-        let speed = 1 - arrival
-        // Fast, scale-aware flight like startup; retain the existing arrival brake.
-        let travel = time * 420 * fieldScale * (1 - arrival * 0.92)
+        let velocity = 420 * fieldScale
+        let travel = reduceMotion ? 0 : velocity * (time - 0.92 * brakedTime(since))
         let width = max(1, size.width + 40)
+        let bounds = Path(CGRect(origin: .zero, size: size))
+
+        // Faint nebula, drifting very slowly with the flight.
+        let drift = travel * 0.02
+        context.fill(bounds, with: .radialGradient(Gradient(colors: [deep.opacity(0.22), .clear]),
+            center: CGPoint(x: size.width * 0.28 - drift.truncatingRemainder(dividingBy: size.width * 0.4), y: size.height * 0.3),
+            startRadius: 0, endRadius: Double(size.width) * 0.6))
+        context.fill(bounds, with: .radialGradient(Gradient(colors: [accent.opacity(0.07), .clear]),
+            center: CGPoint(x: size.width * 0.82, y: size.height * 0.78), startRadius: 0, endRadius: Double(size.width) * 0.45))
+
+        // Distant parallax dust: slower than the warp lanes for depth.
+        for i in 0..<90 {
+            let x0 = fract(Double(i) * 0.618034) * width
+            let y = fract(Double(i) * 0.754878 + 0.13) * Double(size.height)
+            let x = (x0 - travel * 0.16).truncatingRemainder(dividingBy: width)
+            let r = (0.45 + fract(Double(i) * 0.371) * 0.6) * fieldScale
+            var dust = context
+            dust.opacity = (0.18 + fract(Double(i) * 0.529) * 0.3) * (0.8 + 0.2 * sin(time * 1.7 + Double(i)))
+            dust.fill(Path(ellipseIn: CGRect(x: (x < 0 ? x + width : x) - r, y: y - r, width: r * 2, height: r * 2)),
+                      with: .color(.white))
+        }
+
+        // The startup warp's golden-angle lanes, translated sideways.
         for i in 0..<150 {
             let angle = Double(i) * 2.399963
             let lane = 45 + Double((i * 47) % 210)
@@ -111,78 +193,185 @@ struct NativeConnectionView: View {
             let x = (fieldCenter.x + cos(angle) * radius - travel).truncatingRemainder(dividingBy: width)
             let point = CGPoint(x: x < 0 ? x + width : x, y: fieldCenter.y + sin(angle) * radius)
             let edge = max(0, min(1, (z - 0.15) / 0.12))
-            var star = context
-            star.opacity = edge * (0.3 + (1 - z) * 0.65) * (0.65 + speed * 0.35)
+            let twinkle = 1 - arrive * 0.25 * (0.5 + 0.5 * sin(time * 2.4 + Double(i) * 1.7))
+            let alpha = edge * twinkle * (0.3 + (1 - z) * 0.65) * (0.65 + speed * 0.35)
+            let lineWidth = (0.6 + (1 - z) * 1.2) * fieldScale
             let tail = CGPoint(x: point.x + (12 + 115 * (1 - z)) * fieldScale * speed, y: point.y)
             var streak = Path(); streak.move(to: tail); streak.addLine(to: point)
+            if speed > 0.05 && z < 0.45 {
+                var bloom = context
+                bloom.blendMode = .plusLighter
+                bloom.opacity = alpha * speed * 0.3
+                bloom.stroke(streak, with: .color(accent), style: StrokeStyle(lineWidth: lineWidth * 3.5, lineCap: .round))
+            }
+            var star = context
+            star.opacity = alpha
             star.stroke(streak, with: .linearGradient(Gradient(colors: [.clear, accent, .white]),
                 startPoint: tail, endPoint: point),
-                style: StrokeStyle(lineWidth: (0.6 + (1 - z) * 1.2) * fieldScale, lineCap: .round))
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
             let dot = (0.6 + (1 - z) * 0.8) * fieldScale
             star.fill(Path(ellipseIn: CGRect(x: point.x - dot, y: point.y - dot,
                                              width: dot * 2, height: dot * 2)), with: .color(.white))
         }
-        let moonRadius = max(24, min(66 * scale, size.width * 0.12))
-        let moon = CGPoint(x: size.width + moonRadius + (center.x - size.width - moonRadius) * arrival, y: center.y)
-        let orbitX = min(size.width * 0.29, moonRadius * 2.5)
-        let orbitY = moonRadius * 0.78
-        let angle = Double.pi + time * 0.48
-        let flight = CGPoint(x: size.width * 0.38 + sin(time * 0.35) * 18 * scale,
-                             y: center.y + sin(time * 0.9) * 8 * scale)
-        let orbit = CGPoint(x: center.x + cos(angle) * orbitX, y: center.y + sin(angle) * orbitY)
-        let ship = CGPoint(x: flight.x + (orbit.x - flight.x) * arrival,
-                           y: flight.y + (orbit.y - flight.y) * arrival)
-        if arrival > 0 {
-            var glow = context; glow.opacity = arrival
-            glow.fill(Path(ellipseIn: CGRect(x: moon.x - moonRadius * 1.8, y: moon.y - moonRadius * 1.8,
-                                             width: moonRadius * 3.6, height: moonRadius * 3.6)),
-                with: .radialGradient(Gradient(colors: [accent.opacity(0.18), .clear]), center: moon, startRadius: moonRadius * 0.8, endRadius: moonRadius * 1.8))
-            glow.stroke(Path(ellipseIn: CGRect(x: center.x - orbitX, y: center.y - orbitY,
-                                               width: orbitX * 2, height: orbitY * 2)),
-                        with: .color(accent.opacity(0.18)), style: StrokeStyle(lineWidth: 0.7, dash: [3, 7]))
+
+        // Moon glides in slightly ahead of the ship.
+        let moonIn = since.map { smoother($0 / (Self.arrivalDuration * 0.85)) } ?? 0
+        let moon = CGPoint(x: size.width + l.moonRadius * 1.6 + (l.center.x - size.width - l.moonRadius * 1.6) * moonIn, y: l.center.y)
+        let angle = orbitAngle(since)
+        let ship = shipPosition(l, size: size, time: time, since: since)
+
+        // Heading from motion: forward flight plus bob, then the orbit tangent.
+        let dt = 1.0 / 60
+        let next = shipPosition(l, size: size, time: time + dt, since: since.map { $0 + dt })
+        let forward = velocity * 0.25 * speed * dt
+        let dx = Double(next.x - ship.x) + forward
+        let dy = Double(next.y - ship.y)
+        let heading = abs(dx) + abs(dy) < 0.0001 ? 0 : atan2(dy, dx)
+
+        if moonIn > 0 {
+            var halo = context
+            halo.opacity = moonIn * (0.85 + 0.15 * sin(time * 1.6))
+            halo.fill(Path(ellipseIn: CGRect(x: moon.x - l.moonRadius * 2, y: moon.y - l.moonRadius * 2,
+                                             width: l.moonRadius * 4, height: l.moonRadius * 4)),
+                with: .radialGradient(Gradient(colors: [accent.opacity(0.2), accent.opacity(0.06), .clear]),
+                                      center: moon, startRadius: l.moonRadius * 0.85, endRadius: l.moonRadius * 2))
         }
-        let behind = arrival > 0.9 && sin(angle) < 0
-        let rotation = atan2(cos(angle) * orbitY, -sin(angle) * orbitX) * arrival
-        if behind { drawApollo(context, at: ship, scale: max(0.65, scale), angle: rotation, time: time, orbiting: ready) }
-        drawMoon(context, at: moon, radius: moonRadius)
-        if !behind { drawApollo(context, at: ship, scale: max(0.65, scale), angle: rotation, time: time, orbiting: ready) }
+        // Far half of the orbit path sits behind the moon.
+        drawOrbitPath(context, l, from: .pi, to: 2 * .pi, time: time, alpha: arrive)
+
+        let shipScale = max(0.65, l.scale) * (1 + 0.14 * sin(angle) * arrive)
+        let behind = arrive > 0.9 && sin(angle) < 0
+        if behind {
+            drawApollo(context, at: ship, scale: shipScale, angle: heading, time: time, thrust: speed, dim: 0.82)
+        }
+        drawMoon(context, at: moon, radius: l.moonRadius)
+        drawOrbitPath(context, l, from: 0, to: .pi, time: time, alpha: arrive)
+        if let since { drawLockOn(context, at: moon, radius: l.moonRadius, since: since) }
+        if !behind {
+            drawApollo(context, at: ship, scale: shipScale, angle: heading, time: time, thrust: speed, dim: 1)
+        }
+
+        // Soft vignette.
+        let span = Double(max(size.width, size.height))
+        context.fill(bounds, with: .radialGradient(Gradient(colors: [.clear, .black.opacity(0.4)]),
+            center: fieldCenter, startRadius: span * 0.3, endRadius: span * 0.75))
     }
+
+    private func drawOrbitPath(_ context: GraphicsContext, _ l: Layout, from: Double, to: Double, time: Double, alpha: Double) {
+        guard alpha > 0 else { return }
+        var path = Path()
+        for k in 0...48 {
+            let p = ellipsePoint(l.center, l.orbitX, l.orbitY, from + (to - from) * Double(k) / 48)
+            if k == 0 { path.move(to: p) } else { path.addLine(to: p) }
+        }
+        var c = context
+        c.opacity = alpha
+        c.stroke(path, with: .color(accent.opacity(0.22)),
+                 style: StrokeStyle(lineWidth: 0.8, lineCap: .round, dash: [3, 7], dashPhase: CGFloat(reduceMotion ? 0 : -time * 8)))
+    }
+
+    // One-time pulse when the moon is reached: the "connected" moment.
+    private func drawLockOn(_ context: GraphicsContext, at point: CGPoint, radius: Double, since: Double) {
+        for k in 0..<2 {
+            let p = (since - Self.arrivalDuration * 0.75 - Double(k) * 0.4) / 1.4
+            guard p > 0 && p < 1 else { continue }
+            let r = radius * (1.05 + 0.85 * (1 - pow(1 - p, 3)))
+            var ring = context
+            ring.blendMode = .plusLighter
+            ring.opacity = (1 - p) * 0.45
+            ring.stroke(Path(ellipseIn: CGRect(x: point.x - r, y: point.y - r, width: r * 2, height: r * 2)),
+                        with: .color(accent), lineWidth: 1.6 * (1 - p) + 0.4)
+        }
+    }
+
     private func drawMoon(_ context: GraphicsContext, at point: CGPoint, radius: Double) {
         let bounds = CGRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
         let disc = Path(ellipseIn: bounds)
-        context.fill(disc, with: .linearGradient(Gradient(colors: [Color(white: 0.95), Color(white: 0.66), Color(white: 0.4)]),
-            startPoint: CGPoint(x: point.x - radius, y: point.y - radius), endPoint: CGPoint(x: point.x + radius, y: point.y + radius)))
+        let light = CGPoint(x: point.x - radius * 0.35, y: point.y - radius * 0.35)
+        // Sphere lit from the upper left.
+        context.fill(disc, with: .radialGradient(Gradient(colors: [Color(white: 0.97), Color(white: 0.74), Color(white: 0.42)]),
+            center: light, startRadius: 0, endRadius: radius * 1.55))
         var c = context; c.clip(to: disc)
+        // Maria: broad darker plains.
+        let maria: [(Double, Double, Double, Double)] = [(-0.28, -0.22, 0.42, 0.3), (0.18, -0.35, 0.3, 0.22),
+                                                         (0.05, 0.12, 0.36, 0.26), (-0.42, 0.25, 0.24, 0.2)]
+        for (mx, my, w, h) in maria {
+            let mw = w * radius * 1.6, mh = h * radius * 1.6
+            c.fill(Path(ellipseIn: CGRect(x: point.x + mx * radius - mw / 2, y: point.y + my * radius - mh / 2,
+                                          width: mw, height: mh)),
+                   with: .color(Color(white: 0.3).opacity(0.13)))
+        }
+        // Craters, fading toward the limb.
         for i in 0..<22 {
             let a = Double(i) * 2.399963
             let distance = radius * sqrt(Double(i + 1) / 25) * 0.82
+            let limb = 1 - pow(distance / radius, 4) * 0.7
             let r = radius * (0.07 + Double((i * 7) % 5) * 0.015)
             let rect = CGRect(x: point.x + cos(a) * distance - r, y: point.y + sin(a) * distance - r, width: r * 2, height: r * 1.7)
-            c.fill(Path(ellipseIn: rect), with: .color(.black.opacity(0.08 + Double(i % 3) * 0.025)))
-            c.stroke(Path(ellipseIn: rect.offsetBy(dx: 0, dy: 0.7)), with: .color(.white.opacity(0.15)), lineWidth: 0.7)
+            c.fill(Path(ellipseIn: rect), with: .color(.black.opacity((0.08 + Double(i % 3) * 0.025) * limb)))
+            c.stroke(Path(ellipseIn: rect.offsetBy(dx: 0.5, dy: 0.7)), with: .color(.white.opacity(0.17 * limb)), lineWidth: 0.7)
         }
-        context.stroke(disc, with: .color(.white.opacity(0.35)), lineWidth: 0.8)
+        // Terminator shading toward the lower right.
+        c.fill(disc, with: .radialGradient(Gradient(colors: [.black.opacity(0.32), .clear]),
+            center: CGPoint(x: point.x + radius * 0.7, y: point.y + radius * 0.7), startRadius: 0, endRadius: radius * 1.3))
+        // Rim light.
+        var rim = context
+        rim.blendMode = .plusLighter
+        rim.stroke(disc, with: .color(accent.opacity(0.28)), lineWidth: 1.4)
+        context.stroke(disc, with: .color(.white.opacity(0.3)), lineWidth: 0.7)
     }
-    private func drawApollo(_ context: GraphicsContext, at point: CGPoint, scale: Double, angle: Double, time: Double, orbiting: Bool) {
-        var c = context; c.translateBy(x: point.x, y: point.y); c.rotate(by: .radians(angle)); c.scaleBy(x: scale, y: scale)
-        // Bell nozzle, cylindrical service module and tapered Apollo capsule.
-        if !orbiting {
-            let length = 34 + sin(time * 13) * 4
-            var flame = Path(); flame.move(to: CGPoint(x: -26, y: -6)); flame.addQuadCurve(to: CGPoint(x: -26 - length, y: 0), control: CGPoint(x: -40, y: -8)); flame.addQuadCurve(to: CGPoint(x: -26, y: 6), control: CGPoint(x: -40, y: 8)); flame.closeSubpath()
-            c.fill(flame, with: .linearGradient(Gradient(colors: [.clear, accent.opacity(0.7), .white]), startPoint: CGPoint(x: -26 - length, y: 0), endPoint: CGPoint(x: -26, y: 0)))
+
+    private func drawApollo(_ context: GraphicsContext, at point: CGPoint, scale: Double, angle: Double,
+                            time: Double, thrust: Double, dim: Double) {
+        var c = context
+        c.opacity = dim
+        c.translateBy(x: point.x, y: point.y); c.rotate(by: .radians(angle)); c.scaleBy(x: scale, y: scale)
+        // Exhaust: particles, glow and core all fade with thrust.
+        if thrust > 0.01 {
+            var fx = c
+            fx.blendMode = .plusLighter
+            for k in 0..<10 {
+                let phase = fract(time * 1.8 + Double(k) * 0.1)
+                let r = 2.4 * (1 - phase) + 0.4
+                let p = CGPoint(x: -32 - phase * 70, y: sin(Double(k) * 12.9 + time) * phase * 6)
+                fx.opacity = dim * (1 - phase) * 0.45 * thrust
+                fx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)), with: .color(accent))
+            }
+            let flicker = sin(time * 13) * 3 + sin(time * 29 + 1.3) * 2
+            for (length, width, alpha) in [((44 + flicker) * thrust, 9.0, 0.45), ((30 + flicker) * thrust, 5.5, 1.0)] {
+                var flame = Path()
+                flame.move(to: CGPoint(x: -26, y: -width))
+                flame.addQuadCurve(to: CGPoint(x: -26 - length, y: 0), control: CGPoint(x: -26 - length * 0.45, y: -width * 1.2))
+                flame.addQuadCurve(to: CGPoint(x: -26, y: width), control: CGPoint(x: -26 - length * 0.45, y: width * 1.2))
+                flame.closeSubpath()
+                fx.opacity = dim * alpha * thrust
+                fx.fill(flame, with: .linearGradient(Gradient(colors: [.clear, accent.opacity(0.75), .white]),
+                    startPoint: CGPoint(x: -26 - length, y: 0), endPoint: CGPoint(x: -26, y: 0)))
+            }
         }
+        // Bell nozzle, cylindrical service module and tapered Apollo capsule.
         var nozzle = Path(); nozzle.move(to: CGPoint(x: -29, y: -7)); nozzle.addLine(to: CGPoint(x: -19, y: -4)); nozzle.addLine(to: CGPoint(x: -19, y: 4)); nozzle.addLine(to: CGPoint(x: -29, y: 7)); nozzle.closeSubpath()
-        c.fill(nozzle, with: .color(Color(white: 0.3)))
+        c.fill(nozzle, with: .linearGradient(Gradient(colors: [Color(white: 0.45), Color(white: 0.22)]),
+            startPoint: CGPoint(x: -24, y: -7), endPoint: CGPoint(x: -24, y: 7)))
         let module = Path(roundedRect: CGRect(x: -21, y: -11, width: 26, height: 22), cornerRadius: 2)
         c.fill(module, with: .linearGradient(Gradient(colors: [Color(white: 0.95), Color(white: 0.45), Color(white: 0.75)]), startPoint: CGPoint(x: 0, y: -11), endPoint: CGPoint(x: 0, y: 11)))
         for x in [-15.0, -6.0] { c.fill(Path(CGRect(x: x, y: -10, width: 3, height: 20)), with: .color(Color(white: 0.25))) }
+        // Specular highlight along the top of the module.
+        c.fill(Path(roundedRect: CGRect(x: -20, y: -10, width: 24, height: 2.2), cornerRadius: 1), with: .color(.white.opacity(0.55)))
         var capsule = Path(); capsule.move(to: CGPoint(x: 4, y: -13)); capsule.addLine(to: CGPoint(x: 25, y: -3)); capsule.addQuadCurve(to: CGPoint(x: 25, y: 3), control: CGPoint(x: 28, y: 0)); capsule.addLine(to: CGPoint(x: 4, y: 13)); capsule.closeSubpath()
-        c.fill(capsule, with: .linearGradient(Gradient(colors: [Color(red: 0.92, green: 0.83, blue: 0.61), Color(white: 0.65)]), startPoint: CGPoint(x: 10, y: -12), endPoint: CGPoint(x: 10, y: 12)))
+        c.fill(capsule, with: .linearGradient(Gradient(colors: [Color(red: 0.95, green: 0.87, blue: 0.66), Color(red: 0.8, green: 0.72, blue: 0.55), Color(white: 0.55)]), startPoint: CGPoint(x: 10, y: -12), endPoint: CGPoint(x: 10, y: 12)))
         c.stroke(capsule, with: .color(.white.opacity(0.55)), lineWidth: 0.6)
         c.fill(Path(roundedRect: CGRect(x: 12, y: -4, width: 6, height: 4), cornerRadius: 1), with: .color(Color(red: 0.05, green: 0.1, blue: 0.16)))
+        // Window glint.
+        c.fill(Path(roundedRect: CGRect(x: 13, y: -3.5, width: 2, height: 1.2), cornerRadius: 0.5), with: .color(accent.opacity(0.7)))
         var antenna = Path(); antenna.move(to: CGPoint(x: -4, y: -10)); antenna.addLine(to: CGPoint(x: -9, y: -19)); antenna.addLine(to: CGPoint(x: -14, y: -19))
         c.stroke(antenna, with: .color(.white.opacity(0.75)), lineWidth: 0.8)
         c.fill(Path(ellipseIn: CGRect(x: -17, y: -23, width: 6, height: 5)), with: .color(Color(white: 0.8)))
+        // Blinking navigation light.
+        let blink = fract(time * 0.8) < 0.08 ? 1.0 : 0.15
+        var nav = c
+        nav.blendMode = .plusLighter
+        nav.fill(Path(ellipseIn: CGRect(x: -3, y: 9.5, width: 3, height: 3)), with: .color(accent.opacity(blink)))
     }
 }
 

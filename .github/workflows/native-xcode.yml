@@ -9,6 +9,8 @@ on:
       - 'scripts/build-recorder-plugin.py'
       - 'app/native/**'
       - 'app/streaming/input/**'
+      - 'app/streaming/video/ffmpeg.cpp'
+      - 'tests/native/TouchBarTelemetryTests.py'
       - 'tests/native/OverlayTests.mm'
       - 'tests/native/StreamWindowTests.mm'
       - 'tests/native/extract_native_focus_methods.py'
