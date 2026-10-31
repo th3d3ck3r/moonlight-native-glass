@@ -175,6 +175,15 @@ jobs:
           if-no-files-found: error
       - name: Build app and verify bundle
         run: bash scripts/build-native-macos.sh '${{ matrix.architecture }}'
+      - name: Launch the packaged frontend with saved Touch Bar modes
+        if: matrix.architecture == 'arm64'
+        run: python3 tests/native/frontend_launch_smoke.py 'build/native-arm64/MoonlightLG.app' build/frontend-launch-captures
+      - uses: actions/upload-artifact@v6
+        if: always() && matrix.architecture == 'arm64'
+        with:
+          name: Native-Frontend-Launch-Captures
+          path: build/frontend-launch-captures/*
+          if-no-files-found: warn
       - name: Verify packaged stream window opens before connecting
         if: matrix.architecture != 'x86_64'
         run: python3 tests/native/connection_window_bridge.py 'build/native-${{ matrix.architecture }}/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight'

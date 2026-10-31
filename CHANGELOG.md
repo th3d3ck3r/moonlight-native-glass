@@ -1,5 +1,10 @@
 # MoonlightLG changelog
 
+## 1.3.4.1U — private startup correction
+
+- Fix the build 44 launch trap while initializing Touch Bar preferences: reuse the frontend’s existing preference store and safely retain the normal bar if the engine-hosted view cannot open the shared suite. Existing saved settings and the volume bar are preserved.
+- Add a regression for unavailable shared preferences and production frontend startup validation. Internal build 45; physical macOS 27.2 acceptance remains outside CI.
+
 ## 1.3.4.0U — private live Touch Bar statistics
 
 - FPS, network RTT and bitrate appear directly on the main Touch Bar beside Capture and Controls. Wider layouts add timing, network drops and local Mac hardware readings.

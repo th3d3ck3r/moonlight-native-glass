@@ -3,6 +3,23 @@ import SwiftUI
 
 @main struct TouchBarFrontendTests {
     @MainActor static func main() {
+        // Reproduce the shipped startup trap without depending on the runner's
+        // Foundation version: shared suite creation is allowed to return nil.
+        var suiteCalls = 0
+        let unavailableSuite: (String) -> UserDefaults? = { name in
+            suiteCalls += 1
+            precondition(name == NativeTouchBarPresentation.applications[0])
+            return nil
+        }
+        let frontendPrefs = NativeTouchBarPresentation.preferenceStore(
+            bundleIdentifier: NativeTouchBarPresentation.applications[0], suite: unavailableSuite)
+        precondition(frontendPrefs === UserDefaults.standard && suiteCalls == 0,
+                     "Frontend must reuse its existing standard preferences")
+        let hostedPrefs = NativeTouchBarPresentation.preferenceStore(
+            bundleIdentifier: NativeTouchBarPresentation.applications[1], suite: unavailableSuite)
+        precondition(hostedPrefs == nil && suiteCalls == 1)
+        precondition(!NativeTouchBarPresentation.enabled(in: hostedPrefs),
+                     "Unavailable frontend preferences must safely keep normal width")
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
                               styleMask: [.titled], backing: .buffered, defer: false)

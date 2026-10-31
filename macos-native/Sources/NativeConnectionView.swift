@@ -402,8 +402,18 @@ enum NativeTouchBarPresentation {
     static let backupKey = "touchBarPresentationBackup"
     static let applications = ["com.moonlight-stream.NativeGlass", "com.moonlight-stream.NativeGlass.Engine"]
     static let agentDomain = "com.apple.touchbar.agent"
-    static let sharedPreferences = UserDefaults(suiteName: applications[0])!
-    static func enabled(in preferences: UserDefaults = sharedPreferences) -> Bool {
+    // The frontend already owns this domain. Opening it again as a suite can
+    // return nil (observed on macOS 27.2); never force-unwrap preference access
+    // while attaching the first window. The engine-hosted view must not fall
+    // back to its own standard domain if the frontend suite is unavailable.
+    static func preferenceStore(bundleIdentifier: String? = Bundle.main.bundleIdentifier,
+                                suite: (String) -> UserDefaults? = { UserDefaults(suiteName: $0) }) -> UserDefaults? {
+        if bundleIdentifier == applications[0] { return .standard }
+        return suite(applications[0])
+    }
+    static var sharedPreferences: UserDefaults? { preferenceStore() }
+    static func enabled(in preferences: UserDefaults? = sharedPreferences) -> Bool {
+        guard let preferences else { return false }
         preferences.synchronize()
         return supported && preferences.bool(forKey: key)
     }
