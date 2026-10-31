@@ -12,6 +12,9 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
             if CommandLine.arguments.contains("--light") { NSApp.appearance = NSAppearance(named: .aqua) }
         }
         NSApp.setActivationPolicy(.regular)
+        if !CommandLine.arguments.contains("--design-preview") {
+            _ = NativeTouchBarPresentation.apply(UserDefaults.standard.bool(forKey: NativeTouchBarPresentation.key), reapply: true)
+        }
         NSApp.activate(ignoringOtherApps: true)
         DispatchQueue.main.async {
             if !(nativeArgument("--preview-screen") ?? "").hasPrefix("settings-") {

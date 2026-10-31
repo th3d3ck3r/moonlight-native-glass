@@ -24,11 +24,19 @@ Stream status expands into six selectable pages:
 
 Audio expands into local playback mute, volume slider and percentage. The recorder's source audio is unchanged.
 More expands into Statistics, the hardware overlay, fullscreen, controls, hide and disconnect.
-Every expanded page has AppKit's native close/back control. The system Control Strip and physical Escape key retain their normal roles. Expanded layouts reserve an additional 64 points for the native close/back control. The app does not change com.apple.controlstrip preferences, system brightness, system volume, Fn behavior or the user’s Touch Bar visibility settings.
+Every expanded page has AppKit's native close/back control. The default layout keeps the system Control Strip and physical Escape behavior. Expanded layouts reserve an additional 64 points for the native close/back control. System brightness, system volume and Fn behavior remain unchanged.
 
 Crimson SF Symbols, near-black surfaces, monospaced numeric values and restrained active fills match Crimson Glass. Active capture and recording use stronger fills plus distinct labels/glyphs. No blinking effects are used.
-The default stream controls require about 524 points; expanded layouts stay below the standard 685-point app region.
+The default stream controls require about 524 points. Expanded layouts fit the standard 685-point app region and reserve the native Back button. The information view and standard audio slider grow with the space macOS makes available, including a full-width app region when the system Control Strip is hidden by the user’s own macOS settings. The optional **Settings → Appearance → Touch Bar → Use full Touch Bar** setting is off by default.
 Labels with host/game names truncate while accessibility descriptions preserve their full text.
+
+## Optional full width
+
+The full-width toggle uses `PresentationModePerApp` in the macOS Touch Bar agent preference domain, with the value `app` for only `com.moonlight-stream.NativeGlass` and `com.moonlight-stream.NativeGlass.Engine`.
+This is a system preference convention, not a documented NSTouchBar API; physical behavior may vary across macOS versions. No private framework is loaded, and no Touch Bar system process is restarted.
+The app saves each identity’s previous value before applying the override. Turning the toggle off restores those values or removes newly added entries. A subsequent manual change by the user or another utility is preserved.
+Global presentation mode, Fn behavior, other applications’ entries and `com.apple.controlstrip` are unchanged. The change takes effect when returning from Settings to the library or stream. Relauch does not overwrite a later external edit.
+Preference tests inject isolated disposable suites; they never write the CI runner’s real Touch Bar agent domain.
 
 ## State, overhead and input
 

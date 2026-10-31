@@ -11,14 +11,14 @@ static void pump() { NSDate* until=[NSDate dateWithTimeIntervalSinceNow:.08]; wh
 static NSButton* button(NSTouchBar* bar,NSString* name) { return (NSButton*)((NSCustomTouchBarItem*)[bar itemForIdentifier:name]).view; }
 static bool action(int expected) { SDL_Event event; bool found=false; while (SDL_PollEvent(&event)) if (event.type==nativeOverlayEventType() && event.user.code==expected) found=true; return found; }
 static NSTouchBar* expanded(NSTouchBar* bar,NSString* name) { return ((NSPopoverTouchBarItem*)[bar itemForIdentifier:name]).popoverTouchBar; }
-static void capture(NSTouchBar* bar,NSString* path) {
-    NSView* root=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,685,54)] autorelease];
+static void capture(NSTouchBar* bar,NSString* path,CGFloat available=685) {
+    NSView* root=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,available,54)] autorelease];
     root.wantsLayer=YES; root.layer.backgroundColor=NSColor.blackColor.CGColor;
     NSStackView* stack=[[[NSStackView alloc] initWithFrame:NSMakeRect(8,12,669,30)] autorelease];
     stack.orientation=NSUserInterfaceLayoutOrientationHorizontal; stack.spacing=6;
     stack.alignment=NSLayoutAttributeCenterY; stack.distribution=NSStackViewDistributionFill;
     [root addSubview:stack];
-    CGFloat requested=0;
+    CGFloat requested=0; BOOL flexible=NO;
     for (NSString* identifier in bar.defaultItemIdentifiers) {
         NSTouchBarItem* item=[bar itemForIdentifier:identifier]; NSView* view=nil;
         if ([item isKindOfClass:NSPopoverTouchBarItem.class]) view=((NSPopoverTouchBarItem*)item).collapsedRepresentation;
@@ -26,16 +26,17 @@ static void capture(NSTouchBar* bar,NSString* path) {
         else if ([item isKindOfClass:NSCustomTouchBarItem.class]) view=((NSCustomTouchBarItem*)item).view;
         check(view!=nil,"Every declared Touch Bar item must resolve on a Mac without hardware");
         [stack addArrangedSubview:view];
-        for (NSLayoutConstraint* constraint in view.constraints) if (constraint.firstAttribute==NSLayoutAttributeWidth && constraint.relation==NSLayoutRelationEqual) requested+=constraint.constant;
+        if ([identifier isEqual:@"touch.dashboard"] || [identifier isEqual:@"touch.volume"]) flexible=YES;
+        for (NSLayoutConstraint* constraint in view.constraints) if ([constraint.identifier isEqual:@"MoonlightLG.TouchWidth"] && constraint.firstAttribute==NSLayoutAttributeWidth && constraint.secondItem==nil && (constraint.relation==NSLayoutRelationEqual || constraint.relation==NSLayoutRelationGreaterThanOrEqual)) requested+=constraint.constant;
     }
     requested+=MAX(0,(NSInteger)stack.arrangedSubviews.count-1)*6;
     BOOL expandedPage=[bar.defaultItemIdentifiers containsObject:@"touch.pages"] || [bar.defaultItemIdentifiers containsObject:@"touch.mute"] || [bar.defaultItemIdentifiers containsObject:@"touch.stats"];
-    CGFloat budget=669-(expandedPage ? 64 : 0);
+    CGFloat budget=available-16-(expandedPage ? 64 : 0);
     check(requested<=budget,"Reserve the system Control Strip and native popover Back control; never rely on the full physical bar");
     check(bar.escapeKeyReplacementItemIdentifier==nil,"Preserve the system Escape behavior");
-    stack.frame=NSMakeRect(8,12,requested,30);
+    stack.frame=NSMakeRect(8,12,flexible ? budget : requested,30);
     [root layoutSubtreeIfNeeded];
-    for (NSView* view in stack.arrangedSubviews) check(view.frame.size.width>20 && NSMaxX(view.frame)<=670,"Touch Bar item clipped or collapsed");
+    for (NSView* view in stack.arrangedSubviews) check(view.frame.size.width>20 && NSMaxX(view.frame)<=budget+1,"Touch Bar item clipped or collapsed");
     NSBitmapImageRep* image=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:image];
     check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Touch Bar item preview export");
     for (NSView* view in [[stack.arrangedSubviews copy] autorelease]) { [stack removeArrangedSubview:view]; [view removeFromSuperview]; }
@@ -83,6 +84,8 @@ int main(int argc,char** argv) { @autoreleasepool {
     capture(more,[directory stringByAppendingPathComponent:@"touchbar-more.png"]);
     NSSegmentedControl* pages=(NSSegmentedControl*)((NSCustomTouchBarItem*)[dashboard itemForIdentifier:@"touch.pages"]).view;
     for (int i=0;i<6;++i) { pages.selectedSegment=i; [pages sendAction:pages.action to:pages.target]; capture(dashboard,[directory stringByAppendingPathComponent:[NSString stringWithFormat:@"touchbar-info-%d.png",i]]); }
+    capture(dashboard,[directory stringByAppendingPathComponent:@"touchbar-info-wide.png"],1085);
+    capture(audio,[directory stringByAppendingPathComponent:@"touchbar-audio-wide.png"],1085);
     [pages retain];
     NSButton* stale=[button(bar,@"touch.record") retain];
     nativeOverlayDetach(); check(window.touchBar==original,"Restore the previous responder bar at handoff/detach");

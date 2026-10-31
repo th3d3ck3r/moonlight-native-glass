@@ -23,6 +23,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 struct NativeSettingsView: View {
     @ObservedObject var store: EngineStore
     @AppStorage(NativeCrimsonTheme.key) private var crimson = true
+    @AppStorage(NativeTouchBarPresentation.key) private var touchBarFullWidth = false
+    @State private var touchBarError = false
     @State private var pane = SettingsPane.video
     @State private var nativeSize: VideoResolution?
     @State private var choseNative = false
@@ -46,6 +48,15 @@ struct NativeSettingsView: View {
                         Section("Appearance") {
                             Toggle("Crimson Glass", isOn: $crimson).accessibilityIdentifier("crimson-glass-toggle")
                             Text("Near-black surfaces, crimson accents and matching moon artwork. Native Liquid Glass remains active on supported macOS versions. Turn off to use the original appearance.").foregroundStyle(.secondary)
+                        }
+                        Section("Touch Bar") {
+                            Toggle("Use full Touch Bar", isOn: Binding(get: { touchBarFullWidth }, set: changeTouchBarWidth))
+                                .accessibilityIdentifier("touchbar-full-width-toggle")
+                            Text("Off by default: keep the macOS Control Strip. On: give MoonlightLG the full app bar by hiding the strip only for MoonlightLG and its streaming window. Turn off to restore their previous settings. Takes effect when returning to the library or stream.")
+                                .font(.callout).foregroundStyle(.secondary)
+                            Text("Uses a macOS per-app presentation preference. Physical behavior can vary by macOS version.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            if touchBarError { Text("macOS could not save the Touch Bar presentation setting. Turn the option off to restore its saved per-app values. You can also adjust the Touch Bar in macOS Keyboard settings.").foregroundStyle(.red) }
                         }
                     }
                     if pane == .recording { RecordingSettings().disabled(store.streamActive) }
@@ -78,6 +89,11 @@ struct NativeSettingsView: View {
                 .font(.caption).foregroundStyle(.secondary).padding(12)
         }
         .crimsonGlassTheme()
+        .background(NativeTouchBarAccessory(commands: [
+            .init("settings.status", "Settings · \(pane.rawValue)", "gearshape", width: 200, enabled: false),
+            .init("settings.touchbar", touchBarFullWidth ? "Full Width: On" : "Full Width: Off", "arrow.left.and.right", width: 154) { changeTouchBarWidth(!touchBarFullWidth) },
+            .init("settings.close", "Back to App", "arrow.uturn.backward", width: 132) { store.settingsWindow?.close() }
+        ], crimson: crimson).frame(width: 0, height: 0))
         .background(NativeWindowAccessor { store.settingsWindow = $0; $0?.identifier = NSUserInterfaceItemIdentifier("native-settings"); $0?.setAccessibilityIdentifier("native-settings")
             if store.preview, let window = $0 { DispatchQueue.main.async { window.makeKeyAndOrderFront(nil) } } }.frame(width: 0, height: 0))
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification)) { notification in
@@ -93,6 +109,11 @@ struct NativeSettingsView: View {
         .alert(item: Binding(get: { store.message?.settingsScene == true ? store.message : nil }, set: { store.message = $0 })) { message in
             Alert(title: Text(message.title), message: Text(message.detail), dismissButton: .default(Text("OK")))
         }
+    }
+    private func changeTouchBarWidth(_ enabled: Bool) {
+        if store.preview { touchBarFullWidth = enabled; return }
+        if NativeTouchBarPresentation.apply(enabled) { touchBarFullWidth = enabled; touchBarError = false }
+        else { touchBarError = true }
     }
     private struct VideoResolution: Equatable {
         let width: Int

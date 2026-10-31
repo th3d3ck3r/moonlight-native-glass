@@ -30,7 +30,37 @@ import SwiftUI
         let engineBar = NSTouchBar(); window.touchBar = engineBar
         owner.detach(); precondition(window.touchBar === engineBar, "Frontend cleanup must not remove the stream's bar")
         for _ in 0..<20 { owner.attach(window); owner.detach(); precondition(window.touchBar === engineBar) }
+        let agentName = "MoonlightLG.TouchBarTests.Agent.\(UUID().uuidString)"
+        let prefsName = "MoonlightLG.TouchBarTests.Prefs.\(UUID().uuidString)"
+        let agent = UserDefaults(suiteName: agentName)!, prefs = UserDefaults(suiteName: prefsName)!
+        defer { agent.removePersistentDomain(forName: agentName); prefs.removePersistentDomain(forName: prefsName) }
+        let originalModes = ["example.other": "functionKeys", NativeTouchBarPresentation.applications[0]: "fullControlStrip"]
+        agent.set(originalModes, forKey: "PresentationModePerApp")
+        agent.set("appWithControlStrip", forKey: "PresentationModeGlobal")
+        agent.set(["appWithControlStrip": "fullControlStrip"], forKey: "PresentationModeFnModes")
+        precondition(NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent))
+        var modes = agent.dictionary(forKey: "PresentationModePerApp")!
+        precondition(modes["example.other"] as? String == "functionKeys")
+        for app in NativeTouchBarPresentation.applications { precondition(modes[app] as? String == "app") }
+        precondition(agent.string(forKey: "PresentationModeGlobal") == "appWithControlStrip")
+        precondition(agent.dictionary(forKey: "PresentationModeFnModes") as? [String: String] == ["appWithControlStrip": "fullControlStrip"])
+        precondition(NativeTouchBarPresentation.apply(false, preferences: prefs, agent: agent))
+        precondition(agent.dictionary(forKey: "PresentationModePerApp") as? [String: String] == originalModes)
+        precondition(!prefs.bool(forKey: NativeTouchBarPresentation.key) && prefs.object(forKey: NativeTouchBarPresentation.backupKey) == nil)
+        precondition(NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent))
+        modes = agent.dictionary(forKey: "PresentationModePerApp")!
+        modes["example.addedLater"] = "fullControlStrip"
+        modes[NativeTouchBarPresentation.applications[1]] = "functionKeys"
+        agent.set(modes, forKey: "PresentationModePerApp")
+        precondition(NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, reapply: true))
+        precondition(NativeTouchBarPresentation.apply(false, preferences: prefs, agent: agent))
+        modes = agent.dictionary(forKey: "PresentationModePerApp")!
+        precondition(modes["example.addedLater"] as? String == "fullControlStrip")
+        precondition(modes[NativeTouchBarPresentation.applications[1]] as? String == "functionKeys", "Respect a later manual change")
+        precondition(modes[NativeTouchBarPresentation.applications[0]] as? String == "fullControlStrip")
+        agent.set("unexpected format", forKey: "PresentationModePerApp")
+        precondition(!NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent), "Do not overwrite unknown system preference formats")
         window.close()
-        print("PASS: frontend Touch Bar action gating, state updates, symbols and responder ownership")
+        print("PASS: frontend Touch Bar actions, ownership and reversible app-only full-width preferences")
     }
 }

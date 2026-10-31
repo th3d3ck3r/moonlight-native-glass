@@ -202,6 +202,62 @@ struct NativeTouchBarCommand {
         self.width = width; self.enabled = enabled; self.action = action
     }
 }
+
+// macOS has no public NSTouchBar API that hides the Control Strip. This optional
+// private-build feature uses the system's per-application presentation preference,
+// rather than private DFR APIs, global settings, or restarting system processes.
+// Keep a reversible backup for just our two bundle identities. Other apps and
+// global/Fn settings are never modified. Injected suites keep tests off real prefs.
+enum NativeTouchBarPresentation {
+    static let key = "touchBarFullWidth"
+    static let backupKey = "touchBarPresentationBackup"
+    static let applications = ["com.moonlight-stream.NativeGlass", "com.moonlight-stream.NativeGlass.Engine"]
+    static let agentDomain = "com.apple.touchbar.agent"
+    static func apply(_ enabled: Bool, preferences: UserDefaults = .standard,
+                      agent: UserDefaults? = UserDefaults(suiteName: agentDomain), reapply: Bool = false) -> Bool {
+        guard let agent else { return false }
+        agent.synchronize()
+        let raw = agent.object(forKey: "PresentationModePerApp")
+        guard raw == nil || raw is [String: Any] else { return false }
+        var modes = raw as? [String: Any] ?? [:]
+        var backup = preferences.dictionary(forKey: backupKey) ?? [:]
+        let hadBackup = !backup.isEmpty
+        if enabled {
+            // A manually changed system preference takes precedence on relaunch.
+            // The Settings toggle itself is an explicit new request (reapply=false).
+            if reapply && hadBackup { return true }
+            if backup.isEmpty { backup["hadDictionary"] = raw != nil }
+            for app in applications {
+                if backup[app] == nil {
+                    var entry: [String: Any] = ["present": modes[app] != nil]
+                    if let value = modes[app] { entry["value"] = value }
+                    backup[app] = entry
+                }
+                modes[app] = "app"
+            }
+            // Persist recovery data before changing the agent's presentation map.
+            preferences.set(backup, forKey: backupKey); preferences.synchronize()
+        } else {
+            guard hadBackup else { return true }
+            for app in applications {
+                guard let entry = backup[app] as? [String: Any] else { continue }
+                // Do not undo a later change made by the user or another tool.
+                guard modes[app] as? String == "app" else { continue }
+                if entry["present"] as? Bool == true { modes[app] = entry["value"] }
+                else { modes.removeValue(forKey: app) }
+            }
+        }
+        if modes.isEmpty && backup["hadDictionary"] as? Bool == false {
+            agent.removeObject(forKey: "PresentationModePerApp")
+        } else { agent.set(modes, forKey: "PresentationModePerApp") }
+        guard agent.synchronize() else { return false }
+        let saved = agent.dictionary(forKey: "PresentationModePerApp") ?? [:]
+        guard NSDictionary(dictionary: saved).isEqual(to: modes) else { return false }
+        if !enabled { preferences.removeObject(forKey: backupKey) }
+        preferences.set(enabled, forKey: key)
+        return true
+    }
+}
 struct NativeTouchBarAccessory: NSViewRepresentable {
     var commands: [NativeTouchBarCommand]
     var crimson = true

@@ -18,7 +18,8 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     button.font=[NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightMedium];
     button.bezelColor=touchSurface();
     button.contentTintColor=touchAccent(); button.lineBreakMode=NSLineBreakByTruncatingTail;
-    [button.widthAnchor constraintEqualToConstant:width].active=YES;
+    NSLayoutConstraint* constraint=[button.widthAnchor constraintEqualToConstant:width];
+    constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES;
     return button;
 }
 
@@ -47,13 +48,17 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     if ((self=[super initWithFrame:frame])) {
         self.active=YES; self.cpu=self.ram=self.gpu=self.rx=self.tx=-1;
         self.identifier=@"TouchDashboard"; self.streamText=@""; self.devicesText=@"No controller connected";
-        [self.widthAnchor constraintEqualToConstant:350].active=YES;
+        NSLayoutConstraint* constraint=[self.widthAnchor constraintGreaterThanOrEqualToConstant:350];
+        constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES;
+        [self setContentHuggingPriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+        [self setContentCompressionResistancePriority:NSLayoutPriorityDefaultHigh forOrientation:NSLayoutConstraintOrientationHorizontal];
         [self.heightAnchor constraintEqualToConstant:30].active=YES;
         [self refreshCards];
     }
     return self;
 }
 - (BOOL)isFlipped { return YES; }
+- (NSSize)intrinsicContentSize { return NSMakeSize(350,30); }
 - (NSString*)metric:(NSString*)prefix fallback:(NSString*)fallback {
     // Never present a sample as current once the source stops updating.
     if (NSProcessInfo.processInfo.systemUptime-self.streamUpdated>4) return fallback;
@@ -180,7 +185,8 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         NSSliderTouchBarItem* item=[[[NSSliderTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
         item.slider.minValue=0; item.slider.maxValue=1; item.slider.continuous=YES;
         item.slider.doubleValue=nativePlaybackVolume(); item.target=self; item.action=@selector(touchVolume:);
-        [item.slider.widthAnchor constraintEqualToConstant:280].active=YES;
+        NSLayoutConstraint* constraint=[item.slider.widthAnchor constraintGreaterThanOrEqualToConstant:220];
+        constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES;
         [item.slider setAccessibilityLabel:@"Local playback volume; recording audio unchanged"];
         self.touchVolume=item; return item;
     }
@@ -190,7 +196,8 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         NSSegmentedControl* pages=[NSSegmentedControl segmentedControlWithLabels:@[@"Live",@"Video",@"Time",@"Drops",@"Mac",@"I/O"] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(touchPage:)];
         pages.font=[NSFont systemFontOfSize:10.5 weight:NSFontWeightMedium];
         pages.selectedSegment=self.touchDashboard.page; pages.segmentStyle=NSSegmentStyleRounded;
-        [pages.widthAnchor constraintEqualToConstant:234].active=YES; self.touchPages=pages; item.view=pages;
+        NSLayoutConstraint* constraint=[pages.widthAnchor constraintEqualToConstant:234];
+        constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES; self.touchPages=pages; item.view=pages;
     } else {
         NSDictionary* titles=@{@"touch.capture":@"Capture",@"touch.record":@"Record",@"touch.replay":@"Replay",@"touch.stats":@"Stats",@"touch.hardware":@"Monitor",@"touch.fullscreen":@"Full Screen",@"touch.controls":@"Controls",@"touch.hide":@"Hide",@"touch.disconnect":@"Disconnect",@"touch.mute":@"Mute",@"touch.volumeLabel":@"100%"};
         NSDictionary* symbols=@{@"touch.capture":@"cursorarrow",@"touch.record":@"record.circle",@"touch.replay":@"arrow.counterclockwise",@"touch.stats":@"chart.xyaxis.line",@"touch.hardware":@"cpu",@"touch.fullscreen":@"arrow.up.left.and.arrow.down.right",@"touch.controls":@"slider.horizontal.3",@"touch.hide":@"eye.slash",@"touch.disconnect":@"power",@"touch.mute":@"speaker.slash.fill",@"touch.volumeLabel":@"speaker.wave.2"};
@@ -227,7 +234,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     [self.touchDashboard refreshCards];
     NSButton* info=self.touchButtons[@"touch.info"];
     NSString* fps=[self.touchDashboard metric:@"Incoming frame rate" fallback:@""];
-    info.title=copy.connection==NativeConnectionState::Connected ? (fps.length ? [@"Live · " stringByAppendingString:fps] : @"Connected") : connectionDescription(copy.connection);
+    info.title=copy.connection==NativeConnectionState::Connected ? (fps.length ? [NSString stringWithFormat:@"%.0f FPS",fps.doubleValue] : @"Connected") : connectionDescription(copy.connection);
     info.image=touchSymbol(copy.connection==NativeConnectionState::Poor || copy.connection==NativeConnectionState::Disconnected ? @"exclamationmark.circle" : @"moon.fill");
     info.toolTip=@"Stream measurements, decoding, local hardware and controllers";
     NSButton* capture=self.touchButtons[@"touch.capture"]; capture.title=copy.captured ? @"Release" : @"Capture";
