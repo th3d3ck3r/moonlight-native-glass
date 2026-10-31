@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.3.4.2U — private Touch Bar audio navigation correction
+
+- Keep Audio and Window pages inside the existing Controls Touch Bar popover instead of opening nested popovers, which can flash back to the main bar on hardware. Add an explicit Back control; preserve the crimson volume slider, white percentage, mute and all existing actions.
+- Keep the selected page through telemetry, recording and volume updates; reopening Controls starts at its main page. Add navigation and repeated volume-adjustment regressions.
+- Enable the existing measured bitrate output in macOS builds and read codec metadata from the actual engine format. Distinguish missing optional measurements from stale snapshots; host encode latency remains unavailable when the host does not supply it. Internal build 46; physical Touch Bar acceptance remains outside CI.
+
 ## 1.3.4.1U — private startup correction
 
 - Fix the build 44 launch trap while initializing Touch Bar preferences: reuse the frontend’s existing preference store and safely retain the normal bar if the engine-hosted view cannot open the shared suite. Existing saved settings and the volume bar are preserved.

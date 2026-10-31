@@ -99,13 +99,28 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 - (NSString*)metric:(NSString*)prefix fallback:(NSString*)fallback {
     // Never present a sample as current once the source stops updating.
     if (NSProcessInfo.processInfo.systemUptime-self.streamUpdated>4) return fallback;
-    for (const auto& row:NativeStreamStats::parse(self.streamText.UTF8String ?: ""))
-        if ([ [NSString stringWithUTF8String:row.label.c_str()] hasPrefix:prefix])
-            return [NSString stringWithUTF8String:row.value.c_str()];
+    for (const auto& row:NativeStreamStats::parse(self.streamText.UTF8String ?: "")) {
+        NSString* label=[NSString stringWithUTF8String:row.label.c_str()];
+        NSString* value=[NSString stringWithUTF8String:row.value.c_str()];
+        if ([label hasPrefix:prefix]) return value;
+        // The engine embeds codec metadata in its Video stream row; it does
+        // not publish a separate Video codec row. Keep the source unchanged.
+        if ([prefix isEqual:@"Video codec"] && [label isEqual:@"Video stream"]) {
+            NSRange start=[value rangeOfString:@"(Codec: " options:NSBackwardsSearch];
+            if (start.location!=NSNotFound && [value hasSuffix:@")"]) {
+                NSUInteger offset=NSMaxRange(start);
+                NSString* codec=[value substringWithRange:NSMakeRange(offset,value.length-offset-1)];
+                if (codec.length) return codec;
+            }
+        }
+    }
     return fallback;
 }
 - (void)refreshCards {
-    NSString* missing=self.streamText.length ? @"Unavailable / stale" : @"Waiting for data";
+    // A missing field in a fresh snapshot is not a stale stream. In particular,
+    // host encode timing is optional and must not masquerade as old telemetry.
+    BOOL stale=self.streamText.length && NSProcessInfo.processInfo.systemUptime-self.streamUpdated>4;
+    NSString* missing=!self.streamText.length ? @"Waiting for data" : stale ? @"Stale" : @"Not reported";
     if (self.inlineMode) {
         NSString* bitrate=[self metric:@"Bitrate" fallback:missing];
         bitrate=[[bitrate componentsSeparatedByString:@","] firstObject];
@@ -148,6 +163,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     }
     NSMutableArray* spoken=[NSMutableArray array];
     for (NSArray* card in self.cards) [spoken addObject:[card componentsJoinedByString:@": "]];
+    if (!self.inlineMode && self.page==1) [spoken addObject:@"Host latency is reported only when supplied by the streaming host; codec identifies the negotiated video format"];
     [self setAccessibilityLabel:[spoken componentsJoinedByString:@"; "]];
     self.needsDisplay=YES;
 }
@@ -298,7 +314,40 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     // Local sampling only; the streaming engine still owns the stats cadence.
     [self.touchDashboard sample]; [self refreshTouchBar];
 }
+// Keep secondary pages inside the one Controls popover. Presenting a second
+// NSPopoverTouchBarItem from its expanded bar can dismiss both on hardware.
+// Change only the existing bar's items: do not replace the owning bar/popover.
+- (NSArray*)touchControlItems {
+    return @[@"touch.audio",@"touch.record",@"touch.replay",@"touch.stats",@"touch.window",@"touch.disconnect"];
+}
+- (NSTouchBar*)touchControlsBar {
+    NSPopoverTouchBarItem* controls=(NSPopoverTouchBarItem*)[self.streamTouchBar itemForIdentifier:@"touch.more"];
+    return controls.popoverTouchBar;
+}
+- (void)touchShowControls:(NSButton*)sender {
+    if (!self.window || self.window.touchBar!=self.streamTouchBar) return;
+    NSPopoverTouchBarItem* controls=(NSPopoverTouchBarItem*)[self.streamTouchBar itemForIdentifier:@"touch.more"];
+    controls.popoverTouchBar.defaultItemIdentifiers=[self touchControlItems];
+    [self refreshTouchBar];
+    [controls showPopover:sender];
+}
+- (void)touchNavigate:(NSButton*)sender {
+    if (!self.window || self.window.touchBar!=self.streamTouchBar || !sender.enabled) return;
+    NSArray* items=[sender.identifier isEqual:@"touch.audio"] ? @[@"touch.back",@"touch.mute",@"touch.volume",@"touch.volumeLabel"] :
+        [sender.identifier isEqual:@"touch.window"] ? @[@"touch.back",@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide"] : [self touchControlItems];
+    [self touchControlsBar].defaultItemIdentifiers=items;
+    [self refreshTouchBar];
+}
 - (NSTouchBarItem*)touchBar:(NSTouchBar*)bar makeItemForIdentifier:(NSTouchBarItemIdentifier)identifier {
+    if (self.touchLiveStats && ((([identifier isEqual:@"touch.audio"] || [identifier isEqual:@"touch.window"]) && bar!=self.streamTouchBar) || [identifier isEqual:@"touch.back"])) {
+        NSCustomTouchBarItem* item=[[[NSCustomTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
+        BOOL back=[identifier isEqual:@"touch.back"],audio=[identifier isEqual:@"touch.audio"];
+        NSButton* button=touchButton(back ? @"" : audio ? @"Audio" : @"Window",back ? @"chevron.left" : audio ? @"speaker.wave.2.fill" : @"display",self,@selector(touchNavigate:),back ? 36 : audio ? 66 : 80);
+        button.identifier=identifier; button.toolTip=back ? @"Back to Touch Bar Controls" : audio ? @"Adjust local playback volume and mute" : @"Stream window actions";
+        [button setAccessibilityLabel:button.toolTip];
+        self.touchButtons[identifier]=button; item.view=button;
+        [self refreshTouchBar]; return item;
+    }
     if ([identifier isEqual:@"touch.info"] || [identifier isEqual:@"touch.audio"] || [identifier isEqual:@"touch.more"] || [identifier isEqual:@"touch.window"]) {
         NSPopoverTouchBarItem* item=[[[NSPopoverTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
         BOOL info=[identifier isEqual:@"touch.info"],audio=[identifier isEqual:@"touch.audio"];
@@ -319,7 +368,8 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
         } else button=touchButton(item.collapsedRepresentationLabel,info ? @"moon.fill" : audio ? @"speaker.wave.2.fill" : window ? @"display" : @"slider.horizontal.3",item,@selector(showPopover:),info ? 116 : (!audio && self.touchLiveStats && !window) ? 98 : window ? 80 : 66);
         button.identifier=identifier; item.collapsedRepresentation=button;
         self.touchButtons[identifier]=button; [self.touchPopovers addObject:item]; item.showsCloseButton=YES;
-        item.popoverTouchBar=[self touchBarWithItems:info ? @[@"touch.detail"] : audio ? @[@"touch.mute",@"touch.volume",@"touch.volumeLabel"] : window ? @[@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide"] : self.touchLiveStats ? @[@"touch.audio",@"touch.record",@"touch.replay",@"touch.stats",@"touch.window",@"touch.disconnect"] : @[@"touch.stats",@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide",@"touch.disconnect"]];
+        item.popoverTouchBar=[self touchBarWithItems:info ? @[@"touch.detail"] : audio ? @[@"touch.mute",@"touch.volume",@"touch.volumeLabel"] : window ? @[@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide"] : self.touchLiveStats ? [self touchControlItems] : @[@"touch.stats",@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide",@"touch.disconnect"]];
+        if (self.touchLiveStats && [identifier isEqual:@"touch.more"]) { button.target=self; button.action=@selector(touchShowControls:); }
         [self refreshTouchBar]; return item;
     }
     if ([identifier isEqual:@"touch.volume"]) {

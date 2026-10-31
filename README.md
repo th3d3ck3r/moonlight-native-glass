@@ -21,7 +21,7 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
-Private development: **1.3.4.1U · Touch Bar startup correction** is in validation. U packages are shared only with the owner; the stable downloads below remain 1.3.2.0.
+Private development: **1.3.4.2U · Touch Bar audio navigation correction** is in validation. U packages are shared only with the owner; the stable downloads below remain 1.3.2.0.
 
 ## 📦 Download
 

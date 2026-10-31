@@ -83,3 +83,9 @@ Physical-bar photos from the owner revealed that standard NSButtonCell rendering
 `TouchBarFrontendTests` renders the host tile and full/narrow action row, checks overflow access and full-width lifecycle with fake callbacks. `TouchBarTests` checks all six detailed pages remain reachable with a visible measurement area and exercises action routing, playback slider, local monitor and cleanup. `TouchBarPresentationTests` replaces only process-local presentation methods and focus getters to verify native ownership without touching CI's actual bar. Physical swipe/touch rendering and Control Strip behavior on the owner's M1 remain hardware acceptance checks.
 
 Touch Bar actions use explicit UI routes, independent of keyboard shortcut enable flags. The former Controls value 11 was outside the handler enum and could do nothing; it now uses the existing controls command 100. Fullscreen command 221 delegates to the unchanged stock fullscreen operation after native controls/input cleanup. Keyboard binding enable flags and shortcut behavior are unchanged. The real production handler is exercised by StreamWindowTests with shortcuts disabled.
+
+### Audio navigation correction · 1.3.4.2U
+
+Controls now keeps Audio and Window as pages of one expanded Touch Bar. Back returns to Controls, and the native close button returns to the main bar. The volume page retains its crimson continuous slider and white percentage; status updates do not reset navigation. The original controls layout retains its direct Audio popover.
+
+The macOS build enables the existing video bitrate measurement output. Codec is read from the engine’s embedded `(Codec: …)` metadata. A field absent from a fresh snapshot says Not reported; Stale means the entire snapshot has stopped refreshing for more than four seconds. Host encode latency requires timing supplied by the host.
