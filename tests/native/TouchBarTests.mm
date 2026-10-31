@@ -40,7 +40,11 @@ static void capture(NSTouchBar* bar,NSString* path,CGFloat available=685) {
     BOOL framesFit=YES;
     for (NSView* view in stack.arrangedSubviews) {
         fprintf(stderr,"Touch item %s (%s): %s budget %.1f\n",view.identifier.UTF8String ?: "unnamed",NSStringFromClass(view.class).UTF8String,NSStringFromRect(view.frame).UTF8String,budget);
-        if (!(view.frame.size.width>20 && NSMaxX(view.frame)<=budget+1)) framesFit=NO;
+        // AppKit constraints place alignment rectangles. NSTextField includes
+        // two pixels of optical padding outside that rectangle in its frame.
+        NSRect alignment=[view alignmentRectForFrame:view.frame];
+        fprintf(stderr,"  alignment: %s\n",NSStringFromRect(alignment).UTF8String);
+        if (!(alignment.size.width>20 && NSMaxX(alignment)<=budget+1)) framesFit=NO;
     }
     NSBitmapImageRep* image=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:image];
     check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Touch Bar item preview export");
