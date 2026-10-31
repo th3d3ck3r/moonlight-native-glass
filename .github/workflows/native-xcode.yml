@@ -11,6 +11,9 @@ on:
       - 'app/streaming/input/**'
       - 'app/streaming/video/ffmpeg.cpp'
       - 'tests/native/TouchBarTelemetryTests.py'
+      - 'tests/native/SettingsPersistenceTests.swift'
+      - 'tests/native/NumericPreferenceEditorTests.py'
+      - 'scripts/run-startup-preview.py'
       - 'tests/native/OverlayTests.mm'
       - 'tests/native/StreamWindowTests.mm'
       - 'tests/native/extract_native_focus_methods.py'
@@ -80,6 +83,8 @@ jobs:
         run: |
           xcodebuild -project MoonlightLG.xcodeproj -scheme 'MoonlightLG Startup Preview' -configuration Preview -destination 'platform=macOS' -derivedDataPath build/xcode-preview build
           test ! -d build/xcode-preview/Build/Products/Preview/MoonlightLG.app/Contents/Helpers
+      - name: Run the built Startup Preview scheme
+        run: python3 scripts/run-startup-preview.py build/xcode-preview/Build/Products/Preview/MoonlightLG.app build/startup-preview-captures
       - name: Test the root project's UI preview scheme
         run: |
           xcodebuild -project MoonlightLG.xcodeproj -scheme 'MoonlightLG UI Preview' -destination 'platform=macOS' -derivedDataPath build/xcode-preview -resultBundlePath build/xcode-preview.xcresult test
@@ -92,6 +97,8 @@ jobs:
         if: always()
         with:
           name: Xcode-Project-UI-Captures
-          path: build/xcode-captures/*
+          path: |
+            build/xcode-captures/*
+            build/startup-preview-captures/*.png
           if-no-files-found: warn
 

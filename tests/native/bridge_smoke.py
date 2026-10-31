@@ -169,6 +169,8 @@ with tempfile.TemporaryDirectory() as root:
         # the ordinary pause/resume path so it cannot probe the local network.
         bridge.send({"command": "settings", "values": {"enableMdns": False}})
         assert bridge.wait("settings")["values"]["enableMdns"] is False
+        bridge.send({"command": "settings", "values": {"bitrateKbps": 62000, "autoAdjustBitrate": True}})
+        assert bridge.wait("settings")["values"]["bitrateKbps"] == 62000, "Explicit bitrate must win over automatic adjustment"
         bridge.p.stdin.write("not json\n"); bridge.p.stdin.flush(); bridge.wait("error")
     finally:
         bridge.close()
@@ -178,12 +180,27 @@ with tempfile.TemporaryDirectory() as root:
         persisted = restarted.wait("settings")["values"]
         assert persisted["configurationWarnings"] == (not before), "Preference did not persist"
         assert (persisted["width"], persisted["height"]) == (2560, 1440), "Resolution did not persist"
+        assert persisted["bitrateKbps"] == 62000 and persisted["autoAdjustBitrate"] is True, "Bitrate/automatic preference did not survive a real helper restart"
+        restarted.send({"command": "settings", "values": {"fps": 90}})
+        adjusted = restarted.wait("settings")["values"]
+        assert adjusted["bitrateKbps"] != 62000, "Automatic bitrate must still follow a deliberate resolution/rate change"
+        restarted.send({"command": "settings", "values": {"autoAdjustBitrate": False, "bitrateKbps": 73000}})
+        assert restarted.wait("settings")["values"]["bitrateKbps"] == 73000
+        restarted.send({"command": "settings", "values": {"fps": 120}})
+        manual = restarted.wait("settings")["values"]
+        assert manual["bitrateKbps"] == 73000, "Manual bandwidth must survive a rate change when automatic adjustment is off"
+        assert manual["configurationWarnings"] == persisted["configurationWarnings"], "Bitrate edits changed unrelated settings"
+        # Queue the final edit immediately before ordered shutdown, without
+        # waiting for its acknowledgment. A fresh real engine must see it.
+        restarted.send({"command": "settings", "values": {"bitrateKbps": 64000}})
     finally:
         restarted.close()
     live = Bridge(root, test_mode=False)
     try:
         live.wait("ready")
-        assert live.wait("settings")["values"]["enableMdns"] is False
+        fresh = live.wait("settings")["values"]
+        assert fresh["enableMdns"] is False
+        assert fresh["bitrateKbps"] == 64000 and fresh["fps"] == 120 and fresh["autoAdjustBitrate"] is False, "Final queued bandwidth edit did not persist in the real engine"
         assert live.wait("hosts")["hosts"] == []
         # Invalid addresses must be rejected before any network operation.
         for address in ["", "bad host", "https://example.invalid", "x" * 254]:

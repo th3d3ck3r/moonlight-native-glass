@@ -213,6 +213,26 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 - (void)dealloc { [_dashboard release]; [super dealloc]; }
 @end
 
+// One item owns the pager and measurements. AppKit cannot drop the dashboard
+// independently when a segmented control's Touch Bar metrics grow on hardware.
+@interface MLTouchInfoPanel : NSView
+@property(nonatomic,retain) MLTouchDashboard* dashboard;
+@property(nonatomic,retain) NSButton* previous;
+@property(nonatomic,retain) NSButton* next;
+@property(nonatomic,retain) NSTextField* pageLabel;
+@end
+@implementation MLTouchInfoPanel
+- (NSSize)intrinsicContentSize { return NSMakeSize(430,30); }
+- (void)setFrameSize:(NSSize)size {
+    [super setFrameSize:size];
+    self.previous.frame=NSMakeRect(0,0,30,30);
+    self.pageLabel.frame=NSMakeRect(34,7,50,17);
+    self.next.frame=NSMakeRect(88,0,30,30);
+    self.dashboard.frame=NSMakeRect(126,0,MAX(1,size.width-126),30);
+}
+- (void)dealloc { [_dashboard release]; [_previous release]; [_next release]; [_pageLabel release]; [super dealloc]; }
+@end
+
 // NSTouchBar owns the actual controls. The same views are rendered by the
 // regression fixture for layout QA on runners without physical Touch Bar hardware.
 // Same optional system-modal AppKit selectors as the frontend. This changes
@@ -228,14 +248,25 @@ static void touchDismissFullWidth(NSTouchBar* bar) {
     SEL hide=NSSelectorFromString(@"dismissSystemModalTouchBar:");
     if ([NSTouchBar respondsToSelector:hide]) ((void(*)(id,SEL,NSTouchBar*))objc_msgSend)(NSTouchBar.class,hide,bar);
 }
-@implementation MLStreamTitlebar (TouchBar)
-- (void)updateTouchPresentation {
+static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     NSUserDefaults* preferences=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass"] autorelease];
     [preferences synchronize];
-    BOOL wanted=[preferences boolForKey:@"touchBarFullWidth"] && self.streamTouchBar && self.window.touchBar==self.streamTouchBar && self.window.visible && self.window.keyWindow && NSApp.active;
+    return !owner.touchInvalidating && [preferences boolForKey:@"touchBarFullWidth"] && owner.streamTouchBar && owner.window.touchBar==owner.streamTouchBar && owner.window.visible && owner.window.keyWindow && NSApp.active;
+}
+@implementation MLStreamTitlebar (TouchBar)
+- (void)updateTouchPresentation {
+    if (self.touchPresentationUpdating) return;
+    BOOL wanted=touchWantsFullWidth(self);
     if (wanted==self.touchFullWidthPresented) return;
-    if (wanted) self.touchFullWidthPresented=touchPresentFullWidth(self.streamTouchBar);
-    else { touchDismissFullWidth(self.streamTouchBar); self.touchFullWidthPresented=NO; }
+    self.touchPresentationUpdating=YES;
+    if (wanted) {
+        self.touchFullWidthPresented=YES;
+        if (!touchPresentFullWidth(self.streamTouchBar)) self.touchFullWidthPresented=NO;
+    } else { self.touchFullWidthPresented=NO; touchDismissFullWidth(self.streamTouchBar); }
+    self.touchPresentationUpdating=NO;
+    // React once to a real focus/preference change emitted during presentation.
+    // An unsupported selector must not cause recursive retries.
+    if (wanted!=touchWantsFullWidth(self)) [self updateTouchPresentation];
 }
 - (void)touchPresentationChanged:(NSNotification*)notification { [self updateTouchPresentation]; }
 
@@ -271,6 +302,7 @@ static void touchDismissFullWidth(NSTouchBar* bar) {
         NSPopoverTouchBarItem* item=[[[NSPopoverTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
         BOOL info=[identifier isEqual:@"touch.info"],audio=[identifier isEqual:@"touch.audio"];
         BOOL window=[identifier isEqual:@"touch.window"];
+        item.visibilityPriority=info ? 1000 : 500;
         item.collapsedRepresentationLabel=info ? @"Live Status" : audio ? @"Audio" : window ? @"Window" : self.touchLiveStats ? @"Controls" : @"More";
         item.collapsedRepresentationImage=touchSymbol(info ? @"moon.fill" : audio ? @"speaker.wave.2.fill" : @"ellipsis.circle");
         NSButton* button;
@@ -286,7 +318,7 @@ static void touchDismissFullWidth(NSTouchBar* bar) {
         } else button=touchButton(item.collapsedRepresentationLabel,info ? @"moon.fill" : audio ? @"speaker.wave.2.fill" : window ? @"display" : @"slider.horizontal.3",item,@selector(showPopover:),info ? 116 : (!audio && self.touchLiveStats && !window) ? 98 : window ? 80 : 66);
         button.identifier=identifier; item.collapsedRepresentation=button;
         self.touchButtons[identifier]=button; [self.touchPopovers addObject:item]; item.showsCloseButton=YES;
-        item.popoverTouchBar=[self touchBarWithItems:info ? @[@"touch.pages",@"touch.dashboard"] : audio ? @[@"touch.mute",@"touch.volume",@"touch.volumeLabel"] : window ? @[@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide"] : self.touchLiveStats ? @[@"touch.audio",@"touch.record",@"touch.replay",@"touch.stats",@"touch.window",@"touch.disconnect"] : @[@"touch.stats",@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide",@"touch.disconnect"]];
+        item.popoverTouchBar=[self touchBarWithItems:info ? @[@"touch.detail"] : audio ? @[@"touch.mute",@"touch.volume",@"touch.volumeLabel"] : window ? @[@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide"] : self.touchLiveStats ? @[@"touch.audio",@"touch.record",@"touch.replay",@"touch.stats",@"touch.window",@"touch.disconnect"] : @[@"touch.stats",@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide",@"touch.disconnect"]];
         [self refreshTouchBar]; return item;
     }
     if ([identifier isEqual:@"touch.volume"]) {
@@ -308,24 +340,42 @@ static void touchDismissFullWidth(NSTouchBar* bar) {
         [label setAccessibilityLabel:@"Playback volume percentage"];
         self.touchVolumeText=label; item.view=label;
     }
-    else if ([identifier isEqual:@"touch.dashboard"]) item.view=self.touchDashboard;
-    else if ([identifier isEqual:@"touch.pages"]) {
-        NSSegmentedControl* pages=[NSSegmentedControl segmentedControlWithLabels:@[@"Live",@"Video",@"Time",@"Drops",@"Mac",@"I/O"] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(touchPage:)];
-        pages.font=[NSFont systemFontOfSize:10.5 weight:NSFontWeightMedium];
-        pages.selectedSegmentBezelColor=touchAccent();
-        pages.selectedSegment=self.touchDashboard.page; pages.segmentStyle=NSSegmentStyleRounded;
-        NSLayoutConstraint* constraint=[pages.widthAnchor constraintEqualToConstant:234];
-        constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES; self.touchPages=pages; item.view=pages;
+    else if ([identifier isEqual:@"touch.detail"]) {
+        MLTouchInfoPanel* panel=[[[MLTouchInfoPanel alloc] initWithFrame:NSMakeRect(0,0,430,30)] autorelease];
+        panel.identifier=identifier; panel.dashboard=self.touchDashboard;
+        // This dashboard is manually laid out inside a single Touch Bar item.
+        // Its standalone minimum-width constraint must not compete with its parent.
+        for (NSLayoutConstraint* constraint in self.touchDashboard.constraints)
+            if ([constraint.identifier isEqual:@"MoonlightLG.TouchWidth"]) constraint.active=NO;
+        panel.previous=touchButton(@"",@"chevron.left",self,@selector(touchPage:),30);
+        panel.next=touchButton(@"",@"chevron.right",self,@selector(touchPage:),30);
+        panel.previous.identifier=@"touch.page.previous"; panel.next.identifier=@"touch.page.next";
+        panel.previous.toolTip=@"Previous statistics page"; panel.next.toolTip=@"Next statistics page";
+        self.touchButtons[panel.previous.identifier]=panel.previous; self.touchButtons[panel.next.identifier]=panel.next;
+        panel.pageLabel=[NSTextField labelWithString:@"Live"];
+        panel.pageLabel.font=[NSFont systemFontOfSize:11 weight:NSFontWeightSemibold];
+        panel.pageLabel.textColor=NSColor.whiteColor; panel.pageLabel.alignment=NSTextAlignmentCenter;
+        self.touchPageLabel=panel.pageLabel;
+        for (NSView* child in @[panel.previous,panel.pageLabel,panel.next,panel.dashboard]) [panel addSubview:child];
+        NSLayoutConstraint* width=[panel.widthAnchor constraintGreaterThanOrEqualToConstant:430];
+        width.identifier=@"MoonlightLG.TouchWidth"; width.active=YES;
+        [panel.heightAnchor constraintEqualToConstant:30].active=YES;
+        [panel setContentHuggingPriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+        item.visibilityPriority=1000; item.view=panel; [panel setFrameSize:NSMakeSize(430,30)];
     } else {
         NSDictionary* titles=@{@"touch.capture":@"Capture",@"touch.record":@"Record",@"touch.replay":@"Replay",@"touch.stats":@"Stats",@"touch.hardware":@"Monitor",@"touch.fullscreen":@"Full Screen",@"touch.controls":@"Controls",@"touch.hide":@"Hide",@"touch.disconnect":@"Disconnect",@"touch.mute":@"Mute",@"touch.volumeLabel":@"100%"};
         NSDictionary* symbols=@{@"touch.capture":@"cursorarrow",@"touch.record":@"record.circle",@"touch.replay":@"arrow.counterclockwise",@"touch.stats":@"chart.xyaxis.line",@"touch.hardware":@"cpu",@"touch.fullscreen":@"arrow.up.left.and.arrow.down.right",@"touch.controls":@"slider.horizontal.3",@"touch.hide":@"eye.slash",@"touch.disconnect":@"power",@"touch.mute":@"speaker.slash.fill",@"touch.volumeLabel":@"speaker.wave.2"};
-        CGFloat width=[identifier isEqual:@"touch.capture"] ? 84 : [identifier isEqual:@"touch.stats"] ? 90 : [identifier isEqual:@"touch.controls"] ? 94 : [identifier isEqual:@"touch.record"] ? 98 : [identifier isEqual:@"touch.disconnect"] ? 100 : [identifier isEqual:@"touch.fullscreen"] ? 100 : 74;
+        CGFloat width=[identifier isEqual:@"touch.capture"] || [identifier isEqual:@"touch.hardware"] ? 84 : [identifier isEqual:@"touch.stats"] ? 90 : [identifier isEqual:@"touch.controls"] ? 94 : [identifier isEqual:@"touch.record"] ? 98 : [identifier isEqual:@"touch.disconnect"] ? 100 : [identifier isEqual:@"touch.fullscreen"] ? 100 : 74;
         NSButton* button=touchButton(titles[identifier] ?: identifier,symbols[identifier] ?: @"circle",self,@selector(touchAction:),width);
         button.identifier=identifier; self.touchButtons[identifier]=button; item.view=button;
     }
     [self refreshTouchBar]; return item;
 }
-- (void)touchPage:(NSSegmentedControl*)sender { self.touchDashboard.page=sender.selectedSegment; [self.touchDashboard refreshCards]; }
+- (void)touchPage:(NSButton*)sender {
+    if (!self.window || self.window.touchBar!=self.streamTouchBar) return;
+    self.touchDashboard.page=(self.touchDashboard.page+([sender.identifier isEqual:@"touch.page.previous"] ? 5 : 1))%6;
+    [self refreshTouchBar];
+}
 - (void)touchVolume:(NSSliderTouchBarItem*)sender {
     if (!self.window || self.window.touchBar!=self.streamTouchBar) return;
     nativePlaybackSetVolume(sender.slider.floatValue);
@@ -389,7 +439,9 @@ static void touchDismissFullWidth(NSTouchBar* bar) {
     self.touchButtons[@"touch.hardware"].title=self.hardware ? @"Hide Mac" : @"Monitor";
     self.touchButtons[@"touch.mute"].title=copy.muted ? @"Unmute" : @"Mute";
     self.touchVolumeText.stringValue=[NSString stringWithFormat:@"%.0f%%",nativePlaybackVolume()*100];
-    self.touchPages.selectedSegmentBezelColor=touchAccent();
+    NSArray* pageNames=@[@"Live",@"Video",@"Time",@"Drops",@"Mac",@"I/O"];
+    self.touchPageLabel.stringValue=pageNames[MIN(5,MAX(0,self.touchDashboard.page))];
+    [self.touchPageLabel setAccessibilityLabel:[NSString stringWithFormat:@"Statistics page %ld of 6: %@",(long)self.touchDashboard.page+1,self.touchPageLabel.stringValue]];
     if (self.touchVolume) { self.touchVolume.slider.doubleValue=nativePlaybackVolume(); self.touchVolume.slider.trackFillColor=touchAccent(); }
     for (NSString* key in self.touchButtons) {
         NSButton* button=self.touchButtons[key];
@@ -399,12 +451,13 @@ static void touchDismissFullWidth(NSTouchBar* bar) {
     if (self.touchLiveStats) [info setAccessibilityLabel:[self.touchInlineDashboard.accessibilityLabel stringByAppendingString:@"; tap for more stream information"]];
 }
 - (void)invalidateTouchBar {
-    if (self.touchFullWidthPresented) { touchDismissFullWidth(self.streamTouchBar); self.touchFullWidthPresented=NO; }
+    self.touchInvalidating=YES;
+    if (self.touchFullWidthPresented) { self.touchFullWidthPresented=NO; touchDismissFullWidth(self.streamTouchBar); }
     [self.touchTimer invalidate]; self.touchTimer=nil; self.touchDashboard.active=NO; self.touchInlineDashboard.active=NO;
     for (NSPopoverTouchBarItem* item in self.touchPopovers) { [item dismissPopover:nil]; item.popoverTouchBar.delegate=nil; }
     for (NSButton* button in self.touchButtons.allValues) { button.target=nil; button.action=NULL; }
     self.touchVolume.target=nil; self.touchVolume.action=NULL;
-    self.touchPages.target=nil; self.touchPages.action=NULL; self.touchPages=nil;
+    self.touchPageLabel=nil;
     if (self.window.touchBar==self.streamTouchBar) self.window.touchBar=self.previousTouchBar;
     self.streamTouchBar.delegate=nil; self.streamTouchBar=nil; self.previousTouchBar=nil;
     self.touchButtons=nil; self.touchPopovers=nil; self.touchDashboard=nil; self.touchInlineDashboard=nil; self.touchVolume=nil; self.touchVolumeText=nil;

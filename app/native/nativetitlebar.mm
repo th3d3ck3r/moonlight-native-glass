@@ -161,8 +161,10 @@ static NSString* powerDescription(SDL_JoystickPowerLevel level) {
 @property(nonatomic,retain) MLTouchDashboard* touchInlineDashboard;
 @property(nonatomic,assign) BOOL touchLiveStats;
 @property(nonatomic,assign) BOOL touchFullWidthPresented;
+@property(nonatomic,assign) BOOL touchPresentationUpdating;
+@property(nonatomic,assign) BOOL touchInvalidating;
 @property(nonatomic,retain) NSSliderTouchBarItem* touchVolume;
-@property(nonatomic,retain) NSSegmentedControl* touchPages;
+@property(nonatomic,retain) NSTextField* touchPageLabel;
 @property(nonatomic,retain) NSTextField* touchVolumeText;
 @property(nonatomic,retain) NSTimer* touchTimer;
 - (void)requestInputRepair;

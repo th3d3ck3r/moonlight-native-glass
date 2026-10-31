@@ -402,6 +402,11 @@ enum NativeTouchBarPresentation {
     static let backupKey = "touchBarPresentationBackup"
     static let applications = ["com.moonlight-stream.NativeGlass", "com.moonlight-stream.NativeGlass.Engine"]
     static let agentDomain = "com.apple.touchbar.agent"
+    static let sharedPreferences = UserDefaults(suiteName: applications[0])!
+    static func enabled(in preferences: UserDefaults = sharedPreferences) -> Bool {
+        preferences.synchronize()
+        return supported && preferences.bool(forKey: key)
+    }
     static let changed = Notification.Name("com.moonlight-stream.NativeGlass.touchBarPresentationChanged")
     private static let showSelector = NSSelectorFromString("presentSystemModalTouchBar:placement:systemTrayItemIdentifier:")
     private static let hideSelector = NSSelectorFromString("dismissSystemModalTouchBar:")
@@ -420,6 +425,7 @@ enum NativeTouchBarPresentation {
     }
     final class Session {
         private(set) var presented: NSTouchBar?
+        private var revision = 0
         let show: (NSTouchBar) -> Bool
         let hide: (NSTouchBar) -> Void
         init(show: @escaping (NSTouchBar) -> Bool = NativeTouchBarPresentation.present,
@@ -429,8 +435,14 @@ enum NativeTouchBarPresentation {
         func update(_ bar: NSTouchBar?, enabled: Bool, eligible: Bool) {
             let next = enabled && eligible ? bar : nil
             guard presented !== next else { return }
-            if let old = presented { hide(old); presented = nil }
-            if let next, show(next) { presented = next }
+            revision += 1; let current = revision
+            let old = presented; presented = nil
+            if let old { hide(old); if revision != current { return } }
+            if let next {
+                presented = next // AppKit can synchronously send focus notifications.
+                let accepted = show(next)
+                if revision == current && !accepted { presented = nil }
+            }
         }
         deinit { if let presented { hide(presented) } }
     }
@@ -456,7 +468,12 @@ enum NativeTouchBarPresentation {
     static func apply(_ enabled: Bool, preferences: UserDefaults = .standard,
                       agent: UserDefaults? = UserDefaults(suiteName: agentDomain), reapply: Bool = false,
                       available: Bool = supported) -> Bool {
-        guard restoreLegacy(preferences: preferences, agent: agent), !enabled || available else { return false }
+        if enabled && !available {
+            preferences.set(false, forKey: key); preferences.synchronize()
+            NotificationCenter.default.post(name: changed, object: nil)
+            return false
+        }
+        guard restoreLegacy(preferences: preferences, agent: agent) else { return false }
         preferences.set(enabled, forKey: key); preferences.synchronize()
         NotificationCenter.default.post(name: changed, object: nil)
         DistributedNotificationCenter.default().postNotificationName(changed, object: nil, userInfo: nil, deliverImmediately: true)
@@ -468,6 +485,12 @@ enum NativeTouchBarPresentation {
 // nonblocking event handling used by Apollo; only presentation is custom.
 final class NativeTouchBarButton: ConnectionActionButton {
     var statusOnly = false
+    private var pressOrigin = NSPoint.zero
+    override func mouseDown(with event: NSEvent) { pressOrigin = event.locationInWindow; super.mouseDown(with: event) }
+    override func mouseDragged(with event: NSEvent) {
+        if hypot(event.locationInWindow.x - pressOrigin.x, event.locationInWindow.y - pressOrigin.y) > 5 { cancelPress() }
+        super.mouseDragged(with: event)
+    }
     override var isFlipped: Bool { true }
     override var intrinsicContentSize: NSSize { NSSize(width: 70, height: 30) }
     var labelRects: [NSRect] {
@@ -501,6 +524,71 @@ final class NativeTouchBarButton: ConnectionActionButton {
     }
 }
 
+// A single Touch Bar item preserves composition. Keep host status pinned and
+// allow the remaining controls to scroll when the system supplies less width.
+final class NativeTouchBarRow: NSView {
+    let scroll = NSScrollView()
+    let document = NSView()
+    let more = NativeTouchBarButton(title: "", target: nil, action: nil)
+    var status: NSButton?
+    var statusWidth: CGFloat = 0
+    var controls: [(NSButton, CGFloat)] = []
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: statusWidth + (status == nil ? 0 : 6) + document.frame.width, height: 30)
+    }
+    init(buttons: [(NSButton, CGFloat)], pinnedStatus: Bool) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 640, height: 30))
+        identifier = .init("TouchBarCommandRow")
+        scroll.drawsBackground = false; scroll.borderType = .noBorder
+        scroll.hasVerticalScroller = false; scroll.hasHorizontalScroller = false
+        scroll.horizontalScrollElasticity = .allowed; scroll.verticalScrollElasticity = .none
+        scroll.documentView = document; addSubview(scroll)
+        more.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)
+        more.bezelColor = NSColor(srgbRed: 0.12, green: 0.035, blue: 0.055, alpha: 1)
+        more.contentTintColor = NSColor(srgbRed: 0.95, green: 0.19, blue: 0.32, alpha: 1)
+        more.target = self; more.action = #selector(scrollMore)
+        more.setAccessibilityLabel("Scroll to more Touch Bar controls; tap again at the end to return")
+        more.toolTip = "Swipe controls or tap for more"; addSubview(more)
+        var remaining = buttons
+        if pinnedStatus, let first = remaining.first {
+            status = first.0; statusWidth = first.1; first.0.frame = NSRect(x: 0, y: 0, width: first.1, height: 30)
+            addSubview(first.0); remaining.removeFirst()
+        }
+        controls = remaining
+        var x: CGFloat = 0
+        for (button, width) in remaining {
+            button.frame = NSRect(x: x, y: 0, width: width, height: 30)
+            document.addSubview(button); x += width + 6
+        }
+        document.frame = NSRect(x: 0, y: 0, width: max(0, x - 6), height: 30)
+        heightAnchor.constraint(equalToConstant: 30).isActive = true
+        widthAnchor.constraint(greaterThanOrEqualToConstant: 320).isActive = true
+        setContentHuggingPriority(.defaultLow, for: .horizontal)
+        setFrameSize(frame.size)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func setFrameSize(_ size: NSSize) {
+        super.setFrameSize(size)
+        let pinned = status == nil ? 0 : min(statusWidth, max(100, size.width * 0.4))
+        if let status { status.frame = NSRect(x: 0, y: 0, width: pinned, height: 30) }
+        let start = pinned + (status == nil ? 0 : 6)
+        let available = max(0, size.width - start)
+        let overflow = document.frame.width > available
+        more.isHidden = !overflow
+        more.frame = NSRect(x: max(start, size.width - 30), y: 0, width: 30, height: 30)
+        scroll.frame = NSRect(x: start, y: 0, width: max(0, available - (overflow ? 34 : 0)), height: 30)
+        let limit = max(0, document.frame.width - scroll.contentView.bounds.width)
+        scroll.contentView.scroll(to: NSPoint(x: min(limit, scroll.contentView.bounds.origin.x), y: 0))
+        scroll.reflectScrolledClipView(scroll.contentView)
+    }
+    @objc func scrollMore() {
+        let clip = scroll.contentView
+        let end = max(0, document.frame.width - clip.bounds.width)
+        let next = clip.bounds.origin.x >= end - 1 ? 0 : min(end, clip.bounds.origin.x + max(100, clip.bounds.width * 0.75))
+        clip.scroll(to: NSPoint(x: next, y: 0)); scroll.reflectScrolledClipView(clip)
+    }
+}
+
 struct NativeTouchBarAccessory: NSViewRepresentable {
     var commands: [NativeTouchBarCommand]
     var crimson = true
@@ -517,9 +605,12 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         var buttons: [String: NSButton] = [:]
         let presentation = NativeTouchBarPresentation.Session()
         var observers: [NSObjectProtocol] = []
+        var distributedObserver: NSObjectProtocol?
+        var detaching = false
+        var row: NativeTouchBarRow?
         func refreshPresentation() {
-            let eligible = window?.isKeyWindow == true && window?.isVisible == true && NSApp.isActive && window?.touchBar === bar
-            presentation.update(bar, enabled: !CommandLine.arguments.contains("--design-preview") && UserDefaults.standard.bool(forKey: NativeTouchBarPresentation.key), eligible: eligible)
+            let eligible = !detaching && window?.isKeyWindow == true && window?.isVisible == true && NSApp.isActive && window?.touchBar === bar
+            presentation.update(bar, enabled: !CommandLine.arguments.contains("--design-preview") && NativeTouchBarPresentation.enabled(), eligible: eligible)
         }
         func attach(_ next: NSWindow?) {
             if window === next, bar != nil { return }
@@ -527,7 +618,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             guard let next, !commands.isEmpty else { return }
             window = next; previous = next.touchBar
             let bar = NSTouchBar(); bar.delegate = self
-            bar.defaultItemIdentifiers = commands.map { NSTouchBarItem.Identifier($0.id) }
+            bar.defaultItemIdentifiers = [.init("native.commandRow")]
             self.bar = bar; next.touchBar = bar
             for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
                          NSWindow.didMiniaturizeNotification, NSApplication.didBecomeActiveNotification,
@@ -535,16 +626,19 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
                 observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.refreshPresentation() })
             }
             observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: next, queue: .main) { [weak self] _ in
-                self?.presentation.update(nil, enabled: false, eligible: false)
+                self?.detach()
             })
+            distributedObserver = DistributedNotificationCenter.default().addObserver(forName: NativeTouchBarPresentation.changed, object: nil, queue: .main) { [weak self] _ in self?.refreshPresentation() }
             refreshPresentation()
         }
         func detach() {
+            detaching = true
             presentation.update(nil, enabled: false, eligible: false)
+            if let distributedObserver { DistributedNotificationCenter.default().removeObserver(distributedObserver) }; distributedObserver = nil
             for observer in observers { NotificationCenter.default.removeObserver(observer) }; observers.removeAll()
             if let window, window.touchBar === bar { window.touchBar = previous }
             for button in buttons.values { button.target = nil; button.action = nil }
-            buttons.removeAll(); bar?.delegate = nil; bar = nil; previous = nil; window = nil
+            buttons.removeAll(); row = nil; bar?.delegate = nil; bar = nil; previous = nil; window = nil; detaching = false
         }
         func update(_ commands: [NativeTouchBarCommand], crimson: Bool) {
             let identifiersChanged = self.commands.map(\.id) != commands.map(\.id)
@@ -567,15 +661,21 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             button.needsDisplay = true
         }
         func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
-            guard let command = commands.first(where: { $0.id == identifier.rawValue }) else { return nil }
+            guard identifier.rawValue == "native.commandRow" else { return nil }
             let item = NSCustomTouchBarItem(identifier: identifier)
-            let button = NativeTouchBarButton(title: command.title, target: self, action: #selector(press(_:)))
-            button.identifier = NSUserInterfaceItemIdentifier(command.id)
-            button.widthAnchor.constraint(equalToConstant: command.width).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 30).isActive = true
-            style(button, command); buttons[command.id] = button; item.view = button
+            var views: [(NSButton, CGFloat)] = []
+            for command in commands {
+                let button = NativeTouchBarButton(title: command.title, target: self, action: #selector(press(_:)))
+                button.identifier = NSUserInterfaceItemIdentifier(command.id)
+                button.widthAnchor.constraint(equalToConstant: command.width).isActive = true
+                button.heightAnchor.constraint(equalToConstant: 30).isActive = true
+                style(button, command); buttons[command.id] = button; views.append((button, command.width))
+            }
+            let row = NativeTouchBarRow(buttons: views, pinnedStatus: commands.first?.action == nil)
+            self.row = row; item.view = row
             return item
         }
+
         @objc func press(_ sender: NSButton) {
             guard sender.isEnabled, let window, window.touchBar === bar,
                   let command = commands.first(where: { $0.id == sender.identifier?.rawValue }), command.enabled else { return }
@@ -597,6 +697,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
 // so connection actions do not depend on SwiftUI gesture dispatch in that loop.
 class ConnectionActionButton: NSButton {
     private var mousePressed = false
+    func cancelPress() { mousePressed = false; highlight(false) }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
     // NSButton's default mouseDown runs an NSCell tracking loop until mouse-up.

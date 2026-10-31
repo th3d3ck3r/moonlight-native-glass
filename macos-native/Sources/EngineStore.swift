@@ -545,7 +545,14 @@ struct PairingRequest: Identifiable {
         clearMenuRequests()
         connectionDeadline?.cancel(); connectionJourney = nil
         shuttingDown = true; hostDeadline?.cancel(); launchDeadline?.cancel(); pendingStream = nil
-        channel?.stop(); stream?.stop()
+        // Preserve FIFO ordering: a valid settings edit may already be in the
+        // helper's stdin when Quit arrives. SIGTERM could discard it before Qt
+        // reads/saves it. Close discovery only after its queued requests drain.
+        if let channel, !channel.stopRequested {
+            do { try channel.stopGracefully(["command": "shutdown"]) }
+            catch { channel.stop() }
+        }
+        stream?.stop()
     }
 }
 

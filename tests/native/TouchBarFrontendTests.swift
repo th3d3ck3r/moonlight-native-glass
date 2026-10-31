@@ -15,8 +15,8 @@ import SwiftUI
         owner.update([disabled], crimson: true); owner.attach(window)
         let bar = window.touchBar!
         precondition(bar !== previous)
-        let item = bar.item(forIdentifier: NSTouchBarItem.Identifier("apollo.continue")) as! NSCustomTouchBarItem
-        let button = item.view as! NSButton
+        _ = bar.item(forIdentifier: .init("native.commandRow"))
+        let button = owner.buttons["apollo.continue"]!
         button.performClick(nil); precondition(presses == 0 && !button.isEnabled)
         var connected = disabled; connected.enabled = true
         owner.update([connected], crimson: true)
@@ -33,9 +33,9 @@ import SwiftUI
         }, crimson: true)
         let folder = URL(fileURLWithPath: "build/touchbar-previews")
         try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        _ = window.touchBar!.item(forIdentifier: .init("native.commandRow"))
         for command in owner.commands {
-            let item = window.touchBar!.item(forIdentifier: .init(command.id)) as! NSCustomTouchBarItem
-            let view = item.view as! NativeTouchBarButton
+            let view = owner.buttons[command.id] as! NativeTouchBarButton
             view.frame = NSRect(x: 0, y: 0, width: command.width, height: 30)
             precondition(view.labelRects.allSatisfy { view.bounds.contains($0) }, "All status lines must fit inside the physical bar height")
             if !command.title.contains("\n") {
@@ -45,6 +45,21 @@ import SwiftUI
             let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
             view.cacheDisplay(in: view.bounds, to: bitmap)
             try! bitmap.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent("touchbar-\(command.id).png"))
+        }
+        let row = owner.row!
+        for width in [CGFloat(685), 400, 1085] {
+            row.frame = NSRect(x: 0, y: 0, width: width, height: 30)
+            let bitmap = row.bitmapImageRepForCachingDisplay(in: row.bounds)!
+            row.cacheDisplay(in: row.bounds, to: bitmap)
+            try! bitmap.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent("touchbar-library-row-\(Int(width)).png"))
+            precondition(row.status!.frame.maxY <= 30 && row.scroll.frame.maxX <= width, "Pinned host and scroll viewport fit real bar bounds")
+            if width == 400 {
+                precondition(!row.more.isHidden, "Narrow layouts must expose scrollable controls")
+                row.scrollMore()
+                precondition(row.scroll.contentView.bounds.origin.x > 0, "More control must reveal offscreen actions")
+                row.scrollMore(); row.scrollMore()
+            }
+            if width == 1085 { precondition(row.more.isHidden && row.status!.frame.width == 178, "Full width restores the balanced host width") }
         }
         owner.detach(); precondition(window.touchBar === previous)
         button.performClick(nil); precondition(presses == 1, "Detached controls must not invoke an old connection")
@@ -91,6 +106,24 @@ import SwiftUI
         let unavailable = NativeTouchBarPresentation.Session(show: { _ in false }, hide: { _ in preconditionFailure("Never dismiss an unowned bar") })
         unavailable.update(bar, enabled: true, eligible: true); precondition(unavailable.presented == nil)
         unavailable.update(nil, enabled: false, eligible: false)
+        // AppKit may synchronously emit notifications inside presentation.
+        var reentrant: NativeTouchBarPresentation.Session!
+        var showCount = 0, hideCount = 0
+        reentrant = NativeTouchBarPresentation.Session(show: { value in
+            showCount += 1; reentrant.update(value, enabled: true, eligible: true); return true
+        }, hide: { _ in hideCount += 1; reentrant.update(nil, enabled: false, eligible: false) })
+        reentrant.update(bar, enabled: true, eligible: true)
+        reentrant.update(nil, enabled: false, eligible: false)
+        precondition(showCount == 1 && hideCount == 1 && reentrant.presented == nil)
+        var interrupted: NativeTouchBarPresentation.Session!
+        interrupted = NativeTouchBarPresentation.Session(show: { value in
+            interrupted.update(nil, enabled: false, eligible: false); return true
+        }, hide: { _ in })
+        interrupted.update(bar, enabled: true, eligible: true)
+        precondition(interrupted.presented == nil, "Focus loss during show must not leave stale ownership")
+        prefs.set(true, forKey: NativeTouchBarPresentation.key)
+        precondition(!NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, available: false))
+        precondition(!prefs.bool(forKey: NativeTouchBarPresentation.key), "Unsupported persisted ON must be cleared")
         window.close()
         print("PASS: frontend Touch Bar actions, physical layout, full-width focus lifetime, unsupported fallback and legacy preference recovery")
     }

@@ -24,6 +24,9 @@ jobs:
           mkdir -p build
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeConnectionView.swift tests/native/TouchBarFrontendTests.swift -o build/touchbar-frontend-tests
           build/touchbar-frontend-tests
+          python3 tests/native/NumericPreferenceEditorTests.py
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/SettingsPersistenceTests.swift -o build/settings-persistence-tests
+          build/settings-persistence-tests
       - name: Test stream Touch Bar routing, state, layout and lifetime
         run: |
           python3 setup-deps.py
@@ -32,6 +35,11 @@ jobs:
             -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/touchbar-tests
           build/touchbar-tests build/touchbar-previews
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
+            app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/TouchBarPresentationTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/touchbar-presentation-tests
+          build/touchbar-presentation-tests
       - uses: actions/upload-artifact@v6
         if: always()
         with:

@@ -182,8 +182,10 @@ struct NativeSettingsView: View {
         } else {
             let bounds = range(field.id)
             LabeledContent(label(field.id)) {
-                TextField("Value", value: Binding(get: { (store.values[field.id] as? NSNumber)?.intValue ?? bounds.lowerBound }, set: { value in if bounds.contains(value) { store.set(field.id, value) } }), format: .number.grouping(.never))
-                    .labelsHidden().textFieldStyle(.roundedBorder).frame(width: 100).multilineTextAlignment(.trailing)
+                NativeIntegerPreferenceEditor(value: (store.values[field.id] as? NSNumber)?.intValue ?? bounds.lowerBound,
+                                              bounds: bounds, label: label(field.id), identifier: "setting-" + field.id) {
+                    store.set(field.id, $0)
+                }.frame(width: 100)
             }
         }
     }
@@ -203,6 +205,61 @@ struct NativeSettingsView: View {
             "WM_FULLSCREEN": "Full Screen", "WM_FULLSCREEN_DESKTOP": "Borderless Full Screen", "WM_WINDOWED": "Windowed",
             "AC_STEREO": "Stereo", "AC_51_SURROUND": "5.1 Surround", "AC_71_SURROUND": "7.1 Surround", "CSK_OFF": "Never", "CSK_FULLSCREEN": "Full Screen Only", "CSK_ALWAYS": "Always"]
         return labels[key] ?? key
+    }
+}
+
+// A formatted SwiftUI value TextField may defer its binding write until Return
+// or focus loss. Send each valid edit from AppKit's editing notification instead,
+// so quitting while the bitrate field still has focus cannot discard the edit.
+// Keep incomplete/out-of-range drafts local; asynchronous engine acknowledgments
+// must not replace the text/caret while the user is typing.
+struct NativeIntegerPreferenceEditor: NSViewRepresentable {
+    var value: Int
+    var bounds: ClosedRange<Int>
+    var label: String
+    var identifier: String
+    var changed: (Int) -> Void
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var value: Int
+        var bounds: ClosedRange<Int>
+        var changed: (Int) -> Void
+        var submitted: Int
+        init(_ owner: NativeIntegerPreferenceEditor) {
+            value = owner.value; submitted = owner.value; bounds = owner.bounds; changed = owner.changed
+        }
+        private func submit(_ field: NSTextField, finishing: Bool) {
+            if let number = Int(field.stringValue), bounds.contains(number) {
+                if number != submitted { submitted = number; changed(number) }
+            } else if finishing { field.stringValue = String(submitted) }
+        }
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            submit(field, finishing: false)
+        }
+        func controlTextDidEndEditing(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            submit(field, finishing: true)
+        }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: String(value))
+        field.isEditable = true; field.isSelectable = true; field.isBezeled = true
+        field.bezelStyle = .roundedBezel; field.alignment = .right
+        field.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+        field.delegate = context.coordinator
+        return field
+    }
+    func updateNSView(_ field: NSTextField, context: Context) {
+        let owner = context.coordinator
+        owner.value = value; owner.bounds = bounds; owner.changed = changed
+        if field.currentEditor() == nil { field.stringValue = String(value); owner.submitted = value }
+        field.setAccessibilityLabel(label); field.setAccessibilityIdentifier(identifier)
+        field.toolTip = "\(label) · \(bounds.lowerBound)…\(bounds.upperBound). Valid changes save while typing."
+    }
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSTextField, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 100, height: max(22, nsView.fittingSize.height))
     }
 }
 
