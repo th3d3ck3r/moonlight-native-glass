@@ -1,0 +1,30 @@
+name: Touch Bar Layout Probe
+on:
+  push:
+    branches: [feature/touchbar-layout-probe]
+permissions:
+  contents: read
+jobs:
+  layout:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - name: Exercise real Touch Bar controls and export their views
+        run: |
+          mkdir -p build
+          python3 setup-deps.py
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
+            app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/TouchBarTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/touchbar-tests
+          build/touchbar-tests build/touchbar-previews
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: Touch-Bar-Layout-Probe
+          path: build/touchbar-previews/*.png
+          if-no-files-found: warn

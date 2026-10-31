@@ -25,6 +25,7 @@ static void capture(NSTouchBar* bar,NSString* path,CGFloat available=685) {
         else if ([item isKindOfClass:NSSliderTouchBarItem.class]) view=((NSSliderTouchBarItem*)item).slider;
         else if ([item isKindOfClass:NSCustomTouchBarItem.class]) view=((NSCustomTouchBarItem*)item).view;
         check(view!=nil,"Every declared Touch Bar item must resolve on a Mac without hardware");
+        view.translatesAutoresizingMaskIntoConstraints=NO;
         [stack addArrangedSubview:view];
         if ([identifier isEqual:@"touch.dashboard"] || [identifier isEqual:@"touch.volume"]) flexible=YES;
         for (NSLayoutConstraint* constraint in view.constraints) if ([constraint.identifier isEqual:@"MoonlightLG.TouchWidth"] && constraint.firstAttribute==NSLayoutAttributeWidth && constraint.secondItem==nil && (constraint.relation==NSLayoutRelationEqual || constraint.relation==NSLayoutRelationGreaterThanOrEqual)) requested+=constraint.constant;
@@ -36,9 +37,14 @@ static void capture(NSTouchBar* bar,NSString* path,CGFloat available=685) {
     check(bar.escapeKeyReplacementItemIdentifier==nil,"Preserve the system Escape behavior");
     stack.frame=NSMakeRect(8,12,flexible ? budget : requested,30);
     [root layoutSubtreeIfNeeded];
-    for (NSView* view in stack.arrangedSubviews) check(view.frame.size.width>20 && NSMaxX(view.frame)<=budget+1,"Touch Bar item clipped or collapsed");
+    BOOL framesFit=YES;
+    for (NSView* view in stack.arrangedSubviews) {
+        fprintf(stderr,"Touch item %s (%s): %s budget %.1f\n",view.identifier.UTF8String ?: "unnamed",NSStringFromClass(view.class).UTF8String,NSStringFromRect(view.frame).UTF8String,budget);
+        if (!(view.frame.size.width>20 && NSMaxX(view.frame)<=budget+1)) framesFit=NO;
+    }
     NSBitmapImageRep* image=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:image];
     check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Touch Bar item preview export");
+    check(framesFit,"Touch Bar item clipped or collapsed");
     for (NSView* view in [[stack.arrangedSubviews copy] autorelease]) { [stack removeArrangedSubview:view]; [view removeFromSuperview]; }
 }
 int main(int argc,char** argv) { @autoreleasepool {
