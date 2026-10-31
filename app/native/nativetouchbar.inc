@@ -191,7 +191,16 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         self.touchVolume=item; return item;
     }
     NSCustomTouchBarItem* item=[[[NSCustomTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
-    if ([identifier isEqual:@"touch.dashboard"]) item.view=self.touchDashboard;
+    if ([identifier isEqual:@"touch.volumeLabel"]) {
+        NSTextField* label=[NSTextField labelWithString:@"100%"];
+        label.font=[NSFont monospacedDigitSystemFontOfSize:13 weight:NSFontWeightSemibold];
+        label.textColor=NSColor.whiteColor; label.alignment=NSTextAlignmentCenter;
+        NSLayoutConstraint* constraint=[label.widthAnchor constraintEqualToConstant:74];
+        constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES;
+        [label setAccessibilityLabel:@"Playback volume percentage"];
+        self.touchVolumeText=label; item.view=label;
+    }
+    else if ([identifier isEqual:@"touch.dashboard"]) item.view=self.touchDashboard;
     else if ([identifier isEqual:@"touch.pages"]) {
         NSSegmentedControl* pages=[NSSegmentedControl segmentedControlWithLabels:@[@"Live",@"Video",@"Time",@"Drops",@"Mac",@"I/O"] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(touchPage:)];
         pages.font=[NSFont systemFontOfSize:10.5 weight:NSFontWeightMedium];
@@ -258,8 +267,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     self.touchButtons[@"touch.stats"].title=copy.statistics ? @"Stats on" : @"Stats off";
     self.touchButtons[@"touch.hardware"].title=self.hardware ? @"Hide Mac" : @"Monitor";
     self.touchButtons[@"touch.mute"].title=copy.muted ? @"Unmute" : @"Mute";
-    self.touchButtons[@"touch.volumeLabel"].title=[NSString stringWithFormat:@"%.0f%%",nativePlaybackVolume()*100];
-    self.touchButtons[@"touch.volumeLabel"].enabled=NO;
+    self.touchVolumeText.stringValue=[NSString stringWithFormat:@"%.0f%%",nativePlaybackVolume()*100];
     self.touchPages.selectedSegmentBezelColor=touchAccent();
     if (self.touchVolume) { self.touchVolume.slider.doubleValue=nativePlaybackVolume(); self.touchVolume.slider.trackFillColor=touchAccent(); }
     for (NSString* key in self.touchButtons) {
@@ -275,6 +283,6 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     self.touchPages.target=nil; self.touchPages.action=NULL; self.touchPages=nil;
     if (self.window.touchBar==self.streamTouchBar) self.window.touchBar=self.previousTouchBar;
     self.streamTouchBar.delegate=nil; self.streamTouchBar=nil; self.previousTouchBar=nil;
-    self.touchButtons=nil; self.touchPopovers=nil; self.touchDashboard=nil; self.touchVolume=nil;
+    self.touchButtons=nil; self.touchPopovers=nil; self.touchDashboard=nil; self.touchVolume=nil; self.touchVolumeText=nil;
 }
 @end

@@ -179,6 +179,12 @@ jobs:
           xcrun clang++ -std=c++17 -dynamiclib -undefined dynamic_lookup -g tests/native/NativeCrashTrace.cpp -o build/helper-backtrace.dylib
           python3 tests/native/bridge_smoke.py 'build/native-${{ matrix.architecture }}/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight' build/previews/settings-fixture.json
           env -u MOONLIGHT_NATIVE_DIAGNOSTIC_DYLIB python3 tests/native/bridge_smoke.py 'build/native-${{ matrix.architecture }}/MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight'
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: Native-Helper-Crash-Reports-${{ matrix.architecture }}
+          path: ~/Library/Logs/DiagnosticReports/*Moonlight*.ips
+          if-no-files-found: warn
       - name: Test actual menu bar icon state
         if: matrix.architecture == 'universal'
         run: |

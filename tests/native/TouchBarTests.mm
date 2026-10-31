@@ -51,6 +51,8 @@ int main(int argc,char** argv) { @autoreleasepool {
     nativeOverlayAttach(window,"touchbar-fixture"); pump(); NSTouchBar* bar=[window.touchBar retain];
     check(bar && bar!=original && bar.defaultItemIdentifiers.count==6,"Stream owns a six-item Touch Bar");
     NSTouchBar* dashboard=expanded(bar,@"touch.info"); NSTouchBar* audio=expanded(bar,@"touch.audio"); NSTouchBar* more=expanded(bar,@"touch.more");
+    NSTextField* volumeText=(NSTextField*)((NSCustomTouchBarItem*)[audio itemForIdentifier:@"touch.volumeLabel"]).view;
+    check([volumeText isKindOfClass:NSTextField.class] && [volumeText.textColor isEqual:NSColor.whiteColor],"Volume percentage must remain a readable, static readout");
     check(dashboard && audio && more,"Status, audio and secondary controls must expand with native close buttons");
     for (NSString* name in @[@"touch.info",@"touch.audio",@"touch.more"]) check(((NSPopoverTouchBarItem*)[bar itemForIdentifier:name]).showsCloseButton,"Expanded pages need a clear Back control");
     nativeTitlebarSetCapture(true); nativeTitlebarSetConnection(NativeConnectionState::Connected);
