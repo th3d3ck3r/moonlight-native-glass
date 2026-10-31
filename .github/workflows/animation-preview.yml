@@ -1,0 +1,81 @@
+name: Uploaded Animation Preview Validation
+on:
+  push:
+    branches: [feature/uploaded-animation-preview]
+permissions:
+  contents: read
+jobs:
+  previews:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - name: Build Startup Preview
+        run: xcodebuild -project MoonlightLG.xcodeproj -scheme 'MoonlightLG Startup Preview' -configuration Preview -destination 'platform=macOS' -derivedDataPath build/animation-preview build
+      - name: Run Startup Preview and capture arrival
+        run: |
+          mkdir -p build/startup-preview-captures
+          python3 - <<'PY'
+          import pathlib,subprocess,time
+          executable=pathlib.Path('build/animation-preview/Build/Products/Preview/MoonlightLG.app/Contents/MacOS/MoonlightLG').resolve()
+          with open('build/startup-preview-captures/launch.log','w') as log:
+              process=subprocess.Popen([str(executable),'--design-preview','--boot-preview','--dark'],stdout=log,stderr=log)
+              try:
+                  time.sleep(.9)
+                  assert process.poll() is None,'Startup Preview quit during arrival'
+                  subprocess.run(['/usr/sbin/screencapture','-x','build/startup-preview-captures/arrival.png'],check=True)
+                  time.sleep(3)
+                  assert process.poll() is None,'Startup Preview did not remain open after playback'
+                  subprocess.run(['/usr/sbin/screencapture','-x','build/startup-preview-captures/library-after-arrival.png'],check=True)
+              finally:
+                  process.terminate()
+                  try: process.wait(timeout=10)
+                  except subprocess.TimeoutExpired: process.kill();process.wait();raise
+          print('PASS: Startup Preview launched, rendered arrival and remained responsive')
+          PY
+      - name: Build and run UI Preview tests
+        run: xcodebuild -project MoonlightLG.xcodeproj -scheme 'MoonlightLG UI Preview' -destination 'platform=macOS' -derivedDataPath build/animation-preview -resultBundlePath build/uploaded-animations.xcresult test
+      - name: Export UI Preview captures
+        if: always()
+        run: |
+          mkdir -p build/animation-ui-captures
+          if [ -d build/uploaded-animations.xcresult ]; then xcrun xcresulttool export attachments --path build/uploaded-animations.xcresult --output-path build/animation-ui-captures; fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: Uploaded-Animation-Startup-and-UI-Previews
+          path: |
+            build/startup-preview-captures/*
+            build/animation-ui-captures/*
+          if-no-files-found: warn
+  connection-loop:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.2'
+          cache: true
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
+      - name: Exercise uploaded 60 fps Apollo in real Qt and SDL window
+        run: |
+          python3 setup-deps.py
+          python3 scripts/build-connection-view.py build/libMoonlightLGConnection.dylib arm64
+          mkdir -p build/connection-window-qt
+          (cd build/connection-window-qt && qmake ../../tests/native/ConnectionWindowTests.pro QMAKE_APPLE_DEVICE_ARCHS=arm64 && make -j4)
+          MOONLIGHT_NATIVE_CONNECTION_LIBRARY="$PWD/build/libMoonlightLGConnection.dylib" build/connection-window-qt/connection-window-tests build/connection-window-previews
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: Uploaded-Animation-Qt-SDL-Previews
+          path: build/connection-window-previews/*.png
+          if-no-files-found: warn
