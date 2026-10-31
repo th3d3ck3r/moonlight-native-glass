@@ -1,5 +1,13 @@
 # MoonlightLG changelog
 
+## 1.3.3.0U — private Touch Bar build
+
+- Native Crimson Glass Touch Bar controls for the library, Apollo connection and stream window. Stream actions share existing SDL handlers.
+- Live status, capture/release, local audio/mute/volume, recording time and replay readiness; secondary controls for statistics, hardware overlay, fullscreen, stream controls, hide and disconnect.
+- Four information pages: incoming FPS/RTT/bitrate, decode/drop/render readings, local CPU/RAM/GPU sparklines, and network/thermal/controller status. Unavailable and stale measurements are labeled.
+- Internal build 43. Private U artifacts only; stable 1.3.2.0 remains available. Validation pending.
+
+
 ## 🌙 1.3.2.0 — stable — 2026-10-30
 
 - Dedicated Apple Silicon-only (arm64) build for M-series Macs, alongside Intel and Universal packages. All nested Mach-O files are thinned before signing and checked for arm64-only slices.

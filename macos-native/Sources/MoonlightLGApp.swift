@@ -66,6 +66,10 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 NativeBootView.background.ignoresSafeArea()
                 if boot.blocksLibrary {
                     NativeWarpBootView(presentation: boot, previewTime: store.preview ? Double(nativeArgument("--boot-frame") ?? "") : nil)
+                        .background(NativeTouchBarAccessory(commands: [
+                            .init("boot.status", "MoonlightLG · Warp Arrival", "moon.stars.fill", width: 240, enabled: false),
+                            .init("boot.skip", "Skip to Library", "forward.end.fill", width: 150) { boot.finishImmediately() }
+                        ]).frame(width: 0, height: 0))
                         .toolbarBackground(.hidden, for: .windowToolbar)
                         .background(NativeWindowAccessor { window in
                             store.libraryWindow = window
@@ -152,6 +156,14 @@ private struct NativeStatusActions: View {
     }
 }
 
+func nativeCorrespondingSourceURL() -> URL {
+    if MoonlightLGVersion.current.channel != "stable" {
+        return URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass/actions/workflows/native-macos.yml?query=branch%3Afeature%2Frecording-plugin")!
+    }
+    let version = MoonlightLGVersion.current.display
+    return URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v\(version)/MoonlightLG-\(version)-source.tar.gz")!
+}
+
 @MainActor func nativeLegalNoticesURL() -> URL {
     let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightLGEngine.app/Contents/Resources/Legal/index.html")
     return FileManager.default.fileExists(atPath: bundled.path) ? bundled
@@ -173,7 +185,7 @@ private struct NativeStatusActions: View {
                      .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
     for (label, url) in [("GitHub Repository", URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass")!),
                          ("Licenses & Notices", nativeLegalNoticesURL()),
-                         ("Corresponding Source", URL(string: "https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.2.0/MoonlightLG-1.3.2.0-source.tar.gz")!)] {
+                         ("Corresponding Source", nativeCorrespondingSourceURL())] {
         credits.addAttributes([.link: url,
                            .foregroundColor: NativeCrimsonTheme.enabled ? NSColor(srgbRed: 0.95, green: 0.19, blue: 0.32, alpha: 1) : NSColor.linkColor,
                            .underlineStyle: NSUnderlineStyle.single.rawValue],

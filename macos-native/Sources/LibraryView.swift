@@ -26,6 +26,36 @@ struct LibraryView: View {
     }
     private var controlsEnabled: Bool { store.ready && store.connectionJourney == nil && !store.streamActive && store.pairing == nil && !store.addingHost && !store.testingConnection }
 
+    private var touchCommands: [NativeTouchBarCommand] {
+        guard store.connectionJourney == nil else { return [] }
+        let selected = store.selected
+        let game = games.first { $0.id == focusedGame }
+        let index = store.computers.firstIndex { $0.id == store.selectedID } ?? 0
+        var commands: [NativeTouchBarCommand] = [
+            .init("library.status", selected.map { "\($0.name)\n\($0.status) · \($0.apps.count) games" } ?? "MoonlightLG\n\(store.status)", "moon.fill", width: 178, enabled: false),
+            .init("library.previous", "", "chevron.left", width: 36, enabled: controlsEnabled && index > 0) {
+                store.selectedID = store.computers[index - 1].id
+            },
+            .init("library.next", "", "chevron.right", width: 36, enabled: controlsEnabled && index + 1 < store.computers.count) {
+                store.selectedID = store.computers[index + 1].id
+            },
+            .init("library.refresh", "Refresh", "arrow.clockwise", width: 72, enabled: controlsEnabled) { store.refresh() }
+        ]
+        if let selected, !selected.online {
+            commands.append(.init("library.host", "Wake", "power", width: 126, enabled: controlsEnabled) { store.send("wake", ["host": selected.id]) })
+        } else if let selected, !selected.paired {
+            commands.append(.init("library.host", "Pair", "link", width: 126, enabled: controlsEnabled) { store.pair(selected) })
+        } else {
+            commands.append(.init("library.host", game.map { "Play \($0.name)" } ?? "Select a game", "play.fill", width: 126,
+                                  enabled: controlsEnabled && selected?.supported == true && game != nil) {
+                if let selected, let game { store.startStream(selected, game: game) }
+            })
+        }
+        commands.append(.init("library.add", "Add", "plus", width: 58, enabled: controlsEnabled) { addPresented = true })
+        commands.append(.init("library.settings", "Settings", "gearshape", width: 80) { openSettings() })
+        return commands
+    }
+
     var body: some View {
         NavigationSplitView {
             List(selection: $store.selectedID) {
@@ -79,6 +109,7 @@ struct LibraryView: View {
             }
         }
         .crimsonGlassTheme()
+        .background(NativeTouchBarAccessory(commands: touchCommands, crimson: crimson).frame(width: 0, height: 0))
         .sheet(isPresented: $addPresented) { AddComputerSheet(store: store).crimsonGlassTheme() }
         .sheet(item: $store.pairing) { request in PairingSheet(request: request).crimsonGlassTheme().interactiveDismissDisabled() }
         .sheet(item: $details) { ComputerDetailsSheet(computer: $0).crimsonGlassTheme() }

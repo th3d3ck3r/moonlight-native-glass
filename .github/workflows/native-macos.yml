@@ -83,6 +83,21 @@ jobs:
             -framework VideoToolbox -framework CoreMedia -framework CoreVideo -framework AudioToolbox \
             -Wl,-rpath,"$PWD/libs/mac/lib" -o build/recorder-tests
           DYLD_LIBRARY_PATH="$PWD/libs/mac/lib" build/recorder-tests "$PWD/build/libMoonlightLGRecorder.dylib" "$PWD/build/recording-fixtures"
+      - name: Test Touch Bar routing, state, layout and lifetime
+        if: matrix.architecture == 'universal'
+        run: |
+          python3 setup-deps.py
+          xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
+            app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/TouchBarTests.mm \
+            -L libs/mac/lib -lSDL2 -framework AppKit -framework IOKit -framework QuartzCore \
+            -Wl,-rpath,"$PWD/libs/mac/lib" -o build/touchbar-tests
+          build/touchbar-tests build/touchbar-previews
+      - uses: actions/upload-artifact@v6
+        if: always() && matrix.architecture == 'universal'
+        with:
+          name: Native-Touch-Bar-Previews
+          path: build/touchbar-previews/*.png
+          if-no-files-found: warn
       - name: Test native overlays and capture composited previews
         if: matrix.architecture == 'universal'
         run: |

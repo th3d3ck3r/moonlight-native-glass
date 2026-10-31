@@ -1,0 +1,90 @@
+#import <AppKit/AppKit.h>
+#import <SDL.h>
+#import <SDL_syswm.h>
+#include "nativeoverlay.h"
+#include "nativetitlebar.h"
+#include <cstdio>
+#include <cstdlib>
+
+static void check(bool okay,const char* message) { if (!okay) { fprintf(stderr,"FAIL: %s\n",message); exit(1); } }
+static void pump() { NSDate* until=[NSDate dateWithTimeIntervalSinceNow:.08]; while (until.timeIntervalSinceNow>0) [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.005]]; }
+static NSButton* button(NSTouchBar* bar,NSString* name) { return (NSButton*)((NSCustomTouchBarItem*)[bar itemForIdentifier:name]).view; }
+static bool action(int expected) { SDL_Event event; bool found=false; while (SDL_PollEvent(&event)) if (event.type==nativeOverlayEventType() && event.user.code==expected) found=true; return found; }
+static NSTouchBar* expanded(NSTouchBar* bar,NSString* name) { return ((NSPopoverTouchBarItem*)[bar itemForIdentifier:name]).popoverTouchBar; }
+static void capture(NSTouchBar* bar,NSString* path) {
+    NSView* root=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,685,54)] autorelease];
+    root.wantsLayer=YES; root.layer.backgroundColor=NSColor.blackColor.CGColor;
+    NSStackView* stack=[[[NSStackView alloc] initWithFrame:NSMakeRect(8,12,669,30)] autorelease];
+    stack.orientation=NSUserInterfaceLayoutOrientationHorizontal; stack.spacing=6;
+    stack.alignment=NSLayoutAttributeCenterY; stack.distribution=NSStackViewDistributionFill;
+    [root addSubview:stack];
+    CGFloat requested=0;
+    for (NSString* identifier in bar.defaultItemIdentifiers) {
+        NSTouchBarItem* item=[bar itemForIdentifier:identifier]; NSView* view=nil;
+        if ([item isKindOfClass:NSPopoverTouchBarItem.class]) view=((NSPopoverTouchBarItem*)item).collapsedRepresentation;
+        else if ([item isKindOfClass:NSSliderTouchBarItem.class]) view=((NSSliderTouchBarItem*)item).slider;
+        else if ([item isKindOfClass:NSCustomTouchBarItem.class]) view=((NSCustomTouchBarItem*)item).view;
+        check(view!=nil,"Every declared Touch Bar item must resolve on a Mac without hardware");
+        [stack addArrangedSubview:view];
+        for (NSLayoutConstraint* constraint in view.constraints) if (constraint.firstAttribute==NSLayoutAttributeWidth && constraint.relation==NSLayoutRelationEqual) requested+=constraint.constant;
+    }
+    requested+=MAX(0,(NSInteger)stack.arrangedSubviews.count-1)*6;
+    check(requested<=669,"Expanded and main layouts must fit the standard app region without hiding the system strip");
+    stack.frame=NSMakeRect(8,12,requested,30);
+    [root layoutSubtreeIfNeeded];
+    for (NSView* view in stack.arrangedSubviews) check(view.frame.size.width>20 && NSMaxX(view.frame)<=670,"Touch Bar item clipped or collapsed");
+    NSBitmapImageRep* image=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:image];
+    check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Touch Bar item preview export");
+    for (NSView* view in [[stack.arrangedSubviews copy] autorelease]) { [stack removeArrangedSubview:view]; [view removeFromSuperview]; }
+}
+int main(int argc,char** argv) { @autoreleasepool {
+    [NSApplication sharedApplication]; [NSApp finishLaunching]; NSApp.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+    SDL_SetMainReady(); check(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER)==0,"SDL init");
+    SDL_Window* stream=SDL_CreateWindow("Touch Bar fixture",80,100,960,540,SDL_WINDOW_SHOWN|SDL_WINDOW_RESIZABLE);
+    check(stream!=nullptr,"Stream fixture"); SDL_SysWMinfo info; SDL_VERSION(&info.version); check(SDL_GetWindowWMInfo(stream,&info),"Cocoa window");
+    NSWindow* window=info.info.cocoa.window;
+    NSTouchBar* original=[[[NSTouchBar alloc] init] autorelease]; window.touchBar=original;
+    nativeOverlayAttach(window,"touchbar-fixture"); pump(); NSTouchBar* bar=[window.touchBar retain];
+    check(bar && bar!=original && bar.defaultItemIdentifiers.count==6,"Stream owns a six-item Touch Bar");
+    NSTouchBar* dashboard=expanded(bar,@"touch.info"); NSTouchBar* audio=expanded(bar,@"touch.audio"); NSTouchBar* more=expanded(bar,@"touch.more");
+    check(dashboard && audio && more,"Status, audio and secondary controls must expand with native close buttons");
+    for (NSString* name in @[@"touch.info",@"touch.audio",@"touch.more"]) check(((NSPopoverTouchBarItem*)[bar itemForIdentifier:name]).showsCloseButton,"Expanded pages need a clear Back control");
+    nativeTitlebarSetCapture(true); nativeTitlebarSetConnection(NativeConnectionState::Connected);
+    nativeTitlebarSetRecording(false,false,false,false,false,false,0,"Recording disabled"); pump();
+    check(!button(bar,@"touch.record").enabled && !button(bar,@"touch.replay").enabled,"Disabled recording must not trigger recorder actions");
+    [button(bar,@"touch.replay") performClick:nil]; check(!action(219),"Disabled replay must not enqueue an action");
+    SDL_bool relative=SDL_GetRelativeMouseMode();
+    [button(bar,@"touch.capture") performClick:nil]; check(action(1),"Capture uses the same SDL action as the title bar");
+    [button(more,@"touch.fullscreen") performClick:nil]; check(action(2),"Fullscreen queues the existing stream handler");
+    [button(more,@"touch.stats") performClick:nil]; check(action(3),"Statistics action routing");
+    [button(audio,@"touch.mute") performClick:nil]; check(action(207),"Mute action routing");
+    check(SDL_GetRelativeMouseMode()==relative,"Touch Bar actions must not directly mutate mouse confinement");
+    nativeTitlebarSetRecording(true,true,true,true,false,false,125,"Original Stream Quality"); pump();
+    check([button(bar,@"touch.record").title isEqual:@"2:05"] && button(bar,@"touch.replay").enabled,"Recording time and replay readiness must synchronize");
+    [button(bar,@"touch.record") performClick:nil]; check(action(217),"Record routes through the plugin action");
+    [button(bar,@"touch.replay") performClick:nil]; check(action(219),"Replay uses the existing save action");
+    nativeTitlebarSetRecording(true,true,true,true,true,false,126,"Saving"); pump();
+    check(!button(bar,@"touch.replay").enabled && [button(bar,@"touch.replay").title isEqual:@"Saving"],"Prevent duplicate replay saves");
+    nativeTitlebarSetStreamInformation("Incoming frame rate from network: 60.00 FPS\nAverage network latency: 4 ms\nBitrate: 25 Mbps\nAverage decoding time: 1.2 ms\nFrames dropped by network: 0.0%\nRendering frame rate: 59.98 FPS"); pump();
+    NSView* readings=((NSCustomTouchBarItem*)[dashboard itemForIdentifier:@"touch.dashboard"]).view;
+    check([readings.accessibilityLabel containsString:@"60.00 FPS"] && [readings.accessibilityLabel containsString:@"4 ms"],"Stream values come from actual engine statistics");
+    [readings setValue:@0 forKey:@"streamUpdated"]; [readings performSelector:@selector(refreshCards)];
+    check([readings.accessibilityLabel containsString:@"stale"],"Stale measurements must not appear live");
+    nativeTitlebarSetStatistics(false); pump();
+    check([readings.accessibilityLabel containsString:@"Enable Statistics"],"Statistics off must discard old measurements");
+    NSString* directory=argc>1 ? [NSString stringWithUTF8String:argv[1]] : @"build/touchbar-previews";
+    [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
+    nativeTitlebarSetStatistics(true); nativeTitlebarSetStreamInformation("Incoming frame rate from network: 60.00 FPS\nAverage network latency: 4 ms\nBitrate: 25 Mbps"); pump();
+    capture(bar,[directory stringByAppendingPathComponent:@"touchbar-main.png"]);
+    capture(audio,[directory stringByAppendingPathComponent:@"touchbar-audio.png"]);
+    capture(more,[directory stringByAppendingPathComponent:@"touchbar-more.png"]);
+    NSSegmentedControl* pages=(NSSegmentedControl*)((NSCustomTouchBarItem*)[dashboard itemForIdentifier:@"touch.pages"]).view;
+    for (int i=0;i<4;++i) { pages.selectedSegment=i; [pages sendAction:pages.action to:pages.target]; capture(dashboard,[directory stringByAppendingPathComponent:[NSString stringWithFormat:@"touchbar-info-%d.png",i]]); }
+    NSButton* stale=[button(bar,@"touch.record") retain];
+    nativeOverlayDetach(); check(window.touchBar==original,"Restore the previous responder bar at handoff/detach");
+    [stale performClick:nil]; check(!action(217),"A retained old button must not target a detached or later session");
+    [stale release]; [bar release];
+    for (int i=0;i<10;++i) { nativeOverlayAttach(window,"next-touchbar"); nativeOverlayDetach(); pump(); check(window.touchBar==original,"Repeated session cleanup restores ownership"); }
+    SDL_DestroyWindow(stream); SDL_Quit(); fprintf(stderr,"PASS: Touch Bar actions, state, stale data, fit, previews and lifetime\n");
+    return 0;
+} }

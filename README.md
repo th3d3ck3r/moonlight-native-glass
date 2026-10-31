@@ -21,6 +21,8 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
+Private development: **1.3.3.0U · Touch Bar** is in validation. U packages are shared only with the owner; the stable downloads below remain 1.3.2.0.
+
 ## 📦 Download
 
 ### 🌙 MoonlightLG 1.3.2.0

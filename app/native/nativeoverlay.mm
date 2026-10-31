@@ -335,7 +335,7 @@ int nativeOverlayShortcut(const SDL_KeyboardEvent* event) {
 bool nativeOverlayPerformAction(int action, Uint32 requestID) { return pushAction(action, requestID); }
 bool nativeOverlayPresent(int type, bool enabled, const char* text) {
     if (!configured || type<0 || type>1) return false;
-    if (type==0) nativeTitlebarSetStatistics(enabled);
+    if (type==0) { nativeTitlebarSetStatistics(enabled); nativeTitlebarSetStreamInformation(enabled ? text : nullptr); }
     std::lock_guard<std::mutex> lock(snapshotMutex); snapshots[type].enabled=enabled; ++snapshots[type].revision; SDL_strlcpy(snapshots[type].text,text ?: "",sizeof(snapshots[type].text));
     if (!updatePending) { updatePending=true; unsigned current=generation; dispatch_async(dispatch_get_main_queue(), ^{ { std::lock_guard<std::mutex> guard(snapshotMutex); if (generation!=current) return; updatePending=false; } [controller layoutPanels]; }); }
     return true;

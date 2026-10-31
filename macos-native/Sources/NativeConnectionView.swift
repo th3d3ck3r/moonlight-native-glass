@@ -79,6 +79,13 @@ struct NativeConnectionView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("connection-journey")
         .environment(\.colorScheme, .dark)
+        .background(NativeTouchBarAccessory(commands: [
+            .init("apollo.status", "\(journey.computer.name)\n\(journey.detail)", "moon.fill", width: 240, enabled: false),
+            .init("apollo.continue", journey.phase == .entering ? "Opening…" : "Continue to Stream", "play.fill", width: 150,
+                  enabled: journey.phase == .connected && !journey.continueRequested, action: proceed),
+            .init("apollo.retry", "Retry", "arrow.clockwise", width: 65, enabled: journey.phase == .failed && canRetry, action: retry),
+            .init("apollo.cancel", journey.phase == .failed ? "Library" : "Cancel", "xmark", width: 80, action: cancel)
+        ], crimson: crimson).frame(width: 0, height: 0))
     }
 
     private func smooth(_ value: Double) -> Double {
@@ -177,6 +184,94 @@ struct NativeConnectionView: View {
         c.stroke(antenna, with: .color(.white.opacity(0.75)), lineWidth: 0.8)
         c.fill(Path(ellipseIn: CGRect(x: -17, y: -23, width: 6, height: 5)), with: .color(Color(white: 0.8)))
     }
+}
+
+// A native responder accessory shared by the library and hosted Apollo view.
+// Updating labels never replaces a visible bar. Targets are cleared before the
+// view leaves its window, including the connection-to-video handoff.
+struct NativeTouchBarCommand {
+    let id: String
+    var title: String
+    var symbol: String
+    var width: CGFloat
+    var enabled: Bool
+    var action: (() -> Void)?
+    init(_ id: String, _ title: String, _ symbol: String, width: CGFloat = 70,
+         enabled: Bool = true, action: (() -> Void)? = nil) {
+        self.id = id; self.title = title; self.symbol = symbol
+        self.width = width; self.enabled = enabled; self.action = action
+    }
+}
+struct NativeTouchBarAccessory: NSViewRepresentable {
+    var commands: [NativeTouchBarCommand]
+    var crimson = true
+    final class AccessoryView: NSView {
+        weak var owner: Coordinator?
+        override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); owner?.attach(window) }
+    }
+    final class Coordinator: NSObject, NSTouchBarDelegate {
+        var commands: [NativeTouchBarCommand] = []
+        var crimson = true
+        weak var window: NSWindow?
+        var previous: NSTouchBar?
+        var bar: NSTouchBar?
+        var buttons: [String: NSButton] = [:]
+        func attach(_ next: NSWindow?) {
+            if window === next, bar != nil { return }
+            detach()
+            guard let next, !commands.isEmpty else { return }
+            window = next; previous = next.touchBar
+            let bar = NSTouchBar(); bar.delegate = self
+            bar.defaultItemIdentifiers = commands.map { NSTouchBarItem.Identifier($0.id) }
+            self.bar = bar; next.touchBar = bar
+        }
+        func detach() {
+            if let window, window.touchBar === bar { window.touchBar = previous }
+            for button in buttons.values { button.target = nil; button.action = nil }
+            buttons.removeAll(); bar?.delegate = nil; bar = nil; previous = nil; window = nil
+        }
+        func update(_ commands: [NativeTouchBarCommand], crimson: Bool) {
+            let identifiersChanged = self.commands.map(\.id) != commands.map(\.id)
+            self.commands = commands; self.crimson = crimson
+            if identifiersChanged { let current = window; detach(); attach(current) }
+            for command in commands { if let button = buttons[command.id] { style(button, command) } }
+        }
+        func style(_ button: NSButton, _ command: NativeTouchBarCommand) {
+            button.title = command.title; button.isEnabled = command.enabled && command.action != nil
+            button.image = NSImage(systemSymbolName: command.symbol, accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: 15, weight: .medium))
+            button.imagePosition = .imageLeft
+            button.font = .systemFont(ofSize: command.title.contains("\n") ? 10 : 11, weight: .medium)
+            button.lineBreakMode = .byTruncatingMiddle
+            button.bezelColor = crimson ? NSColor(srgbRed: 0.12, green: 0.035, blue: 0.055, alpha: 1) : nil
+            button.contentTintColor = crimson ? NSColor(srgbRed: 0.95, green: 0.19, blue: 0.32, alpha: 1) : nil
+            button.setAccessibilityLabel(command.title.replacingOccurrences(of: "\n", with: "; "))
+            button.toolTip = command.title
+        }
+        func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
+            guard let command = commands.first(where: { $0.id == identifier.rawValue }) else { return nil }
+            let item = NSCustomTouchBarItem(identifier: identifier)
+            let button = ConnectionActionButton(title: command.title, target: self, action: #selector(press(_:)))
+            button.identifier = NSUserInterfaceItemIdentifier(command.id)
+            button.widthAnchor.constraint(equalToConstant: command.width).isActive = true
+            style(button, command); buttons[command.id] = button; item.view = button
+            return item
+        }
+        @objc func press(_ sender: NSButton) {
+            guard sender.isEnabled, let window, window.touchBar === bar,
+                  let command = commands.first(where: { $0.id == sender.identifier?.rawValue }), command.enabled else { return }
+            command.action?()
+        }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> AccessoryView {
+        let view = AccessoryView(); view.owner = context.coordinator
+        context.coordinator.update(commands, crimson: crimson); return view
+    }
+    func updateNSView(_ view: AccessoryView, context: Context) {
+        context.coordinator.update(commands, crimson: crimson); context.coordinator.attach(view.window)
+    }
+    static func dismantleNSView(_ view: AccessoryView, coordinator: Coordinator) { coordinator.detach(); view.owner = nil }
 }
 
 // SDL and Qt own this window's event loop. Use AppKit target/action controls

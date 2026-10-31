@@ -9,7 +9,7 @@ and macOS permissions. Do not rebrand upstream copyright/license attribution.
 ## Versions (user-required)
 
 The user-facing scheme is `redesign.major.minor.hotfix`, without leading zeros.
-The current release version is **1.3.2.0** (internal build 42). Each component is a nonnegative
+The current release version is **1.3.3.0U** (internal build 43). Each component is a nonnegative
 integer with no decimal rollover: `1.2.9.0` → `1.2.10.0` → `1.2.11.0`.
 
 - `U`: unreleased development work. Share U build links only directly with the user.
