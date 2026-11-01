@@ -120,8 +120,9 @@ def main():
     fingerprint = hashlib.sha256("\n".join(digest_file(path) for path in (
         ROOT / "scripts/package-legal-notices.py", ROOT / "legal/components.json",
         binary, raw_app / "Contents/Info.plist", pathlib.Path(__file__),
-        *[ROOT / p for p in ["scripts/build-recorder-plugin.py", "recording/Recorder.mm", "recording/RecorderABI.h", "recording/AnnexB.h", "recording/BoundedQueue.h", "scripts/build-connection-view.py", "macos-native/ConnectionHost/NativeConnectionHost.swift", "macos-native/Sources/NativeConnectionView.swift", "macos-native/Sources/NativeCrimsonTheme.swift", "macos-native/Sources/EngineProtocol.swift"]],
-        ROOT / "macos-native/Resources/moonlight.icns")).encode()).hexdigest()
+        *[ROOT / p for p in ["scripts/build-recorder-plugin.py", "recording/Recorder.mm", "recording/RecorderABI.h", "recording/AnnexB.h", "recording/BoundedQueue.h", "scripts/build-connection-view.py", "scripts/build-visual-resources.py", "macos-native/Sources/SmokeAccretionScene.swift", "macos-native/Sources/MoonlightLGTouchBarArt.swift", "macos-native/Sources/SmokeAccretion.metal", "macos-native/ConnectionHost/NativeConnectionHost.swift", "macos-native/Sources/NativeConnectionView.swift", "macos-native/Sources/NativeCrimsonTheme.swift", "macos-native/Sources/EngineProtocol.swift"]],
+        ROOT / "macos-native/Resources/moonlight.icns",
+        *sorted(p for p in (ROOT / "macos-native/Resources/Assets.xcassets").rglob("*") if p.is_file()))).encode()).hexdigest()
     helper = products / "MoonlightLGEngine.app"
     marker = products / ".moonlight-engine.sha256"
     if helper.exists() and marker.exists() and marker.read_text().strip() == fingerprint:

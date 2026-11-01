@@ -1,6 +1,6 @@
 <div align="center">
 
-![MoonlightLG](https://raw.githubusercontent.com/th3d3ck3r/moonlight-native-glass/moonlightlg-v1.3.2.0/readme-assets/images/moonlightlg-banner.svg)
+![MoonlightLG](readme-assets/images/moonlightlg-banner.svg)
 
 # 🌙 MoonlightLG
 
@@ -21,7 +21,7 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
-Private development: **1.3.4.2U · Touch Bar audio navigation correction** is in validation. U packages are shared only with the owner; the stable downloads below remain 1.3.2.0.
+Private development: **1.3.5.0U · Smoke accretion artwork and animations** is in validation. U packages are shared only with the owner; the stable downloads below remain 1.3.2.0.
 
 ## 📦 Download
 

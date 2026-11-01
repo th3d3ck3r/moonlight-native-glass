@@ -39,6 +39,8 @@ import SwiftUI
         owner.update([connected], crimson: true)
         precondition(window.touchBar === bar, "State updates must preserve the current bar and its focus")
         button.performClick(nil); precondition(presses == 1)
+        let iconPoint = NSPoint(x: button.frame.minX + 12, y: button.frame.minY + 15)
+        precondition(button.hitTest(iconPoint) === button, "The template glyph must forward icon taps to the nonblocking native button")
         precondition(button.image != nil && button.contentTintColor != nil, "Use native symbols and Crimson Glass tint")
         precondition(button.frame.width == 150 && button.frame.height == 30)
         // Reproduce the two-line status and narrow labels from the owner's
@@ -48,7 +50,7 @@ import SwiftUI
         var scrollPresses = 0
         owner.update([status] + labels.enumerated().map { index, value in
             NativeTouchBarCommand("layout.\(index)", value.0, value.1, width: value.2) { scrollPresses += 1 }
-        }, crimson: true)
+        }, crimson: true, artState: .idle)
         let folder = URL(fileURLWithPath: "build/touchbar-previews")
         try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         _ = window.touchBar!.item(forIdentifier: .init("native.commandRow"))
@@ -67,6 +69,18 @@ import SwiftUI
             view.frame = originalFrame
         }
         let row = owner.row!
+        precondition(owner.strip != nil && owner.strip?.state == .idle && owner.strip?.isAnimating == false,
+                     "Library artwork must remain still inside the existing status tile")
+        let originalStrip = owner.strip
+        owner.update(owner.commands, crimson: true, artState: .connecting)
+        precondition(owner.strip === originalStrip && owner.strip?.state == .connecting,
+                     "Connection updates must reuse the artwork and existing command row")
+        owner.update(owner.commands, crimson: true, artState: .connected)
+        let connectedAt = owner.strip?.connectionStartedAt
+        owner.update(owner.commands, crimson: true, artState: .connected)
+        precondition(owner.strip?.connectionStartedAt == connectedAt,
+                     "Metadata updates must not replay the connect shockwave")
+        owner.update(owner.commands, crimson: true, artState: .idle)
         var previousEnd: CGFloat = -6
         for (control, _) in row.controls {
             precondition(control.frame.minX >= previousEnd + 6, "Scrollable controls must retain distinct non-overlapping document frames")
@@ -106,6 +120,8 @@ import SwiftUI
         precondition(row.more.contentTintColor == nil && row.more.bezelColor == nil, "Overflow navigation must respect disabling Crimson Glass")
         row.removeFromSuperview()
         owner.detach(); precondition(window.touchBar === previous)
+        precondition(originalStrip?.isAnimating == false && originalStrip?.superview == nil,
+                     "Detach must remove artwork and all animation work")
         button.performClick(nil); precondition(presses == 1, "Detached controls must not invoke an old connection")
         owner.update([connected], crimson: true); owner.attach(window)
         let engineBar = NSTouchBar(); window.touchBar = engineBar

@@ -22,8 +22,7 @@ jobs:
       - name: Test library and Apollo Touch Bar action gating
         run: |
           mkdir -p build
-          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeConnectionView.swift tests/native/TouchBarFrontendTests.swift -o build/touchbar-frontend-tests
-          build/touchbar-frontend-tests
+          python3 scripts/run-smoke-art-tests.py
           python3 tests/native/NumericPreferenceEditorTests.py
           xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/EngineStore.swift tests/native/SettingsPersistenceTests.swift -o build/settings-persistence-tests
           build/settings-persistence-tests
@@ -44,7 +43,9 @@ jobs:
         if: always()
         with:
           name: Native-Touch-Bar-Previews
-          path: build/touchbar-previews/*.png
+          path: |
+            build/touchbar-previews/*.png
+            build/smoke-scene-previews/*.png
           if-no-files-found: warn
   build:
     # UI probes compile/render the actual native frontend quickly. A final

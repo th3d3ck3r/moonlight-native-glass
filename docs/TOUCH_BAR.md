@@ -89,3 +89,7 @@ Touch Bar actions use explicit UI routes, independent of keyboard shortcut enabl
 Controls now keeps Audio and Window as pages of one expanded Touch Bar. Back returns to Controls, and the native close button returns to the main bar. The volume page retains its crimson continuous slider and white percentage; status updates do not reset navigation. The original controls layout retains its direct Audio popover.
 
 The macOS build enables the existing video bitrate measurement output. Codec is read from the engine’s embedded `(Codec: …)` metadata. A field absent from a fresh snapshot says Not reported; Stale means the entire snapshot has stopped refreshing for more than four seconds. Host encode latency requires timing supplied by the host.
+
+### Smoke accretion artwork · 1.3.5.0U
+
+The supplied animated moon occupies the leading artwork area of the existing status tile during startup and connection. Host text, native buttons, command identifiers and horizontal scrolling remain in their established layout. Compact widths fall back to a template glyph. Library artwork stays still, and the streaming controls retain their current statistics, audio and recording interface with no live animation. The owning window controls animation eligibility; Reduce Motion uses still artwork.

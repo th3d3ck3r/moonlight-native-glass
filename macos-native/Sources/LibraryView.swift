@@ -109,7 +109,7 @@ struct LibraryView: View {
             }
         }
         .crimsonGlassTheme()
-        .background(NativeTouchBarAccessory(commands: touchCommands, crimson: crimson).frame(width: 0, height: 0))
+        .background(NativeTouchBarAccessory(commands: touchCommands, crimson: crimson, artState: .idle).frame(width: 0, height: 0))
         .sheet(isPresented: $addPresented) { AddComputerSheet(store: store).crimsonGlassTheme() }
         .sheet(item: $store.pairing) { request in PairingSheet(request: request).crimsonGlassTheme().interactiveDismissDisabled() }
         .sheet(item: $details) { ComputerDetailsSheet(computer: $0).crimsonGlassTheme() }

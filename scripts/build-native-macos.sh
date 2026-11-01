@@ -48,6 +48,8 @@ cp macos-native/Resources/crimson.icns "$app/Contents/Resources/crimson.icns"
 cp macos-native/Resources/boot-moon.png "$app/Contents/Resources/boot-moon.png"
 cp macos-native/Resources/full-moon.png "$app/Contents/Resources/full-moon.png"
 cp macos-native/Resources/boot-animation.mp4 "$app/Contents/Resources/boot-animation.mp4"
+python3 scripts/build-visual-resources.py "$app/Contents/Resources"
+cp macos-native/Resources/MenuBarMoonlightLG*.png "$app/Contents/Resources/"
 cp macos-native/Info.plist "$app/Contents/Info.plist"
 ditto "$engine_app" "$app/Contents/Helpers/MoonlightLGEngine.app"
 # The active streaming process has its own Dock icon. Update the nested bundle

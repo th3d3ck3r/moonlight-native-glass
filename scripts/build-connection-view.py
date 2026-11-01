@@ -6,7 +6,7 @@ arches = sys.argv[2:]
 assert arches and set(arches) <= {'arm64', 'x86_64'}
 output.parent.mkdir(parents=True, exist_ok=True)
 sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip()
-sources = [root / 'macos-native/Sources' / name for name in ['EngineProtocol.swift', 'NativeCrimsonTheme.swift', 'NativeConnectionView.swift']]
+sources = [root / 'macos-native/Sources' / name for name in ['EngineProtocol.swift', 'NativeCrimsonTheme.swift', 'SmokeAccretionScene.swift', 'MoonlightLGTouchBarArt.swift', 'NativeConnectionView.swift']]
 sources.append(root / 'macos-native/ConnectionHost/NativeConnectionHost.swift')
 with tempfile.TemporaryDirectory() as temp:
     slices = []
@@ -18,3 +18,5 @@ with tempfile.TemporaryDirectory() as temp:
             *map(str, sources), '-o', str(target)], check=True)
         slices.append(str(target))
     subprocess.run(['lipo', '-create', *slices, '-output', str(output)], check=True)
+
+subprocess.run([sys.executable, str(root / 'scripts/build-visual-resources.py'), str(output.parent.parent / 'Resources')], check=True)

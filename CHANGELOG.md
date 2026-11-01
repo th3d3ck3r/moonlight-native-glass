@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.3.5.0U — private Smoke accretion artwork
+
+- Integrate the supplied cratered moon and crimson smoke GPU scenes for startup and connection, preserving finite startup, status panels, nonblocking Continue/Cancel/Retry and stream/input boundaries.
+- Adapt the supplied Touch Bar animation to the existing compact host/status tile; retain readable status, commands, scrolling, optional full width, streaming statistics and the crimson volume slider. Motion stops when inactive, hidden, detached, idle or streaming, and respects Reduce Motion.
+- Add supplied app and template menu artwork and README banner. Package the Metal library and artwork for the native app, connection helper and previews. Internal build 47; physical Touch Bar rendering and live host performance require hardware acceptance beyond CI.
+
 ## 1.3.4.2U — private Touch Bar audio navigation correction
 
 - Keep Audio and Window pages inside the existing Controls Touch Bar popover instead of opening nested popovers, which can flash back to the main bar on hardware. Add an explicit Back control; preserve the crimson volume slider, white percentage, mute and all existing actions.

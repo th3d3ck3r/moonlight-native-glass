@@ -70,9 +70,9 @@ final class NativeAppDelegate: NSObject, NSApplicationDelegate {
                 if boot.blocksLibrary {
                     NativeWarpBootView(presentation: boot, previewTime: store.preview ? Double(nativeArgument("--boot-frame") ?? "") : nil)
                         .background(NativeTouchBarAccessory(commands: [
-                            .init("boot.status", "MoonlightLG · Warp Arrival", "moon.stars.fill", width: 240, enabled: false),
+                            .init("boot.status", "MoonlightLG · Smoke accretion", "moon.stars.fill", width: 240, enabled: false),
                             .init("boot.skip", "Skip to Library", "forward.end.fill", width: 150) { boot.finishImmediately() }
-                        ]).frame(width: 0, height: 0))
+                        ], artState: .booting, bootStartedAt: boot.startedAt).frame(width: 0, height: 0))
                         .toolbarBackground(.hidden, for: .windowToolbar)
                         .background(NativeWindowAccessor { window in
                             store.libraryWindow = window

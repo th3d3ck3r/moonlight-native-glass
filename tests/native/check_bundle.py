@@ -48,6 +48,21 @@ print("Native Dock icon corner transparency verified")
 
 assert (app / "Contents/Helpers/MoonlightLGEngine.app/Contents/Frameworks/libMoonlightLGConnection.dylib").is_file(), "Missing stream-window connection view"
 
+for bundle in [app, app / "Contents/Helpers/MoonlightLGEngine.app"]:
+    resources = bundle / "Contents/Resources"
+    for name in ["Assets.car", "default.metallib"]:
+        assert (resources / name).is_file() and (resources / name).stat().st_size > 0, f"Missing shared GPU/art resource: {bundle}/{name}"
+    subprocess.run(["/usr/bin/swift", "-e", r'''import Metal
+import Foundation
+let device = MTLCreateSystemDefaultDevice()!
+let library = try device.makeLibrary(URL: URL(fileURLWithPath: CommandLine.arguments[1]))
+for name in ["smokeAccretion", "smokeAccretionStrip"] {
+    precondition(library.functionNames.contains(name), "Missing packaged stitchable function: " + name)
+}
+print("Packaged Smoke accretion Metal functions verified")
+''', str(resources / "default.metallib")], check=True)
+
+
 legal = app / "Contents/Helpers/MoonlightLGEngine.app/Contents/Resources/Legal"
 for name in ["index.html", "GPL-3.0.txt", "THIRD_PARTY_NOTICES.txt", "SOURCES.json", "ModeSeven-font.txt"]:
     assert (legal / name).is_file() and (legal / name).stat().st_size > 0, f"Missing legal notice: {name}"

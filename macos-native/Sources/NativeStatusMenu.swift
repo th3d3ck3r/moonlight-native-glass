@@ -16,6 +16,7 @@ import Combine
     private var stateObservation: AnyCancellable?
     private var activeMenu: NSMenu?
     private var restoreInputAfterMenu = true
+    private let menuGlyph: NSImage?
     private let crescent: NSImage?
     private let fullMoon: NSImage?
     private var windowObservation: AnyCancellable?
@@ -38,6 +39,11 @@ import Combine
             image.isTemplate = false
             return image
         }
+        let suppliedGlyph = resourceURL.flatMap { NSImage(contentsOf: $0.appendingPathComponent("MenuBarMoonlightLG.png")) }
+        let newGlyph = suppliedGlyph ?? NSImage(named: "MenuBarMoonlightLG")
+        newGlyph?.size = NSSize(width: 18, height: 18)
+        newGlyph?.isTemplate = true
+        menuGlyph = newGlyph
         crescent = load("moonlight.icns")
         fullMoon = load("full-moon.png")
         crimsonCrescent = load("crimson-moon.png")
@@ -63,7 +69,7 @@ import Combine
         windowExists = exists
         let idle = NativeCrimsonTheme.enabled ? (crimsonCrescent ?? crescent) : crescent
         let active = NativeCrimsonTheme.enabled ? (crimsonFullMoon ?? fullMoon ?? idle) : (fullMoon ?? idle)
-        item.button?.image = exists ? active : idle
+        item.button?.image = menuGlyph ?? (exists ? active : idle)
         let state = exists ? "stream window open" : "no stream window"
         item.button?.setAccessibilityLabel("MoonlightLG — " + state)
         item.button?.toolTip = nil

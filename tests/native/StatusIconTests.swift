@@ -26,11 +26,11 @@ import Combine
         state.exists = true
         flush()
         let fullMoon = button.image!
-        precondition(fullMoon !== crescent, "Full moon resource must load")
+        precondition(fullMoon === crescent && fullMoon.isTemplate, "Idle and active states must reuse the new system-tinted menu glyph")
         precondition(fullMoon.size == crescent.size)
         precondition(button.accessibilityLabel()?.contains("stream window open") == true)
-        // Verify the actual rendered images, including Retina-sized backing.
-        // The blue artwork and opaque edge centers must survive the corner mask.
+        // Verify the supplied template glyph at physical and Retina sizes.
+        // State remains in accessibility and menu actions, not manual tinting.
         for (name, image) in [("crescent", crescent), ("full-moon", fullMoon)] {
             for scale in [1, 2] {
                 let pixels = 18 * scale
@@ -42,12 +42,12 @@ import Combine
                 NSGraphicsContext.current!.cgContext.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
                 image.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
                 NSGraphicsContext.restoreGraphicsState()
-                for (x, y) in [(0, 0), (pixels-1, 0), (0, pixels-1), (pixels-1, pixels-1)] {
-                    precondition(bitmap.colorAt(x: x, y: y)!.alphaComponent < 0.05, "Both icon states must have transparent rounded corners")
-                }
-                precondition(bitmap.colorAt(x: pixels/2, y: 0)!.alphaComponent > 0.95, "Mask must preserve the icon's straight edge")
-                let center = bitmap.colorAt(x: pixels/2, y: pixels/2)!.usingColorSpace(.sRGB)!
-                precondition(center.alphaComponent > 0.95 && center.blueComponent > center.redComponent, "Mask must preserve the original full-color artwork")
+                var visible = 0
+                for y in 0..<pixels { for x in 0..<pixels {
+                    if bitmap.colorAt(x: x, y: y)!.alphaComponent > 0.1 { visible += 1 }
+                } }
+                precondition(visible > pixels && visible < pixels * pixels,
+                             "Template glyph must preserve visible strokes and transparent space")
                 if CommandLine.arguments.count > 2 {
                     let directory = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
                     try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -124,30 +124,17 @@ import Combine
         }
         precondition(finalMenu.items.first { $0.title == "Settings…" }?.isEnabled == true)
         precondition(finalMenu.items.first { $0.title == "Open Engine Logs" }?.isEnabled == true)
-        // Both crimson states must preserve transparent empty space and full color.
+        // Template artwork follows the system appearance in either app theme.
         UserDefaults.standard.set(true, forKey: NativeCrimsonTheme.key)
         flush()
         for exists in [false, true] {
             state.exists = exists; flush()
-            let image = button.image!
-            precondition(image !== crescent && image !== fullMoon)
-            let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 36, pixelsHigh: 36,
-                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
-            image.draw(in: NSRect(x: 0, y: 0, width: 36, height: 36))
-            NSGraphicsContext.restoreGraphicsState()
-            precondition(bitmap.colorAt(x: 0, y: 0)!.alphaComponent < 0.05)
-            var redPixels = 0
-            for y in 0..<36 { for x in 0..<36 {
-                let color = bitmap.colorAt(x: x, y: y)!.usingColorSpace(.sRGB)!
-                if color.alphaComponent > 0.5 && color.redComponent > color.blueComponent + 0.1 { redPixels += 1 }
-            } }
-            precondition(redPixels > 50, "Crimson artwork must retain visible red pixels")
+            precondition(button.image === crescent && button.image!.isTemplate,
+                         "Crimson Glass must retain the same system-tinted template glyph")
+            precondition(button.accessibilityLabel()?.contains(exists ? "stream window open" : "no stream window") == true)
         }
         UserDefaults.standard.set(false, forKey: NativeCrimsonTheme.key); flush()
-        precondition(button.image === fullMoon, "Turning off Crimson Glass must restore the original cached icon")
+        precondition(button.image === crescent, "Theme changes must not reload the menu artwork")
         print("Status icon states, menu confirmations/input handoff, click/hidden restore and hover removal checks passed")
     }
 }
