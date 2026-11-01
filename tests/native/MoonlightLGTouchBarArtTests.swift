@@ -52,9 +52,9 @@ import QuartzCore
         precondition(strip.isAnimating, "Visible connecting artwork must animate")
         now = 101
         waitFor("Registered timer must advance the injected clock; active=\(strip.presentationActive), timer=\(strip.isAnimating), attached=\(strip.window != nil), visible=\(strip.visibleRect), hidden=\(strip.isHiddenOrHasHiddenAncestor)") { strip.sceneSnapshot.time == 1 }
-        strip.setFrameSize(NSSize(width: 72, height: 30)); strip.refreshPresentation(); pump()
-        precondition(strip.isAnimating && strip.bounds.width == 72,
-                     "Actual compact status-tile framing must preserve live scheduling")
+        strip.setFrameSize(NSSize(width: 685, height: 30)); strip.refreshPresentation(); pump()
+        precondition(strip.isAnimating && strip.bounds.width == 685,
+                     "Whole app-area framing must preserve live scheduling")
         strip.show(.connected); pump()
         let connectedAt = strip.connectionStartedAt
         precondition(connectedAt == now)
@@ -94,7 +94,7 @@ import QuartzCore
         strip.isHidden = true; strip.refreshPresentation()
         precondition(!strip.isAnimating, "Hidden artwork must not animate")
         strip.isHidden = false; strip.refreshPresentation(); pump(); precondition(strip.isAnimating)
-        strip.frame.origin.x = 600; strip.refreshPresentation()
+        strip.frame.origin.x = 900; strip.refreshPresentation()
         precondition(!strip.isAnimating, "A fully clipped tile must not animate")
         strip.frame.origin.x = 0; strip.refreshPresentation(); pump(); precondition(strip.isAnimating)
         window.orderOut(nil); strip.setPresentationActive(false)

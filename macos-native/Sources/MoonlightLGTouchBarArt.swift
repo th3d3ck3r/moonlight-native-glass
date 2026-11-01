@@ -87,9 +87,9 @@ struct MoonlightLGTouchBarLiveView: View {
     }
 }
 
-// MARK: - Existing Touch Bar decoration
+// MARK: - Full app-area Touch Bar decoration
 
-/// Decorative artwork inside the existing 30-point status tile. The owning
+/// Decorative artwork across the existing 30-point command row. The owning
 /// coordinator controls presentation eligibility; this view never presents a
 /// Touch Bar, changes its controls or handles input. There is no animation work
 /// in the library, during streaming, or after its owner suspends/detaches it.
@@ -305,7 +305,7 @@ final class MoonlightLGTouchBarStripView: NSView {
 
     private func startTimer() {
         guard timer == nil else { return }
-        let next = Timer(timeInterval: 1 / 30.0, repeats: true) { [weak self] _ in self?.tick() }
+        let next = Timer(timeInterval: 1 / 60.0, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(next, forMode: .common); timer = next
     }
     private func stopTimer() { timer?.invalidate(); timer = nil }

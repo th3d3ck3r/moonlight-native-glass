@@ -241,7 +241,7 @@ private final class NativeTouchBarGlyphView: NSImageView {
 
 final class NativeTouchBarButton: ConnectionActionButton {
     var statusOnly = false
-    var strip: MoonlightLGTouchBarStripView?
+    var artworkBehind = false
     private var templateImageView: NSImageView?
     var templateGlyph: NSImage? {
         didSet {
@@ -253,20 +253,9 @@ final class NativeTouchBarButton: ConnectionActionButton {
             layoutArt()
         }
     }
-    private var stripWidth: CGFloat { strip != nil && bounds.width >= 148 ? min(72, bounds.width - 100) : 0 }
-    func installStrip(_ strip: MoonlightLGTouchBarStripView) {
-        self.strip = strip; addSubview(strip); layoutArt()
-    }
-    func removeStrip() {
-        strip?.setPresentationActive(false); strip?.removeFromSuperview(); strip = nil
-        layoutArt()
-    }
     private func layoutArt() {
-        strip?.frame = NSRect(x: 0, y: 0, width: stripWidth, height: 30)
-        strip?.isHidden = stripWidth == 0
-        strip?.refreshPresentation()
         templateImageView?.frame = NSRect(x: title.isEmpty ? (bounds.width - 18) / 2 : 7, y: 6, width: 18, height: 18)
-        templateImageView?.isHidden = templateGlyph == nil || stripWidth > 0
+        templateImageView?.isHidden = templateGlyph == nil
     }
     override func setFrameSize(_ size: NSSize) { super.setFrameSize(size); layoutArt() }
     private var pressOrigin = NSPoint.zero
@@ -276,21 +265,23 @@ final class NativeTouchBarButton: ConnectionActionButton {
         super.mouseDragged(with: event)
     }
     override var isFlipped: Bool { true }
+    override var isOpaque: Bool { false }
     override var intrinsicContentSize: NSSize { NSSize(width: 70, height: 30) }
     var labelRects: [NSRect] {
         let count = title.contains("\n") ? 2 : 1
-        let x: CGFloat = stripWidth > 0 ? stripWidth + 7 : image == nil ? 7 : 29
+        let x: CGFloat = image == nil ? 7 : 29
         return (0..<count).map { row in
             NSRect(x: x, y: count == 1 ? 8 : CGFloat(3 + row * 12),
                    width: max(0, bounds.width - x - 7), height: count == 1 ? 15 : 12)
         }
     }
     override func draw(_ dirtyRect: NSRect) {
-        let background = bezelColor ?? NSColor(white: 0.13, alpha: 1)
+        let base = bezelColor ?? NSColor(white: 0.13, alpha: 1)
+        let background = artworkBehind ? NSColor.black.withAlphaComponent(statusOnly ? 0.28 : 0.58) : base
         (cell?.isHighlighted == true ? background.blended(withFraction: 0.2, of: .white)! : background).setFill()
         NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6).fill()
         let opacity: CGFloat = isEnabled || statusOnly ? 1 : 0.4
-        if let image, templateGlyph == nil, stripWidth == 0 {
+        if let image, templateGlyph == nil {
             let tint = (contentTintColor ?? .controlAccentColor).withAlphaComponent(opacity)
             let icon = image.withSymbolConfiguration(.init(hierarchicalColor: tint)) ?? image
             let x = title.isEmpty ? (bounds.width - 15) / 2 : 7
@@ -301,7 +292,7 @@ final class NativeTouchBarButton: ConnectionActionButton {
         for (row, rect) in labelRects.enumerated() {
             let paragraph = NSMutableParagraphStyle(); paragraph.lineBreakMode = .byTruncatingMiddle
             let font = NSFont.systemFont(ofSize: lines.count > 1 ? (row == 0 ? 10.5 : 9) : 11, weight: .semibold)
-            let drawn = row > 0 && stripWidth > 0 ? lines[row].replacingOccurrences(of: "Ready to stream", with: "Ready") : lines[row]
+            let drawn = lines[row]
             (drawn as NSString).draw(in: rect, withAttributes: [
                 .font: font, .foregroundColor: NSColor.white.withAlphaComponent(opacity * (row == 0 ? 1 : 0.8)),
                 .paragraphStyle: paragraph])
@@ -316,16 +307,17 @@ final class NativeTouchBarRow: NSView {
     let document = NSView()
     let more = NativeTouchBarButton(title: "", target: nil, action: nil)
     var status: NSButton?
+    private(set) var strip: MoonlightLGTouchBarStripView?
     var statusWidth: CGFloat = 0
     private var scrollObserver: NSObjectProtocol?
     var controls: [(NSButton, CGFloat)] = []
     override var intrinsicContentSize: NSSize {
-        NSSize(width: statusWidth + (status == nil ? 0 : 6) + document.frame.width, height: 30)
+        NSSize(width: strip == nil ? statusWidth + (status == nil ? 0 : 6) + document.frame.width : NSView.noIntrinsicMetric, height: 30)
     }
     init(buttons: [(NSButton, CGFloat)], pinnedStatus: Bool) {
         super.init(frame: NSRect(x: 0, y: 0, width: 640, height: 30))
         identifier = .init("TouchBarCommandRow")
-        scroll.drawsBackground = false; scroll.borderType = .noBorder
+        scroll.drawsBackground = false; scroll.contentView.drawsBackground = false; scroll.borderType = .noBorder
         scroll.hasVerticalScroller = false; scroll.hasHorizontalScroller = false
         scroll.horizontalScrollElasticity = .allowed; scroll.verticalScrollElasticity = .none
         scroll.documentView = document; addSubview(scroll)
@@ -352,19 +344,48 @@ final class NativeTouchBarRow: NSView {
         heightAnchor.constraint(equalToConstant: 30).isActive = true
         widthAnchor.constraint(greaterThanOrEqualToConstant: 320).isActive = true
         setContentHuggingPriority(.defaultLow, for: .horizontal)
+        // Request the physical maximum as a soft preference. AppKit can shrink
+        // this single item for the Control Strip or smaller available regions.
+        let fill = widthAnchor.constraint(equalToConstant: 1085)
+        fill.priority = .defaultLow; fill.isActive = true
         setFrameSize(frame.size)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    /// One decoration spans the entire allocated item, behind the existing
+    /// nonblocking controls. Keep the moon's centre open by docking actions right.
+    func installStrip(_ view: MoonlightLGTouchBarStripView) {
+        if strip !== view { removeStrip(); strip = view; addSubview(view, positioned: .below, relativeTo: nil) }
+        view.frame = bounds
+        for button in ([status].compactMap { $0 } + controls.map { $0.0 } + [more]) {
+            (button as? NativeTouchBarButton)?.artworkBehind = true
+            button.needsDisplay = true
+        }
+        invalidateIntrinsicContentSize()
+        setFrameSize(frame.size)
+    }
+    func removeStrip() {
+        strip?.setPresentationActive(false); strip?.removeFromSuperview(); strip = nil
+        for button in ([status].compactMap { $0 } + controls.map { $0.0 } + [more]) {
+            (button as? NativeTouchBarButton)?.artworkBehind = false
+            button.needsDisplay = true
+        }
+        invalidateIntrinsicContentSize()
+        setFrameSize(frame.size)
+    }
     override func setFrameSize(_ size: NSSize) {
         super.setFrameSize(size)
-        let pinned = status == nil ? 0 : min(statusWidth, max(100, size.width * 0.4))
+        strip?.frame = bounds
+        let pinned = status == nil ? 0 : min(statusWidth, max(100, size.width * (strip == nil ? 0.4 : 0.3)))
         if let status { status.frame = NSRect(x: 0, y: 0, width: pinned, height: 30) }
         let start = pinned + (status == nil ? 0 : 6)
         let available = max(0, size.width - start)
         let overflow = document.frame.width > available
         more.isHidden = !overflow
         more.frame = NSRect(x: max(start, size.width - 30), y: 0, width: 30, height: 30)
-        scroll.frame = NSRect(x: start, y: 0, width: max(0, available - (overflow ? 34 : 0)), height: 30)
+        let viewport = max(0, available - (overflow ? 34 : 0))
+        let controlWidth = strip == nil ? viewport : min(document.frame.width, viewport)
+        scroll.frame = NSRect(x: strip == nil ? start : size.width - (overflow ? 34 : 0) - controlWidth,
+                              y: 0, width: controlWidth, height: 30)
         let limit = max(0, document.frame.width - scroll.contentView.bounds.width)
         scroll.contentView.scroll(to: NSPoint(x: min(limit, scroll.contentView.bounds.origin.x), y: 0))
         scroll.reflectScrolledClipView(scroll.contentView)
@@ -426,12 +447,15 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         private var playingBoot: Date?
         private var bootPlayed = false
         func configureArt() {
-            guard let status = row?.status as? NativeTouchBarButton else { return }
-            if artState == nil {
-                status.removeStrip(); strip = nil; playingBoot = nil; bootPlayed = false
+            guard let row else { return }
+            // Library/stream retain their normal controls and do no shader work.
+            // Startup and Apollo animate the full allocated app area; the system
+            // Control Strip remains governed only by the existing opt-in setting.
+            if artState == nil || artState == .idle {
+                row.removeStrip(); strip = nil; playingBoot = nil; bootPlayed = false
             } else if strip == nil {
-                let view = MoonlightLGTouchBarStripView(frame: NSRect(x: 0, y: 0, width: 72, height: 30))
-                strip = view; status.installStrip(view)
+                let view = MoonlightLGTouchBarStripView(frame: row.bounds)
+                strip = view; row.installStrip(view)
             }
         }
         func refreshArt() {
@@ -455,6 +479,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             window = next; previous = next.touchBar
             let bar = NSTouchBar(); bar.delegate = self
             bar.defaultItemIdentifiers = [.init("native.commandRow")]
+            bar.principalItemIdentifier = .init("native.commandRow")
             self.bar = bar; next.touchBar = bar
             for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
                          NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification,
@@ -472,7 +497,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         func detach() {
             detaching = true
             strip?.setPresentationActive(false)
-            (row?.status as? NativeTouchBarButton)?.removeStrip()
+            row?.removeStrip()
             strip = nil; playingBoot = nil; bootPlayed = false
             presentation.update(nil, enabled: false, eligible: false)
             if let distributedObserver { DistributedNotificationCenter.default().removeObserver(distributedObserver) }; distributedObserver = nil

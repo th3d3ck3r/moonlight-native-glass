@@ -15,7 +15,7 @@ shared = ['SmokeAccretionScene.swift', 'MoonlightLGTouchBarArt.swift']
 fixtures = [
     ('TouchBarFrontend', ['EngineProtocol.swift', 'NativeCrimsonTheme.swift', *shared, 'NativeConnectionView.swift'], 'TouchBarFrontendTests.swift', []),
     ('TouchBarArt', shared, 'MoonlightLGTouchBarArtTests.swift', []),
-    ('SmokeScene', shared, 'SmokeSceneRenderTests.swift', [str(root / 'build/smoke-scene-previews')])
+    ('SmokeScene', ['EngineProtocol.swift', 'NativeCrimsonTheme.swift', *shared, 'NativeConnectionView.swift'], 'SmokeSceneRenderTests.swift', [str(root / 'build/smoke-scene-previews')])
 ]
 for name, sources, test, arguments in fixtures:
     app = build / (name + '.app')

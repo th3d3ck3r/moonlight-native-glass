@@ -181,9 +181,12 @@ float3 scene(float2 p, float t, float boot, float uP, float uC, float s, float f
     float2 dp = float2(p.x, p.y / tilt) / scaleIn;
     dp = rot(dp, swirl * (1.0 - length(dp)));
     float rd = length(dp);
-    float f = diskDens(dp, t, boost);
     float inner = R0 * 1.12;
     float band = ss(inner, inner + 0.06, rd) * ss(0.64, 0.3, rd);
+    // Density contributes only inside this exact support. Keep the separate
+    // haze and exponential glow below, including their unbounded tails.
+    float f = 0.0;
+    if (band != 0.0 && form != 0.0) { f = diskDens(dp, t, boost); }
     float temp = ss(0.6, inner, rd) * mix(1.0, ss(0.25, 0.7, uP), boot);
     float dop = 1.0 + 0.55 * clamp(dp.x / max(rd, 0.001), -1.0, 1.0);
     float filam = ss(0.35, 0.9, f);
@@ -201,10 +204,13 @@ float3 scene(float2 p, float t, float boot, float uP, float uC, float s, float f
     float lr = rr - R0 * 1.04;
     float2 ldp = (p / max(rr, 0.001)) * (inner + lr * 1.6);
     ldp = rot(ldp, swirl * (1.0 - length(ldp)));
-    float lf = diskDens(ldp * float2(1.0, -1.0), t, boost);
     float up = ss(-0.15, 0.35, p.y / max(rr, 0.001));
     float arcBand = ss(R0, R0 * 1.1, rr) * ss(R0 * 2.1, R0 * 1.3, rr);
     float under = ss(R0, R0 * 1.06, rr) * ss(R0 * 1.22, R0 * 1.08, rr) * ss(0.1, -0.4, p.y / max(rr, 0.001));
+    float lf = 0.0;
+    if ((arcBand * up + under * 0.6) != 0.0 && form != 0.0) {
+        lf = diskDens(ldp * float2(1.0, -1.0), t, boost);
+    }
     col += mix(C, float3(1.0, 0.82, 0.88), ss(R0 * 1.6, R0 * 1.08, rr) * 0.7)
          * (lf * lf * lf * 3.0 + 0.08) * (arcBand * up + under * 0.6) * form
          * 1.05 * (1.0 + uC * 0.35) * mix(1.0, ss(0.35, 0.7, uP), boot);
@@ -224,7 +230,9 @@ float3 scene(float2 p, float t, float boot, float uP, float uC, float s, float f
     col += float3(1.0, 0.85, 0.9) * exp(-fe * fe) * boot
          * (exp(-abs(rr - R0 * 1.2) * 30.0) * 1.5 + exp(-rr * 4.0) * 0.6);
 
-    col += progressRing(p, rr, fillIn, uC) * (1.0 - boot) * ring;
+    if ((1.0 - boot) != 0.0 && ring != 0.0) {
+        col += progressRing(p, rr, fillIn, uC) * (1.0 - boot) * ring;
+    }
     col += float3(1.0, 0.8, 0.86) * shock * 0.5;
     return col;
 }

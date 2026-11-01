@@ -69,9 +69,18 @@ import SwiftUI
             view.frame = originalFrame
         }
         let row = owner.row!
-        precondition(owner.strip != nil && owner.strip?.state == .idle && owner.strip?.isAnimating == false,
-                     "Library artwork must remain still inside the existing status tile")
+        precondition(owner.strip == nil && row.strip == nil,
+                     "Library must retain its ordinary controls without a live renderer")
+        owner.update(owner.commands, crimson: true, artState: .connecting)
         let originalStrip = owner.strip
+        precondition(originalStrip != nil && originalStrip?.superview === row,
+                     "Artwork belongs to the full command row, never the status button")
+        for width in [CGFloat(685), 400, 1085] {
+            row.frame = NSRect(x: 0, y: 0, width: width, height: 30)
+            precondition(originalStrip?.frame == row.bounds, "Artwork must span every allocated physical width")
+            precondition(originalStrip?.hitTest(NSPoint(x: width / 2, y: 15)) == nil,
+                         "Whole-bar artwork must never intercept native actions")
+        }
         owner.update(owner.commands, crimson: true, artState: .connecting)
         precondition(owner.strip === originalStrip && owner.strip?.state == .connecting,
                      "Connection updates must reuse the artwork and existing command row")
@@ -81,6 +90,8 @@ import SwiftUI
         precondition(owner.strip?.connectionStartedAt == connectedAt,
                      "Metadata updates must not replay the connect shockwave")
         owner.update(owner.commands, crimson: true, artState: .idle)
+        precondition(row.strip == nil && originalStrip?.superview == nil && originalStrip?.isAnimating == false,
+                     "Returning to library must remove the row-wide live surface")
         var previousEnd: CGFloat = -6
         for (control, _) in row.controls {
             precondition(control.frame.minX >= previousEnd + 6, "Scrollable controls must retain distinct non-overlapping document frames")

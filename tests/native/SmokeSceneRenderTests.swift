@@ -85,6 +85,76 @@ import SwiftUI
                      "The Touch Bar shader must respond to connected state, not display a fixed image")
         precondition(images["tile-connecting"]!.tiffRepresentation != images["tile-connected"]!.tiffRepresentation,
                      "The actual 72-point status tile must retain live state changes")
+        // Exercise the production composition, not just the shader in an
+        // isolated view: the moon must occupy the centre of the app's available
+        // bar while the original status/actions remain visible above it.
+        for width in [CGFloat(685), 1085] {
+            for boot in [true, false] {
+                let size = NSSize(width: width, height: 30)
+                let window = NSWindow(contentRect: NSRect(origin: NSPoint(x: 70, y: 100), size: size),
+                                      styleMask: .borderless, backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false; window.backgroundColor = .black
+                let status = NativeTouchBarButton(title: boot ? "MoonlightLG\nStarting…" : "Th3D3ck3r-R7\nReady to stream", target: nil, action: nil)
+                status.statusOnly = true; status.isEnabled = false
+                status.templateGlyph = MoonlightLGTouchBarArt.appGlyph
+                status.image = status.templateGlyph
+                let primary = NativeTouchBarButton(title: boot ? "Skip to Library" : "Continue to Stream", target: nil, action: nil)
+                primary.image = NSImage(systemSymbolName: boot ? "forward.end.fill" : "play.fill", accessibilityDescription: nil)
+                let cancel = NativeTouchBarButton(title: "Cancel", target: nil, action: nil)
+                cancel.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
+                let retry = NativeTouchBarButton(title: "Retry", target: nil, action: nil)
+                retry.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
+                retry.isEnabled = false
+                var buttons: [(NSButton, CGFloat)] = [(status, 200), (primary, 150)]
+                if !boot { buttons += [(retry, 65), (cancel, 80)] }
+                for (button, _) in buttons {
+                    button.bezelColor = NSColor(srgbRed: 0.12, green: 0.035, blue: 0.055, alpha: 1)
+                    button.contentTintColor = NSColor(srgbRed: 0.95, green: 0.19, blue: 0.32, alpha: 1)
+                }
+                let row = NativeTouchBarRow(buttons: buttons, pinnedStatus: true)
+                var now: CFTimeInterval = 100
+                let strip = MoonlightLGTouchBarStripView(frame: NSRect(origin: .zero, size: size),
+                    clock: { now }, reduceMotion: { false })
+                row.installStrip(strip)
+                row.frame = NSRect(origin: .zero, size: size)
+                window.contentView = row
+                window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+                strip.setPresentationActive(true)
+                if boot { strip.playBoot(duration: 3.8); now += 3.2 }
+                else { strip.show(.connected, animated: false); now += 1.6 }
+                RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+                precondition(row.strip === strip && strip.frame == row.bounds,
+                             "Production artwork must fill the complete row, never a status tile")
+                precondition(strip.bounds.width == width && strip.bounds.height == 30 && strip.isAnimating)
+                precondition(row.status!.frame.maxX < width / 2 && row.scroll.frame.minX > width / 2,
+                             "Foreground status/actions must leave the central moon readable")
+                precondition(buttons.allSatisfy { $0.0.frame.height == 30 }, "Controls retain physical Touch Bar height")
+                let path = directory.appendingPathComponent("smoke-row-\(boot ? "boot" : "connected")-\(Int(width)).png")
+                let capture = Process(); capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), path.path]
+                try! capture.run(); capture.waitUntilExit()
+                precondition(capture.terminationStatus == 0, "Composited production-row capture must succeed")
+                let bitmap = NSBitmapImageRep(data: try! Data(contentsOf: path))!
+                // Neither status nor action occupies this region. Bright lunar
+                // pixels prove the GPU image is centred across the whole row;
+                // the old 72-point status decoration cannot satisfy this check.
+                let scale = CGFloat(bitmap.pixelsWide) / width
+                let center = bitmap.pixelsWide / 2
+                let radius = Int(15 * scale)
+                var lunarPixels = 0
+                for y in 0..<bitmap.pixelsHigh {
+                    for x in max(0, center - radius)..<min(bitmap.pixelsWide, center + radius) {
+                        guard let c = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                        if c.redComponent > 0.25 && c.greenComponent > 0.2 && c.blueComponent > 0.2 { lunarPixels += 1 }
+                    }
+                }
+                precondition(lunarPixels > 10, "\(path.lastPathComponent): central moon must render through the actual composed control row")
+                row.removeStrip()
+                precondition(!strip.isAnimating && strip.superview == nil,
+                             "Removing the row artwork must tear down its renderer and timer")
+                window.orderOut(nil); window.close()
+            }
+        }
         // Template PNGs need AppKit's image-view rendering; raw NSImage.draw
         // would leave the black mask invisible on the dark Touch Bar surface.
         let glyphWindow = NSWindow(contentRect: NSRect(x: 70, y: 100, width: 72, height: 30),
@@ -111,6 +181,6 @@ import SwiftUI
         } }
         precondition(lightPixels > 10, "System-tinted template glyph must remain visible on the dark surface")
         glyphWindow.orderOut(nil); glyphWindow.close()
-        print("PASS: packaged screen/Touch Bar Metal functions, 72-point tile, live state frames and visible system-tinted glyph")
+        print("PASS: packaged screen/Touch Bar Metal functions, live state frames, integrated 685/1085-point rows and visible system-tinted glyph")
     }
 }
