@@ -547,7 +547,11 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         private func makeBar() -> NSTouchBar {
             let result = NSTouchBar(); result.delegate = self
             result.defaultItemIdentifiers = [.init("native.commandRow")]
-            result.principalItemIdentifier = .init("native.commandRow")
+            // The row is the entire flexible app region, not a centered item.
+            // principalItemIdentifier centers within the physical Touch Bar;
+            // with the Control Strip present that can shift/clip this canvas.
+            // Match the stream bar: let AppKit place and size the only item.
+            result.principalItemIdentifier = nil
             return result
         }
         func configureArt() {

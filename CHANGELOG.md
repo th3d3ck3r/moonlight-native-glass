@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.3.5.4U — private library Touch Bar placement
+
+- Remove physical-bar principal-item centering from the library, startup and Apollo canvases. Use the same ordinary placement as the working stream bar so the available app region is not shifted toward the Control Strip.
+- Preserve the flexible canvas, animation, scrolling, shortcuts, crimson volume slider and existing full-width lifecycle. Internal build 51.
+- Check normal and independent full-width bar placement in the native regressions. Physical M1 presentation still requires owner confirmation.
+
 ## 1.3.5.3U — private adaptive Touch Bar sizing
 
 - Make the home/connection Touch Bar item flexible so AppKit gives it the available app area instead of centering a content-sized row. The animation follows that allocation in normal and full-width modes.

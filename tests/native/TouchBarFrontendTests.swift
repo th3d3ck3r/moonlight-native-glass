@@ -32,6 +32,8 @@ import SwiftUI
         owner.update([disabled], crimson: true); owner.attach(window)
         let bar = window.touchBar!
         precondition(bar !== previous)
+        precondition(bar.principalItemIdentifier == nil,
+                     "The library/Apollo canvas must fill its app region, not request physical-bar centering")
         _ = bar.item(forIdentifier: .init("native.commandRow"))
         let button = owner.buttons["apollo.continue"]!
         button.performClick(nil); precondition(presses == 0 && !button.isEnabled)
@@ -343,6 +345,8 @@ import SwiftUI
         let session = NativeTouchBarPresentation.Session(show: { candidate in
             shows += 1
             precondition(candidate !== window.touchBar, "System-modal presentation must not reuse the window-owned bar")
+            precondition(candidate.principalItemIdentifier == nil,
+                         "The independent full-width canvas must also avoid principal-item centering")
             let item = candidate.item(forIdentifier: .init("native.commandRow")) as? NSCustomTouchBarItem
             precondition(item?.view != nil && item?.view === owner.modalSurface?.row,
                          "Modal controls must be fully materialized before entering the presentation API")
@@ -378,6 +382,8 @@ import SwiftUI
         owner.update([status, command], crimson: true, artState: .idle)
         owner.attach(window)
         let normal = owner.bar!
+        precondition(normal.principalItemIdentifier == nil,
+                     "Normal fallback must preserve edge-to-edge allocation beside the Control Strip")
         _ = normal.item(forIdentifier: .init("native.commandRow"))
         let normalRow = owner.row!, normalStrip = owner.strip!, normalButton = owner.buttons[command.id]!
         pump()
