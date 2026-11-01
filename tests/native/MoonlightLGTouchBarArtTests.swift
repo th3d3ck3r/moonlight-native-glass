@@ -108,8 +108,8 @@ import QuartzCore
         strip.show(.connecting); pump(); precondition(strip.isAnimating)
         strip.removeFromSuperview(); pump(); precondition(!strip.isAnimating, "Detach must stop the timer")
         window.contentView!.addSubview(strip); strip.setPresentationActive(true); pump()
-        NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
-        precondition(!strip.isAnimating && !strip.presentationActive, "Application deactivation must suspend, never steal the bar back")
+        strip.setPresentationActive(false)
+        precondition(!strip.isAnimating && !strip.presentationActive, "The owning coordinator's deactivation must suspend, never steal the bar back")
         strip.removeFromSuperview()
 
         weak var released: MoonlightLGTouchBarStripView?
