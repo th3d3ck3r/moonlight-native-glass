@@ -1,10 +1,10 @@
-name: Prepare MoonlightLG Draft Release
+name: Prepare MoonlightLG Release Bundle
 on:
   push:
     branches: [feature/recording-plugin]
     paths: [.github/workflows/publish-native-preview.yml]
 permissions:
-  contents: write
+  contents: read
   actions: read
 concurrency:
   group: publish-moonlightlg-stable
@@ -166,16 +166,27 @@ jobs:
           shutil.copyfile(overlays[0], root / 'overlay-controls-dark.png')
           PY
           cat release-assets/SHA256SUMS.txt
-      - name: Stage unpublished draft with the exact validated assets
+      - name: Stage held release bundle without release-write permissions
         run: |
-          gh release create "$RELEASE_TAG" --target "$VALIDATED_SHA" --draft \
-            --title "🌙 MoonlightLG $VERSION · Crimson Glass" \
-            --notes-file docs/RELEASE_1.3.5.4.md \
-            release-assets/*.zip release-assets/*.tar.gz release-assets/SHA256SUMS.txt \
-            release-assets/LICENSE.txt release-assets/THIRD_PARTY_NOTICES.txt release-assets/SOURCE_MANIFEST.json release-assets/*.png
-          # Explicit owner hold: this workflow must never publish the draft.
-          gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' | grep -qx true
-          if gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
-            echo 'Unexpected public tag during draft preparation; refusing further actions.' >&2
-            exit 1
-          fi
+          cp docs/RELEASE_1.3.5.4.md release-assets/RELEASE_NOTES.md
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path('release-assets')
+          files = {p.name: p.stat().st_size for p in root.iterdir() if p.is_file()}
+          (root / 'PREPARATION.json').write_text(json.dumps({
+              'version': os.environ['VERSION'], 'build': 52,
+              'validated_commit': os.environ['VALIDATED_SHA'],
+              'macos_run': int(os.environ['BUILD_RUN']), 'xcode_run': int(os.environ['XCODE_RUN']),
+              'publication_hold': True, 'owner_go_required': True,
+              'github_draft_created': False,
+              'draft_creation_blocker': 'GitHub release creation returned HTTP 403 Resource not accessible by integration.',
+              'public_release_unchanged': 'moonlightlg-v1.3.2.0',
+              'files': files
+          }, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: MoonlightLG-1.3.5.4-Release-Ready
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 90
