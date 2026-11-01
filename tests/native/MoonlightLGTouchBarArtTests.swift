@@ -5,6 +5,7 @@ import QuartzCore
     @MainActor static func main() {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.regular)
+        NSApp.finishLaunching()
         let window = NSWindow(contentRect: NSRect(x: 20, y: 40, width: 400, height: 140),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -14,7 +15,14 @@ import QuartzCore
             let deadline = Date().addingTimeInterval(0.05)
             while Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.005)) }
         }
-        pump()
+        func waitFor(_ description: String, _ condition: () -> Bool) {
+            let deadline = Date().addingTimeInterval(2)
+            while !condition() && Date() < deadline {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+            }
+            precondition(condition(), description)
+        }
+        waitFor("AppKit fixture must own an active key window") { NSApp.isActive && window.isKeyWindow }
         let oldEnabled = MoonlightLGTouchBarArt.liveAnimationEnabled
         defer { MoonlightLGTouchBarArt.liveAnimationEnabled = oldEnabled; window.close() }
         MoonlightLGTouchBarArt.liveAnimationEnabled = true
@@ -40,22 +48,23 @@ import QuartzCore
         precondition(strip.hitTest(NSPoint(x: 10, y: 10)) == nil, "Decoration must never intercept a control tap")
         strip.show(.connecting); pump()
         precondition(strip.isAnimating, "Visible connecting artwork must animate")
-        now = 101; pump()
-        precondition(strip.sceneSnapshot.time == 1)
+        now = 101
+        waitFor("Registered timer must advance the injected clock; active=\(strip.presentationActive), timer=\(strip.isAnimating), attached=\(strip.window != nil), visible=\(strip.visibleRect), hidden=\(strip.isHiddenOrHasHiddenAncestor)") { strip.sceneSnapshot.time == 1 }
         strip.setFrameSize(NSSize(width: 72, height: 30)); strip.refreshPresentation(); pump()
         precondition(strip.isAnimating && strip.bounds.width == 72,
                      "Actual compact status-tile framing must preserve live scheduling")
         strip.show(.connected); pump()
         let connectedAt = strip.connectionStartedAt
         precondition(connectedAt == now)
-        now = 101.7; pump()
+        now = 101.7
+        waitFor("Registered timer must advance the connected shockwave") { strip.sceneSnapshot.connected > 0 && strip.sceneSnapshot.connected < 1 }
         let phase = strip.sceneSnapshot.connected
         precondition(phase > 0 && phase < 1)
         strip.show(.connected); strip.refreshPresentation(); pump()
         precondition(strip.connectionStartedAt == connectedAt && strip.sceneSnapshot.connected == phase,
                      "Metadata refresh must not restart the connected shockwave")
-        now = 102.3; pump()
-        precondition(strip.sceneSnapshot.connected == 1)
+        now = 102.3
+        waitFor("Registered timer must finish connected easing") { strip.sceneSnapshot.connected == 1 }
         strip.show(.failed)
         let frozen = strip.sceneSnapshot
         precondition(!strip.isAnimating && strip.sceneSaturation == 0.25)
@@ -91,7 +100,8 @@ import QuartzCore
         window.makeKeyAndOrderFront(nil); strip.setPresentationActive(true); pump()
         strip.show(.idle); precondition(!strip.isAnimating, "Returning to the library removes all live scheduling")
         strip.playBoot(duration: 3.8); pump(); precondition(strip.isAnimating)
-        now += 4; pump()
+        now += 4
+        waitFor("Registered timer must finish the finite Touch Bar boot") { strip.state == .idle }
         precondition(strip.state == .idle && !strip.isAnimating, "Boot must terminate rather than reschedule an idle timer")
         strip.show(.connecting); pump(); precondition(strip.isAnimating)
         strip.removeFromSuperview(); pump(); precondition(!strip.isAnimating, "Detach must stop the timer")
