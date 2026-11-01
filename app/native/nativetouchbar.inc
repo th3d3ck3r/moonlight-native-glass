@@ -289,6 +289,8 @@ static NSString* const touchSurfaceID=@"touch.surface";
 - (instancetype)initWithFrame:(NSRect)frame {
     if ((self=[super initWithFrame:frame])) {
         self.wantsLayer=YES; self.layer.backgroundColor=NSColor.blackColor.CGColor;
+        for (NSString* name in @[NSViewFrameDidChangeNotification,NSViewBoundsDidChangeNotification])
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(ancestorGeometryChanged:) name:name object:nil];
         self.translatesAutoresizingMaskIntoConstraints=NO;
         [self.heightAnchor constraintEqualToConstant:30].active=YES;
         [self setContentHuggingPriority:50 forOrientation:NSLayoutConstraintOrientationHorizontal];
@@ -335,9 +337,21 @@ static NSString* const touchSurfaceID=@"touch.surface";
     self.centerOnLayout=YES; self.needsLayout=YES; [self layoutSubtreeIfNeeded];
 }
 - (void)setFrameSize:(NSSize)size { [super setFrameSize:size]; self.needsLayout=YES; }
-- (void)viewDidMoveToWindow { [super viewDidMoveToWindow]; [self updateArtwork]; }
+- (void)viewDidMoveToSuperview {
+    [super viewDidMoveToSuperview];
+    for (NSView* ancestor=self.superview;ancestor;ancestor=ancestor.superview) {
+        ancestor.postsFrameChangedNotifications=YES; ancestor.postsBoundsChangedNotifications=YES;
+    }
+    self.needsLayout=YES;
+}
+- (void)ancestorGeometryChanged:(NSNotification*)note {
+    NSView* changed=note.object;
+    if (changed!=self && [changed isKindOfClass:NSView.class] && [self isDescendantOf:changed] && !self.arranging)
+        self.needsLayout=YES;
+}
+- (void)viewDidMoveToWindow { [super viewDidMoveToWindow]; self.needsLayout=YES; [self updateArtwork]; }
 - (void)viewDidHide { [super viewDidHide]; [self updateArtwork]; }
-- (void)viewDidUnhide { [super viewDidUnhide]; [self updateArtwork]; }
+- (void)viewDidUnhide { [super viewDidUnhide]; self.needsLayout=YES; [self updateArtwork]; }
 - (void)layout {
     [super layout]; if (self.arranging) return; self.arranging=YES;
     NSRect viewport=NSIntersectionRect(self.visibleRect,self.bounds); if (NSIsEmptyRect(viewport)) viewport=self.bounds;
@@ -414,6 +428,7 @@ static NSString* const touchSurfaceID=@"touch.surface";
     if (gesture.state==NSGestureRecognizerStateBegan) [self.owner touchRestoreControlStrip:gesture];
 }
 - (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     SEL selector=NSSelectorFromString(@"setPresentationActive:");
     if ([self.artwork respondsToSelector:selector]) ((void(*)(id,SEL,BOOL))objc_msgSend)(self.artwork,selector,NO);
     [_artwork release]; [_scroll release]; [_document release]; [_moonTarget release]; [_identifiers release]; [_controls release]; [super dealloc];

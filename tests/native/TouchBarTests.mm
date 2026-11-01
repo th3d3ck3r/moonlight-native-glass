@@ -85,13 +85,22 @@ static NSButton* surfaceButton(NSTouchBar* bar,NSString* name) {
 static void checkSurfacePage(NSView* surface,NSArray* identifiers,const char* message) { check([[surface valueForKey:@"identifiers"] isEqualToArray:identifiers],message); }
 static void captureSurface(NSView* surface,NSString* path,CGFloat width) {
     NSView* root=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,width,30)] autorelease];
-    [root addSubview:surface]; surface.frame=root.bounds; [surface layoutSubtreeIfNeeded];
+    [root addSubview:surface]; surface.translatesAutoresizingMaskIntoConstraints=NO;
+    NSArray* allocation=@[[surface.leadingAnchor constraintEqualToAnchor:root.leadingAnchor],
+        [surface.trailingAnchor constraintEqualToAnchor:root.trailingAnchor],
+        [surface.topAnchor constraintEqualToAnchor:root.topAnchor],
+        [surface.bottomAnchor constraintEqualToAnchor:root.bottomAnchor]];
+    [NSLayoutConstraint activateConstraints:allocation]; [root layoutSubtreeIfNeeded];
+    surface.needsLayout=YES; [surface layoutSubtreeIfNeeded];
     NSView* artwork=[surface valueForKey:@"artwork"]; NSScrollView* scroll=[surface valueForKey:@"scroll"];
+    fprintf(stderr,"SURFACE %s root=%s frame=%s bounds=%s visible=%s art=%s scroll=%s\n",path.lastPathComponent.UTF8String,
+        NSStringFromRect(root.bounds).UTF8String,NSStringFromRect(surface.frame).UTF8String,NSStringFromRect(surface.bounds).UTF8String,
+        NSStringFromRect(surface.visibleRect).UTF8String,NSStringFromRect(artwork.frame).UTF8String,NSStringFromRect(scroll.frame).UTF8String);
     check(NSEqualRects(artwork.frame,root.bounds) && NSEqualRects(scroll.frame,root.bounds),"Animation and native scroll viewport must use the actual allocated width");
     for (NSView* control in [surface valueForKey:@"controls"]) check(control.bounds.size.width>=30 && control.bounds.size.height==30,"Animated surface preserves comfortable controls");
     NSBitmapImageRep* image=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:image];
     check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Export actual native animated surface control composition");
-    [surface removeFromSuperview];
+    [NSLayoutConstraint deactivateConstraints:allocation]; [surface removeFromSuperview];
 }
 int main(int argc,char** argv) { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp finishLaunching]; NSApp.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
