@@ -46,6 +46,7 @@ jobs:
           path: |
             build/touchbar-previews/*.png
             build/smoke-scene-previews/*.png
+            build/smoke-scene-previews/*.ips
           if-no-files-found: warn
   build:
     # UI probes compile/render the actual native frontend quickly. A final

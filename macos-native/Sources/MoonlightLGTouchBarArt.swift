@@ -115,6 +115,7 @@ final class MoonlightLGTouchBarStripView: NSView {
     private var bootDuration: TimeInterval = 3.8
     private var configured = false
     private var liveWasVisible = false
+    private var updatingLive = false
 
     override convenience init(frame frameRect: NSRect) {
         self.init(frame: frameRect, clock: CACurrentMediaTime,
@@ -170,9 +171,16 @@ final class MoonlightLGTouchBarStripView: NSView {
         // The existing Touch Bar coordinator is the single authority for app
         // and owning-window focus. A hosting window can have different AppKit
         // activation semantics; never override the parent's eligibility here.
-        for name in [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
-                     NSView.boundsDidChangeNotification, NSView.frameDidChangeNotification] {
+        for name in [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification] {
             observe(.default, name) { $0.refreshPresentation() }
+        }
+        for name in [NSView.boundsDidChangeNotification, NSView.frameDidChangeNotification] {
+            let token = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                guard let self, let changed = note.object as? NSView,
+                      changed === self || self.isDescendant(of: changed) else { return }
+                self.refreshPresentation()
+            }
+            observers.append((.default, token))
         }
         configured = true
         updateStillImage(animated: false)
@@ -264,19 +272,24 @@ final class MoonlightLGTouchBarStripView: NSView {
         // animates, and Reduce Motion must stop all animation immediately.
     }
 
+    private func clearLiveContent() {
+        liveWasVisible = false
+        stopTimer()
+        let oldHost = hostingView; hostingView = nil
+        oldHost?.removeFromSuperview()
+        imageLayer.removeAllAnimations()
+    }
+
     private func updateLive() {
-        guard wantsLive else {
-            liveWasVisible = false
-            stopTimer()
-            let oldHost = hostingView; hostingView = nil
-            oldHost?.removeFromSuperview()
-            imageLayer.removeAllAnimations()
-            return
-        }
-        // Layout/visibility notifications must not publish another SwiftUI
-        // frame and recursively request layout. The timer advances live frames.
+        // NSHostingView initialization/layout can synchronously post AppKit
+        // frame notifications before the hostingView assignment completes.
+        // Never construct another renderer from those reentrant callbacks.
+        guard !updatingLive else { return }
+        updatingLive = true
+        defer { updatingLive = false }
+        guard wantsLive else { clearLiveContent(); return }
         if !liveWasVisible && state != .failed { advanceScene() }
-        guard wantsLive else { return } // A completed boot just became idle.
+        guard wantsLive else { clearLiveContent(); return }
         liveWasVisible = true
         if rendersLiveContent && hostingView == nil {
             let view = NSHostingView(rootView: MoonlightLGTouchBarLiveView(model: model))
@@ -284,7 +297,8 @@ final class MoonlightLGTouchBarStripView: NSView {
             hostingView = view
             addSubview(view)
         }
-        guard wantsLive else { updateLive(); return }
+        // Eligibility can change synchronously while the renderer attaches.
+        guard wantsLive else { clearLiveContent(); return }
         if state == .failed { stopTimer() }
         else { startTimer() }
     }
