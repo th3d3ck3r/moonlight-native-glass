@@ -167,9 +167,9 @@ final class MoonlightLGTouchBarStripView: NSView {
         observe(NSWorkspace.shared.notificationCenter,
                 NSWorkspace.accessibilityDisplayOptionsDidChangeNotification) { $0.refreshPresentation() }
         observe(.default, MoonlightLGTouchBarArt.configurationChanged) { $0.refreshPresentation() }
-        for name in [NSApplication.didResignActiveNotification, NSApplication.didHideNotification] {
-            observe(.default, name) { $0.setPresentationActive(false) }
-        }
+        // The existing Touch Bar coordinator is the single authority for app
+        // and owning-window focus. A hosting window can have different AppKit
+        // activation semantics; never override the parent's eligibility here.
         for name in [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
                      NSView.boundsDidChangeNotification, NSView.frameDidChangeNotification] {
             observe(.default, name) { $0.refreshPresentation() }

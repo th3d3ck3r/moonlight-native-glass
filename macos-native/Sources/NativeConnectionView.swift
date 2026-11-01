@@ -459,7 +459,8 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
                          NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification,
                          NSWindow.didChangeOcclusionStateNotification, NSApplication.didBecomeActiveNotification,
-                         NSApplication.didResignActiveNotification, NativeTouchBarPresentation.changed] {
+                         NSApplication.didResignActiveNotification, NSApplication.didHideNotification,
+                         NSApplication.didUnhideNotification, NativeTouchBarPresentation.changed] {
                 observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.refreshPresentation() })
             }
             observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: next, queue: .main) { [weak self] _ in

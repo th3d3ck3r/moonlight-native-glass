@@ -22,7 +22,9 @@ import QuartzCore
             }
             precondition(condition(), description)
         }
-        waitFor("AppKit fixture must own an active key window") { NSApp.isActive && window.isKeyWindow }
+        waitFor("AppKit fixture must expose an attached visible rendering surface") { window.isVisible && window.contentView != nil }
+        // Eligibility is supplied by the already-tested owning coordinator;
+        // command-line fixtures do not require foreground app activation.
         let oldEnabled = MoonlightLGTouchBarArt.liveAnimationEnabled
         defer { MoonlightLGTouchBarArt.liveAnimationEnabled = oldEnabled; window.close() }
         MoonlightLGTouchBarArt.liveAnimationEnabled = true
