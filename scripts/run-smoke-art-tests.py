@@ -56,3 +56,6 @@ for name, sources, test, arguments in fixtures:
                 break
             time.sleep(.2)
         raise
+
+# Compare the optimized shader against the untouched supplied visual reference.
+subprocess.run([sys.executable, str(root / 'scripts/test-smoke-shader-performance.py')], check=True)

@@ -47,6 +47,7 @@ jobs:
             build/touchbar-previews/*.png
             build/smoke-scene-previews/*.png
             build/smoke-scene-previews/*.ips
+            build/smoke-shader-performance/results.json
           if-no-files-found: warn
   build:
     # UI probes compile/render the actual native frontend quickly. A final

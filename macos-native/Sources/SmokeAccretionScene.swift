@@ -17,26 +17,55 @@ struct SmokeAccretionState {
     var icon = false
 }
 
+/// Bound the expensive procedural effect's physical pixels on Retina displays.
+/// Layout, text and controls remain at the native backing resolution.
+/// Keep the reference's aspect ratio and wall-clock timing at every size.
+enum SmokeAccretionRenderBudget {
+    static let maximumPixels = CGSize(width: 1280, height: 800)
+    static func factor(size: CGSize, displayScale: CGFloat) -> CGFloat {
+        max(1, max(size.width * displayScale / maximumPixels.width,
+                   size.height * displayScale / maximumPixels.height))
+    }
+}
+
 /// A 3D cratered moon inside a spinning crimson smoke accretion disk.
 /// Rendered entirely on the GPU through SwiftUI's `colorEffect` (macOS 14+),
 /// shared by the startup animation and the connection screen.
 struct SmokeAccretionScene: View {
     var state: SmokeAccretionState
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         GeometryReader { geometry in
-            Rectangle()
-                .fill(Color.black)
-                .colorEffect(ShaderLibrary.bundle(.main).smokeAccretion(
-                    .float2(Float(geometry.size.width), Float(geometry.size.height)),
-                    // Wrapped so float precision stays high in long sessions.
-                    .float(Float(state.time.truncatingRemainder(dividingBy: 3600))),
-                    .float(Float(state.bootProgress)),
-                    .float(state.isBoot ? 1 : 0),
-                    .float(Float(state.connected)),
-                    .float(Float(state.sinceConnect)),
-                    .float(Float(state.progressFill)),
-                    .float(state.icon ? 1 : 0)))
+            let factor = state.isBoot ? SmokeAccretionRenderBudget.factor(size: geometry.size, displayScale: displayScale) : 1
+            if factor > 1 {
+                let size = CGSize(width: geometry.size.width / factor, height: geometry.size.height / factor)
+                scene(size: size)
+                    .frame(width: size.width, height: size.height)
+                    // Rasterize before scaling, so a large 2x window does not
+                    // multiply this procedural shader's cost by four.
+                    .drawingGroup(opaque: true, colorMode: .nonLinear)
+                    .scaleEffect(factor)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            } else {
+                scene(size: geometry.size)
+            }
         }
+        .clipped()
+    }
+
+    private func scene(size: CGSize) -> some View {
+        Rectangle()
+            .fill(Color.black)
+            .colorEffect(ShaderLibrary.bundle(.main).smokeAccretion(
+                .float2(Float(size.width), Float(size.height)),
+                // Wrapped so float precision stays high in long sessions.
+                .float(Float(state.time.truncatingRemainder(dividingBy: 3600))),
+                .float(Float(state.bootProgress)),
+                .float(state.isBoot ? 1 : 0),
+                .float(Float(state.connected)),
+                .float(Float(state.sinceConnect)),
+                .float(Float(state.progressFill)),
+                .float(state.icon ? 1 : 0)))
     }
 }

@@ -20,10 +20,19 @@ import SwiftUI
                      "Both packaged stitchable functions must be available")
         let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // Large Retina startup windows must not silently return to shading
+        // four times as many pixels. Native-size text sits outside this effect.
+        for size in [CGSize(width: 1100, height: 720), CGSize(width: 2560, height: 1600), CGSize(width: 600, height: 1200)] {
+            let factor = SmokeAccretionRenderBudget.factor(size: size, displayScale: 2)
+            precondition(size.width * 2 / factor <= 1280.001 && size.height * 2 / factor <= 800.001)
+        }
+        precondition(SmokeAccretionRenderBudget.factor(size: CGSize(width: 640, height: 400), displayScale: 2) == 1,
+                     "Small surfaces keep their full native resolution")
         var images: [String: NSBitmapImageRep] = [:]
         let frames: [(String, SmokeAccretionState, Bool)] = [
             ("boot-early", .init(time: 0.6, bootProgress: 0.6 / 3.8, isBoot: true), false),
             ("boot-arrival", .init(time: 3.6, bootProgress: 3.6 / 3.8, isBoot: true), false),
+            ("boot-retina", .init(time: 3.6, bootProgress: 3.6 / 3.8, isBoot: true), false),
             ("connecting", .init(time: 3, progressFill: 0.9), false),
             ("connected", .init(time: 5, connected: 1, sinceConnect: 1.5, progressFill: 1), false),
             ("strip-connecting", .init(time: 3, progressFill: 0.9), true),
@@ -32,7 +41,7 @@ import SwiftUI
             ("tile-connected", .init(time: 5, connected: 1, sinceConnect: 1.5, progressFill: 1), true)
         ]
         for (name, state, strip) in frames {
-            let size = strip ? NSSize(width: name.hasPrefix("tile-") ? 72 : 685, height: 30) : NSSize(width: 640, height: 400)
+            let size = strip ? NSSize(width: name.hasPrefix("tile-") ? 72 : 685, height: 30) : NSSize(width: name == "boot-retina" ? 1100 : 640, height: name == "boot-retina" ? 720 : 400)
             let window = NSWindow(contentRect: NSRect(origin: NSPoint(x: 70, y: 100), size: size),
                                   styleMask: .borderless, backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false

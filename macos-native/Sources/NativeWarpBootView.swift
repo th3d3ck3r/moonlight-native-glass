@@ -21,7 +21,7 @@ struct NativeWarpBootView: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 120, paused: previewTime != nil || presentation.phase != .playing)) { timeline in
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: previewTime != nil || presentation.phase != .playing)) { timeline in
             let t = previewTime ?? max(0, timeline.date.timeIntervalSince(presentation.startedAt ?? timeline.date))
             let progress = min(1, t / Self.sceneLength)
             GeometryReader { geometry in
