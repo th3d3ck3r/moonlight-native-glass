@@ -53,7 +53,10 @@ import SwiftUI
                 window.contentView = view
                 liveStrip = view
             } else {
-                let host = NSHostingView(rootView: SmokeAccretionScene(state: state))
+                let host = NSHostingView(rootView: SmokeAccretionScene(state: state)
+                    // Hosted runners may expose a 1x virtual screen. Exercise
+                    // the actual Retina budget branch as well as native 1x.
+                    .environment(\.displayScale, name == "boot-retina" ? 2 : (NSScreen.main?.backingScaleFactor ?? 1)))
                 host.frame = NSRect(origin: .zero, size: size)
                 window.contentView = host
             }
