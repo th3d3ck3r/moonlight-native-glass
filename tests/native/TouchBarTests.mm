@@ -122,12 +122,31 @@ static void captureSurface(NSView* surface,NSString* path,CGFloat width) {
 // Negotiate space through real Auto Layout instead of assigning a width to the
 // surface. A second arranged view represents the space owned by the Control
 // Strip; hiding/showing/resizing it must transfer the available app area.
-static void exerciseFlexibleSurface(NSView* surface) {
-    check(surface.intrinsicContentSize.width==NSViewNoIntrinsicMetric && surface.intrinsicContentSize.height==30,
+static void exerciseFlexibleSurface(NSView* controllerSurface) {
+    check(controllerSurface.intrinsicContentSize.width==NSViewNoIntrinsicMetric && controllerSurface.intrinsicContentSize.height==30,
           "The single native Touch Bar item must advertise a flexible width, not a centered content-sized width");
-    for (NSLayoutConstraint* constraint in surface.constraints)
-        check(!(constraint.firstAttribute==NSLayoutAttributeWidth && constraint.relation==NSLayoutRelationEqual && !constraint.secondItem),
-              "A full-bar item must not impose a fixed physical width beside the Control Strip");
+    // NSTouchBar installs host-owned sizing constraints on its actual item view.
+    // Do not strip those constraints or move the live controls into a competing
+    // layout. Test the same production class before it is assigned to AppKit.
+    Class type=NSClassFromString(@"MLTouchSurface");
+    check(type && [controllerSurface isKindOfClass:type],"Resolve the actual production surface class");
+    NSView* surface=[[[type alloc] initWithFrame:NSMakeRect(0,0,685,30)] autorelease];
+    check(surface.intrinsicContentSize.width==NSViewNoIntrinsicMetric && surface.intrinsicContentSize.height==30,
+          "A fresh production surface must be flexible before Touch Bar hosting");
+    for (NSLayoutConstraint* constraint in surface.constraints) {
+        BOOL fixed=constraint.firstAttribute==NSLayoutAttributeWidth && constraint.relation==NSLayoutRelationEqual && !constraint.secondItem;
+        if (fixed) fprintf(stderr,"SOURCE WIDTH CONSTRAINT %s\n",constraint.description.UTF8String);
+        check(!fixed,"The production surface constructor must not impose a fixed physical width");
+    }
+    NSView* document=[surface valueForKey:@"document"];
+    NSMutableArray* dummyControls=[NSMutableArray array];
+    for (NSNumber* width in @[@74,@122]) {
+        NSView* control=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,width.doubleValue,30)] autorelease];
+        NSLayoutConstraint* constraint=[control.widthAnchor constraintEqualToConstant:width.doubleValue];
+        constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES;
+        [dummyControls addObject:control]; [document addSubview:control];
+    }
+    [surface setValue:dummyControls forKey:@"controls"];
     NSStackView* host=[[[NSStackView alloc] initWithFrame:NSMakeRect(0,0,1085,30)] autorelease];
     host.orientation=NSUserInterfaceLayoutOrientationHorizontal; host.spacing=0;
     host.alignment=NSLayoutAttributeCenterY; host.distribution=NSStackViewDistributionFill; host.detachesHiddenViews=YES;
@@ -151,8 +170,8 @@ static void exerciseFlexibleSurface(NSView* surface) {
               "The native item must fill all available space as the Control Strip changes, including full width");
         NSView* artwork=[surface valueForKey:@"artwork"];
         check(fabs(artwork.frame.size.width-available)<.5,"The animation must follow the negotiated app area rather than the controls' natural width");
-        for (NSView* control in [surface valueForKey:@"controls"])
-            if ([control isKindOfClass:NSClassFromString(@"MLTouchStatsButton")]) checkMetricFrames([control valueForKey:@"dashboard"]);
+        for (NSView* control in dummyControls)
+            check(NSContainsRect(document.bounds,control.frame),"Negotiated allocation must retain both unchanged dummy controls");
     }
     [host removeArrangedSubview:surface]; [surface removeFromSuperview];
 }
