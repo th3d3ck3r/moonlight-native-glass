@@ -496,8 +496,13 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         init(presentation: NativeTouchBarPresentation.Session = .init(),
              fullWidthEnabled: @escaping () -> Bool = { !CommandLine.arguments.contains("--design-preview") && NativeTouchBarPresentation.enabled() },
              ownerEligible: @escaping (NSWindow) -> Bool = { $0.isKeyWindow && $0.isVisible && NSApp.isActive },
-             contentReady: @escaping (NSTouchBar, NativeTouchBarRow) -> Bool = {
-                 !$0.itemIdentifiers.isEmpty && $1.window != nil && !$1.visibleRect.isEmpty && $1.bounds.width > 0
+             contentReady: @escaping (NSTouchBar, NativeTouchBarRow) -> Bool = { bar, row in
+                 row.layoutControls()
+                 let area = row.layoutViewport
+                 return !bar.itemIdentifiers.isEmpty && row.window != nil && !row.isHiddenOrHasHiddenAncestor
+                     && !row.visibleRect.isEmpty && area.width >= 320 && area.contains(row.scroll.frame)
+                     && (row.status.map { area.contains($0.frame) } ?? true)
+                     && (row.more.isHidden || area.contains(row.more.frame))
              },
              fullWidthFailed: @escaping () -> Void = NativeTouchBarPresentation.restoreAfterFailedPresentation) {
             self.presentation = presentation; self.fullWidthEnabled = fullWidthEnabled
@@ -590,7 +595,16 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
                 rejectModal(); return
             }
             let wasPresented = presentation.presented === candidate
+            let expectedGeneration = generation
             presentation.update(candidate, enabled: true, eligible: true)
+            // AppKit may synchronously close the owner or hand its window to
+            // another surface. That is normal cleanup, not runtime rejection.
+            guard generation == expectedGeneration else { return }
+            guard self.eligible && fullWidthEnabled() else {
+                presentation.update(nil, enabled: false, eligible: false)
+                releaseModal(); strip?.setPresentationActive(self.eligible)
+                return
+            }
             guard presentation.presented === candidate else { rejectModal(); return }
             strip?.setPresentationActive(false)
             surface.strip?.setPresentationActive(true)

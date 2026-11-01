@@ -271,7 +271,7 @@ import SwiftUI
         window.isReleasedWhenClosed = false
         let original = NSTouchBar(); window.touchBar = original
         var enabled = false, eligible = true, ready = true, allowShow = true
-        var loseFocusDuringShow = false
+        var loseFocusDuringShow = false, detachDuringShow = false
         var shows = 0, hides = 0, failures = 0, actions = 0, validations = 0
         var presented: NSTouchBar?
         var owner: NativeTouchBarAccessory.Coordinator!
@@ -286,6 +286,7 @@ import SwiftUI
                 loseFocusDuringShow = false; eligible = false; owner.requestPresentation()
             }
             if allowShow { presented = candidate }
+            if detachDuringShow { detachDuringShow = false; owner.detach() }
             return allowShow
         }, hide: { candidate in
             precondition(presented === candidate, "Dismiss only the owned modal bar")
@@ -377,6 +378,16 @@ import SwiftUI
         owner.detach(); pump(0.4)
         precondition(session.presented == nil && window.touchBar === original && owner.modalSurface == nil,
                      "Detach must cancel delayed acceptance work and restore the previous window bar")
+        // Close/handoff can occur synchronously inside the system call. It
+        // must dismiss ownership without reporting a capability failure or
+        // rewriting the user's saved full-width option.
+        let beforeClose = shows, failuresBeforeClose = failures
+        detachDuringShow = true
+        owner.attach(window); owner.requestPresentation()
+        waitFor("Detach inside presentation must unwind without a false failure") {
+            shows > beforeClose && session.presented == nil && window.touchBar === original
+        }
+        precondition(failures == failuresBeforeClose && owner.modalSurface == nil)
         owner = nil; window.close()
         print("PASS: independent full-width hosts, prepared controls, routing/state sync, focus/reentry, refusal/blank fallback, retry latch and teardown")
     }
