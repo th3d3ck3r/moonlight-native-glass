@@ -448,10 +448,10 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         private var bootPlayed = false
         func configureArt() {
             guard let row else { return }
-            // Library/stream retain their normal controls and do no shader work.
+            // Library uses still artwork; streaming retains its own controls.
             // Startup and Apollo animate the full allocated app area; the system
             // Control Strip remains governed only by the existing opt-in setting.
-            if artState == nil || artState == .idle {
+            if artState == nil {
                 row.removeStrip(); strip = nil; playingBoot = nil; bootPlayed = false
             } else if strip == nil {
                 let view = MoonlightLGTouchBarStripView(frame: row.bounds)

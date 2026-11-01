@@ -69,10 +69,10 @@ import SwiftUI
             view.frame = originalFrame
         }
         let row = owner.row!
-        precondition(owner.strip == nil && row.strip == nil,
-                     "Library must retain its ordinary controls without a live renderer")
-        owner.update(owner.commands, crimson: true, artState: .connecting)
+        precondition(owner.strip != nil && row.strip === owner.strip && owner.strip?.state == .idle && owner.strip?.isAnimating == false,
+                     "Library keeps the full-bar still artwork without a live renderer")
         let originalStrip = owner.strip
+        owner.update(owner.commands, crimson: true, artState: .connecting)
         precondition(originalStrip != nil && originalStrip?.superview === row,
                      "Artwork belongs to the full command row, never the status button")
         for width in [CGFloat(685), 400, 1085] {
@@ -90,8 +90,11 @@ import SwiftUI
         precondition(owner.strip?.connectionStartedAt == connectedAt,
                      "Metadata updates must not replay the connect shockwave")
         owner.update(owner.commands, crimson: true, artState: .idle)
-        precondition(row.strip == nil && originalStrip?.superview == nil && originalStrip?.isAnimating == false,
-                     "Returning to library must remove the row-wide live surface")
+        precondition(row.strip === originalStrip && originalStrip?.isAnimating == false,
+                     "Returning to library must stop the live surface and reuse still artwork")
+        owner.update(owner.commands, crimson: true)
+        precondition(row.strip == nil && originalStrip?.superview == nil,
+                     "Removing artwork ownership must fully detach the row-wide surface")
         var previousEnd: CGFloat = -6
         for (control, _) in row.controls {
             precondition(control.frame.minX >= previousEnd + 6, "Scrollable controls must retain distinct non-overlapping document frames")

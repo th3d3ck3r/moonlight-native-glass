@@ -4,7 +4,7 @@
 
 - Startup and Apollo artwork now spans the full allocated app area, behind the existing controls. Actions dock to the right so the central moon stays readable; narrow bars retain scrolling and nonblocking taps.
 - Target the M1 display’s 60 Hz for boot, bound the procedural boot effect to 1280×800 physical pixels while keeping text and layout native, and request 60 fps for smoother Touch Bar motion while retaining the supplied scene timing. Skip expensive smoke calculations only where their exact visibility mask is zero; the authored scene and assets stay intact.
-- Preserve normal library and stream controls, the volume bar, Reduce Motion, finite startup, focus/cleanup and the separate full-width opt-in. The system Control Strip is not changed by the artwork.
+- Use the full-bar still artwork while idle without a live renderer. Preserve library and stream controls, the volume bar, Reduce Motion, finite startup, focus/cleanup and the separate full-width opt-in. The system Control Strip is not changed by the artwork.
 - Add actual composited 685/1085-point row render checks. Internal build 48; physical M1 cadence and Touch Bar presentation still require hardware acceptance.
 
 ## 1.3.5.0U — private Smoke accretion artwork
