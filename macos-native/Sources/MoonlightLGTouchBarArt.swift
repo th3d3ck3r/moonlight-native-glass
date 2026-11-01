@@ -109,7 +109,7 @@ final class MoonlightLGTouchBarStripView: NSView {
     private let clock: () -> CFTimeInterval
     private let motionReduced: () -> Bool
     private let rendersLiveContent: Bool
-    private let clockStart: CFTimeInterval
+    private var clockStart: CFTimeInterval
     private var stateStart: CFTimeInterval
     private var connectedAt: CFTimeInterval?
     private var bootDuration: TimeInterval = 3.8
@@ -221,6 +221,18 @@ final class MoonlightLGTouchBarStripView: NSView {
     func refreshPresentation() {
         guard configured else { return }
         updateLive()
+    }
+
+    /// Transfer the presentation to an independent host without replaying boot
+    /// or the connected shockwave. Each host retains its own view and renderer.
+    func adoptScene(from other: MoonlightLGTouchBarStripView) {
+        let now = clock(), oldNow = other.clock()
+        clockStart = now - max(0, oldNow - other.clockStart)
+        stateStart = now - max(0, oldNow - other.stateStart)
+        connectedAt = other.connectedAt.map { now - max(0, oldNow - $0) }
+        state = other.state; bootDuration = other.bootDuration
+        model.state = other.model.state; model.saturation = other.model.saturation
+        updateStillImage(animated: false); refreshPresentation()
     }
 
     /// Called once for the current boot, using the screen's start date if known.

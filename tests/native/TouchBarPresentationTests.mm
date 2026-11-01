@@ -13,6 +13,7 @@ static void check(bool okay,const char* message) {
 }
 static bool mockKey=true,mockVisible=true,mockActive=true,cleaning=false;
 static bool reenterShow=false,reenterHide=false,loseFocusDuringShow=false;
+static bool throwDuringShow=false,throwDuringHide=false;
 static int shown=0,hidden=0;
 static NSTouchBar* presented=nil;
 static NSWindow* fixtureWindow=nil;
@@ -34,7 +35,15 @@ static void fakeShow(id receiver,SEL selector,NSTouchBar* bar,long long placemen
     if (cleaning) return;
     check(bar && placement==1 && tray==nil,"Request full app-region placement with no Control Strip tray item");
     check(presented==nil,"Do not present the same or another bar twice without releasing ownership");
+    NSDictionary* controls=[bar.delegate valueForKey:@"touchButtons"];
+    check(bar.defaultItemIdentifiers.count>0,"Never invoke private presentation with an empty bar");
+    for (NSString* identifier in bar.defaultItemIdentifiers)
+        check(controls[identifier]!=nil,"Resolve every real top-level control before invoking private presentation");
     presented=bar; ++shown;
+    if (throwDuringShow) {
+        throwDuringShow=false;
+        @throw [NSException exceptionWithName:@"InjectedPresentationFailure" reason:@"Partially claimed private presentation" userInfo:nil];
+    }
     if (reenterShow) { reenterShow=false; refresh(bar); }
     if (loseFocusDuringShow) {
         loseFocusDuringShow=false; mockKey=false;
@@ -45,6 +54,10 @@ static void fakeHide(id receiver,SEL selector,NSTouchBar* bar) {
     if (cleaning) { presented=nil; return; }
     check(bar && presented==bar,"Dismiss only the bar actually owned by this session");
     presented=nil; ++hidden;
+    if (throwDuringHide) {
+        throwDuringHide=false;
+        @throw [NSException exceptionWithName:@"InjectedDismissalFailure" reason:@"Private dismissal failed after release" userInfo:nil];
+    }
     if (reenterHide) { reenterHide=false; refresh(bar); }
 }
 static void pump() {
@@ -84,7 +97,10 @@ struct Fixture {
     }
     void enable(bool enabled) {
         [preferences setBool:enabled forKey:@"touchBarFullWidth"]; [preferences synchronize];
-        if (retainedBar && retainedBar.delegate) refresh(retainedBar);
+        if (retainedBar && retainedBar.delegate) {
+            NSNotification* changed=[NSNotification notificationWithName:@"com.moonlight-stream.NativeGlass.touchBarPresentationChanged" object:nil];
+            [retainedBar.delegate performSelector:NSSelectorFromString(@"touchPresentationChanged:") withObject:changed];
+        }
     }
     void retainCurrentBar() {
         [retainedBar release]; retainedBar=[fixtureWindow.touchBar retain];
@@ -177,7 +193,34 @@ static void run(Fixture& fixture) {
     nativeOverlayAttach(fixtureWindow,"presentation-fixture-disabled"); pump(); fixture.retainCurrentBar();
     check(shown==7 && presented==nil,"Disabled full width must remain disabled across reconnects");
     nativeOverlayDetach();
-    fprintf(stderr,"PASS: native full-width default, enable, focus/visibility lifecycle, reentrant callbacks, settings, detach and reconnect\n");
+
+    fprintf(stderr,"Presentation fixture: content guards and private API rejection\n");
+    nativeOverlayAttach(fixtureWindow,"presentation-fixture-fallback"); pump(); fixture.retainCurrentBar();
+    bar=fixture.retainedBar;
+    NSArray* originalItems=[bar.defaultItemIdentifiers copy];
+    bar.defaultItemIdentifiers=@[];
+    fixture.enable(true);
+    check(shown==7 && hidden==7 && presented==nil && fixtureWindow.touchBar==bar,
+          "An empty bar must retain ordinary window controls without invoking private presentation");
+    refresh(bar); refresh(bar);
+    check(shown==7,"A rejected empty bar must not retry private presentation during telemetry refresh");
+    bar.defaultItemIdentifiers=originalItems; [originalItems release];
+    fixture.enable(false);
+    throwDuringShow=true; fixture.enable(true);
+    check(shown==8 && hidden==8 && presented==nil && fixtureWindow.touchBar==bar,
+          "A throwing private presentation must dismiss partial ownership and retain ordinary controls");
+    check(![[(id)bar.delegate valueForKey:@"touchFullWidthPresented"] boolValue],
+          "Private API rejection must never claim full-width ownership");
+    refresh(bar); refresh(bar);
+    check(shown==8 && hidden==8,"A rejected private API must not flash/retry on every state update");
+    fixture.enable(false); fixture.enable(true);
+    check(shown==9 && presented==bar,"An explicit setting change can retry a recovered presentation");
+    throwDuringHide=true; fixture.enable(false);
+    check(hidden==9 && presented==nil && fixtureWindow.touchBar==bar,
+          "A throwing private dismissal must not crash normal controls or preserve stale ownership");
+    nativeOverlayDetach();
+    check(fixtureWindow.touchBar==fixture.originalBar && bar.delegate==nil,"Fallback cleanup must restore the previous bar and release delegates");
+    fprintf(stderr,"PASS: native full-width content guards, private API exception fallback, retry suppression, default, focus/visibility, reentrancy and cleanup\n");
 }
 
 int main() { @autoreleasepool {

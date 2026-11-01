@@ -167,6 +167,49 @@ import SwiftUI
                 window.orderOut(nil); window.close()
             }
         }
+        // Reproduce physical hosting: an oversized fitting frame can remain
+        // behind a narrower Control Strip allocation. Capture the actual clip,
+        // not an idealized row whose frame was manually set to the right size.
+        let clippedWindow = NSWindow(contentRect: NSRect(x: 70, y: 100, width: 685, height: 30),
+                                     styleMask: .borderless, backing: .buffered, defer: false)
+        clippedWindow.isReleasedWhenClosed = false; clippedWindow.backgroundColor = .black
+        let clip = NSClipView(frame: NSRect(x: 0, y: 0, width: 685, height: 30))
+        clip.drawsBackground = false
+        let clippedStatus = NativeTouchBarButton(title: "MoonlightLG\nStarting…", target: nil, action: nil)
+        clippedStatus.statusOnly = true; clippedStatus.isEnabled = false
+        let clippedSkip = NativeTouchBarButton(title: "Skip to Library", target: nil, action: nil)
+        let clippedRow = NativeTouchBarRow(buttons: [(clippedStatus, 200), (clippedSkip, 150)], pinnedStatus: true)
+        let oversized = clippedRow.widthAnchor.constraint(equalToConstant: 1085)
+        oversized.isActive = true // fixture only: deliberately reproduce build 48
+        clip.documentView = clippedRow; clippedWindow.contentView = clip
+        clippedRow.frame = NSRect(x: 0, y: 0, width: 1085, height: 30)
+        var clippedNow: CFTimeInterval = 100
+        let clippedArt = MoonlightLGTouchBarStripView(frame: clippedRow.bounds,
+            clock: { clippedNow }, reduceMotion: { false })
+        clippedRow.installStrip(clippedArt)
+        clippedWindow.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        clippedArt.setPresentationActive(true); clippedArt.playBoot(); clippedNow += 3.2
+        RunLoop.main.run(until: Date().addingTimeInterval(0.8)); clippedRow.layoutControls()
+        precondition(abs(clippedRow.layoutViewport.width - 685) < 1 && clippedArt.frame == clippedRow.layoutViewport,
+                     "The physical viewport, not the oversized fitting frame, must frame the shader")
+        precondition(clippedSkip.convert(clippedSkip.bounds, to: clippedRow).maxX <= clippedRow.layoutViewport.maxX + 1,
+                     "Skip must remain reachable beside the system Control Strip")
+        let clippedPath = directory.appendingPathComponent("smoke-row-host-clipped-685.png")
+        let clippedCapture = Process(); clippedCapture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        clippedCapture.arguments = ["-x", "-o", "-l", String(clippedWindow.windowNumber), clippedPath.path]
+        try! clippedCapture.run(); clippedCapture.waitUntilExit(); precondition(clippedCapture.terminationStatus == 0)
+        let clippedBitmap = NSBitmapImageRep(data: try! Data(contentsOf: clippedPath))!
+        var centeredMoon = 0
+        let middle = clippedBitmap.pixelsWide / 2
+        for y in 0..<clippedBitmap.pixelsHigh {
+            for x in max(0, middle - 12)..<min(clippedBitmap.pixelsWide, middle + 12) {
+                guard let c = clippedBitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                if c.greenComponent > 0.2 && c.blueComponent > 0.2 { centeredMoon += 1 }
+            }
+        }
+        precondition(centeredMoon > 10, "The moon must stay centred in the physically visible region")
+        clippedRow.removeStrip(); clippedWindow.orderOut(nil); clippedWindow.close()
+
         // Template PNGs need AppKit's image-view rendering; raw NSImage.draw
         // would leave the black mask invisible on the dark Touch Bar surface.
         let glyphWindow = NSWindow(contentRect: NSRect(x: 70, y: 100, width: 72, height: 30),

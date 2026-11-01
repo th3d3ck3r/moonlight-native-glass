@@ -62,6 +62,24 @@ import QuartzCore
         waitFor("Registered timer must advance the connected shockwave") { strip.sceneSnapshot.connected > 0 && strip.sceneSnapshot.connected < 1 }
         let phase = strip.sceneSnapshot.connected
         precondition(phase > 0 && phase < 1)
+        // A separate modal host uses a different clock origin. Adopting the
+        // existing scene must preserve its age, not replay the connection pulse.
+        var modalNow: CFTimeInterval = 1000
+        let modalStrip = MoonlightLGTouchBarStripView(frame: NSRect(x: 0, y: 50, width: 240, height: 30),
+            clock: { modalNow }, reduceMotion: { false }, rendersLiveContent: false)
+        window.contentView!.addSubview(modalStrip)
+        modalStrip.adoptScene(from: strip); modalStrip.setPresentationActive(true)
+        precondition(modalStrip !== strip && modalStrip.state == .connected)
+        precondition(abs(modalStrip.sceneSnapshot.sinceConnect - strip.sceneSnapshot.sinceConnect) < 0.0001 &&
+                     abs(modalStrip.sceneSnapshot.connected - phase) < 0.0001,
+                     "Independent presentation must preserve the in-progress connected shockwave")
+        let adoptedConnect = modalStrip.connectionStartedAt
+        modalNow += 0.6
+        waitFor("The modal host must finish the existing pulse rather than restarting it") { modalStrip.sceneSnapshot.connected == 1 }
+        modalStrip.show(.connected); pump()
+        precondition(modalStrip.connectionStartedAt == adoptedConnect && modalStrip.sceneSnapshot.connected == 1)
+        modalStrip.removeFromSuperview()
+        precondition(!modalStrip.isAnimating, "Retiring a modal renderer must leave no timer work")
         strip.show(.connected); strip.refreshPresentation(); pump()
         precondition(strip.connectionStartedAt == connectedAt && strip.sceneSnapshot.connected == phase,
                      "Metadata refresh must not restart the connected shockwave")
@@ -102,8 +120,18 @@ import QuartzCore
         window.makeKeyAndOrderFront(nil); strip.setPresentationActive(true); pump()
         strip.show(.idle); precondition(!strip.isAnimating, "Returning to the library removes all live scheduling")
         strip.playBoot(duration: 3.8); pump(); precondition(strip.isAnimating)
-        now += 4
-        waitFor("Registered timer must finish the finite Touch Bar boot") { strip.state == .idle }
+        now += 1.5
+        waitFor("Boot must advance before changing presentation hosts") { strip.sceneSnapshot.bootProgress > 0.3 }
+        modalNow = 2000
+        window.contentView!.addSubview(modalStrip)
+        modalStrip.adoptScene(from: strip); modalStrip.setPresentationActive(true)
+        precondition(modalStrip.state == .booting &&
+                     abs(modalStrip.sceneSnapshot.bootProgress - strip.sceneSnapshot.bootProgress) < 0.0001,
+                     "Moving to an independent host must not replay the boot sweep")
+        now += 2.5; modalNow += 2.5
+        waitFor("Registered timers must finish one finite boot across both hosts") { strip.state == .idle && modalStrip.state == .idle }
+        precondition(!modalStrip.isAnimating)
+        modalStrip.removeFromSuperview()
         precondition(strip.state == .idle && !strip.isAnimating, "Boot must terminate rather than reschedule an idle timer")
         strip.show(.connecting); pump(); precondition(strip.isAnimating)
         strip.removeFromSuperview(); pump(); precondition(!strip.isAnimating, "Detach must stop the timer")

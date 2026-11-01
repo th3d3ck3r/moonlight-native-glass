@@ -140,6 +140,7 @@ struct NativeTouchBarCommand {
 // or restart TouchBarServer/ControlStrip. This private-build hook needs hardware QA.
 enum NativeTouchBarPresentation {
     static let key = "touchBarFullWidth"
+    static let failedKey = "touchBarFullWidthUnavailable"
     static let backupKey = "touchBarPresentationBackup"
     static let applications = ["com.moonlight-stream.NativeGlass", "com.moonlight-stream.NativeGlass.Engine"]
     static let agentDomain = "com.apple.touchbar.agent"
@@ -173,6 +174,15 @@ enum NativeTouchBarPresentation {
         guard let method = class_getClassMethod(NSTouchBar.self, hideSelector) else { return }
         typealias Hide = @convention(c) (AnyClass, Selector, NSTouchBar) -> Void
         unsafeBitCast(method_getImplementation(method), to: Hide.self)(NSTouchBar.self, hideSelector, bar)
+    }
+    static func restoreAfterFailedPresentation() {
+        // The connection scene can run inside the engine process. Write only
+        // the frontend's shared option, never the engine's standard domain.
+        guard let preferences = sharedPreferences else { return }
+        preferences.set(false, forKey: key); preferences.set(true, forKey: failedKey)
+        preferences.synchronize()
+        NotificationCenter.default.post(name: changed, object: nil)
+        DistributedNotificationCenter.default().postNotificationName(changed, object: nil, userInfo: nil, deliverImmediately: true)
     }
     final class Session {
         private(set) var presented: NSTouchBar?
@@ -226,6 +236,7 @@ enum NativeTouchBarPresentation {
             return false
         }
         guard recoveredLegacy else { return false }
+        preferences.removeObject(forKey: failedKey)
         preferences.set(enabled, forKey: key); preferences.synchronize()
         NotificationCenter.default.post(name: changed, object: nil)
         DistributedNotificationCenter.default().postNotificationName(changed, object: nil, userInfo: nil, deliverImmediately: true)
@@ -310,9 +321,12 @@ final class NativeTouchBarRow: NSView {
     private(set) var strip: MoonlightLGTouchBarStripView?
     var statusWidth: CGFloat = 0
     private var scrollObserver: NSObjectProtocol?
+    private var geometryObservers: [NSObjectProtocol] = []
+    private(set) var layoutViewport = NSRect.zero
+    private var layingOut = false
     var controls: [(NSButton, CGFloat)] = []
     override var intrinsicContentSize: NSSize {
-        NSSize(width: strip == nil ? statusWidth + (status == nil ? 0 : 6) + document.frame.width : NSView.noIntrinsicMetric, height: 30)
+        NSSize(width: max(320, statusWidth + (status == nil ? 0 : 6) + document.frame.width), height: 30)
     }
     init(buttons: [(NSButton, CGFloat)], pinnedStatus: Bool) {
         super.init(frame: NSRect(x: 0, y: 0, width: 640, height: 30))
@@ -343,11 +357,18 @@ final class NativeTouchBarRow: NSView {
         document.frame = NSRect(x: 0, y: 0, width: max(0, x - 6), height: 30)
         heightAnchor.constraint(equalToConstant: 30).isActive = true
         widthAnchor.constraint(greaterThanOrEqualToConstant: 320).isActive = true
-        setContentHuggingPriority(.defaultLow, for: .horizontal)
-        // Request the physical maximum as a soft preference. AppKit can shrink
-        // this single item for the Control Strip or smaller available regions.
-        let fill = widthAnchor.constraint(equalToConstant: 1085)
-        fill.priority = .defaultLow; fill.isActive = true
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.init(rawValue: 50), for: .horizontal)
+        setContentCompressionResistancePriority(.init(rawValue: 50), for: .horizontal)
+        // Never request a physical bar width. AppKit owns the allocation and
+        // reserves space for the Control Strip and system modal close button.
+        for name in [NSView.frameDidChangeNotification, NSView.boundsDidChangeNotification] {
+            geometryObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                guard let self, let view = note.object as? NSView,
+                      view !== self, self.isDescendant(of: view) else { return }
+                self.layoutControls()
+            })
+        }
         setFrameSize(frame.size)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -374,21 +395,35 @@ final class NativeTouchBarRow: NSView {
     }
     override func setFrameSize(_ size: NSSize) {
         super.setFrameSize(size)
-        strip?.frame = bounds
-        let pinned = status == nil ? 0 : min(statusWidth, max(100, size.width * (strip == nil ? 0.4 : 0.3)))
-        if let status { status.frame = NSRect(x: 0, y: 0, width: pinned, height: 30) }
+        layoutControls()
+    }
+    override func layout() { super.layout(); layoutControls() }
+    override func viewDidMoveToSuperview() { super.viewDidMoveToSuperview(); layoutControls() }
+    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); layoutControls() }
+    func layoutControls() {
+        guard !layingOut else { return }
+        layingOut = true
+        defer { layingOut = false }
+        let clipped = visibleRect.intersection(bounds)
+        let area = !clipped.isEmpty ? clipped : bounds
+        layoutViewport = NSRect(x: area.minX, y: bounds.minY, width: area.width, height: 30)
+        let width = layoutViewport.width, origin = layoutViewport.minX
+        strip?.frame = layoutViewport
+        let pinned = status == nil ? 0 : min(statusWidth, max(100, width * (strip == nil ? 0.4 : 0.3)))
+        if let status { status.frame = NSRect(x: origin, y: 0, width: pinned, height: 30) }
         let start = pinned + (status == nil ? 0 : 6)
-        let available = max(0, size.width - start)
+        let available = max(0, width - start)
         let overflow = document.frame.width > available
         more.isHidden = !overflow
-        more.frame = NSRect(x: max(start, size.width - 30), y: 0, width: 30, height: 30)
+        more.frame = NSRect(x: origin + max(start, width - 30), y: 0, width: 30, height: 30)
         let viewport = max(0, available - (overflow ? 34 : 0))
         let controlWidth = strip == nil ? viewport : min(document.frame.width, viewport)
-        scroll.frame = NSRect(x: strip == nil ? start : size.width - (overflow ? 34 : 0) - controlWidth,
+        scroll.frame = NSRect(x: origin + (strip == nil ? start : width - (overflow ? 34 : 0) - controlWidth),
                               y: 0, width: controlWidth, height: 30)
         let limit = max(0, document.frame.width - scroll.contentView.bounds.width)
         scroll.contentView.scroll(to: NSPoint(x: min(limit, scroll.contentView.bounds.origin.x), y: 0))
         scroll.reflectScrolledClipView(scroll.contentView)
+        updateOverflowHint()
     }
     func setCrimson(_ enabled: Bool) {
         more.bezelColor = enabled ? NSColor(srgbRed: 0.12, green: 0.035, blue: 0.055, alpha: 1) : nil
@@ -416,6 +451,7 @@ final class NativeTouchBarRow: NSView {
     }
     deinit {
         if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver) }
+        for observer in geometryObservers { NotificationCenter.default.removeObserver(observer) }
         more.target = nil; more.action = nil
     }
 }
@@ -436,7 +472,13 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         var previous: NSTouchBar?
         var bar: NSTouchBar?
         var buttons: [String: NSButton] = [:]
-        let presentation = NativeTouchBarPresentation.Session()
+        let presentation: NativeTouchBarPresentation.Session
+        private let fullWidthEnabled: () -> Bool
+        private let ownerEligible: (NSWindow) -> Bool
+        private let contentReady: (NSTouchBar, NativeTouchBarRow) -> Bool
+        private let fullWidthFailed: () -> Void
+        private weak var surfaceOwner: Coordinator?
+        private(set) var modalSurface: Coordinator?
         var observers: [NSObjectProtocol] = []
         var distributedObserver: NSObjectProtocol?
         var detaching = false
@@ -446,11 +488,31 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         var strip: MoonlightLGTouchBarStripView?
         private var playingBoot: Date?
         private var bootPlayed = false
+        private var generation = 0
+        private var presentationPending = false
+        private var validationWork: DispatchWorkItem?
+        private var rejected = false
+
+        init(presentation: NativeTouchBarPresentation.Session = .init(),
+             fullWidthEnabled: @escaping () -> Bool = { !CommandLine.arguments.contains("--design-preview") && NativeTouchBarPresentation.enabled() },
+             ownerEligible: @escaping (NSWindow) -> Bool = { $0.isKeyWindow && $0.isVisible && NSApp.isActive },
+             contentReady: @escaping (NSTouchBar, NativeTouchBarRow) -> Bool = {
+                 !$0.itemIdentifiers.isEmpty && $1.window != nil && !$1.visibleRect.isEmpty && $1.bounds.width > 0
+             },
+             fullWidthFailed: @escaping () -> Void = NativeTouchBarPresentation.restoreAfterFailedPresentation) {
+            self.presentation = presentation; self.fullWidthEnabled = fullWidthEnabled
+            self.ownerEligible = ownerEligible; self.contentReady = contentReady
+            self.fullWidthFailed = fullWidthFailed
+            super.init()
+        }
+        private func makeBar() -> NSTouchBar {
+            let result = NSTouchBar(); result.delegate = self
+            result.defaultItemIdentifiers = [.init("native.commandRow")]
+            result.principalItemIdentifier = .init("native.commandRow")
+            return result
+        }
         func configureArt() {
             guard let row else { return }
-            // Library uses still artwork; streaming retains its own controls.
-            // Startup and Apollo animate the full allocated app area; the system
-            // Control Strip remains governed only by the existing opt-in setting.
             if artState == nil {
                 row.removeStrip(); strip = nil; playingBoot = nil; bootPlayed = false
             } else if strip == nil {
@@ -467,44 +529,115 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
                 }
             } else { playingBoot = nil; bootPlayed = false; strip.show(artState) }
         }
-        func refreshPresentation() {
-            let eligible = !detaching && window?.isKeyWindow == true && window?.isVisible == true && NSApp.isActive && window?.touchBar === bar
+        private func updateContents() {
+            for command in commands { if let button = buttons[command.id] { style(button, command) } }
+            row?.setCrimson(crimson); configureArt(); refreshArt()
+        }
+        private func prepareModal() -> Coordinator? {
+            if let modalSurface { return modalSurface }
+            let surface = Coordinator()
+            surface.surfaceOwner = self; surface.window = window
+            surface.commands = commands; surface.crimson = crimson
+            surface.artState = artState; surface.bootStartedAt = bootStartedAt
+            surface.bar = surface.makeBar()
+            // Complete item creation before invoking the system-modal API. Its
+            // views are independent of the ordinary window-owned bar's views.
+            guard surface.bar?.item(forIdentifier: .init("native.commandRow")) != nil,
+                  surface.row != nil else { surface.detach(); return nil }
+            if let original = strip { surface.strip?.adoptScene(from: original) }
+            surface.bootPlayed = bootPlayed; surface.playingBoot = playingBoot
+            modalSurface = surface
+            return surface
+        }
+        private func releaseModal() {
+            validationWork?.cancel(); validationWork = nil
+            let old = modalSurface; modalSurface = nil
+            old?.detach()
+        }
+        func requestPresentation() {
+            guard surfaceOwner == nil, !presentationPending, !detaching else { return }
+            presentationPending = true
+            let expected = generation
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.generation == expected else { return }
+                self.presentationPending = false; self.refreshPresentation()
+            }
+        }
+        private var eligible: Bool {
+            !detaching && window.map(ownerEligible) == true && window?.touchBar === bar && bar != nil
+        }
+        private func rejectModal() {
+            rejected = true
+            presentation.update(nil, enabled: false, eligible: false)
+            releaseModal()
             strip?.setPresentationActive(eligible)
-            presentation.update(bar, enabled: !CommandLine.arguments.contains("--design-preview") && NativeTouchBarPresentation.enabled(), eligible: eligible)
+            fullWidthFailed()
+        }
+        func refreshPresentation() {
+            guard surfaceOwner == nil else { return }
+            let eligible = eligible, enabled = fullWidthEnabled()
+            if !enabled { rejected = false }
+            guard eligible && enabled && !rejected else {
+                presentation.update(nil, enabled: false, eligible: false)
+                releaseModal(); strip?.setPresentationActive(eligible)
+                return
+            }
+            // Never present from makeItemForIdentifier or share an NSView
+            // between normal and modal hosts. The normal bar remains installed
+            // as the window's ownership anchor and immediate fallback.
+            _ = bar?.item(forIdentifier: .init("native.commandRow"))
+            guard let surface = prepareModal(), let candidate = surface.bar, let modalRow = surface.row else {
+                rejectModal(); return
+            }
+            let wasPresented = presentation.presented === candidate
+            presentation.update(candidate, enabled: true, eligible: true)
+            guard presentation.presented === candidate else { rejectModal(); return }
+            strip?.setPresentationActive(false)
+            surface.strip?.setPresentationActive(true)
+            if !wasPresented {
+                let expected = generation
+                let work = DispatchWorkItem { [weak self, weak candidate, weak modalRow] in
+                    guard let self, let candidate, let modalRow,
+                          self.generation == expected, self.eligible,
+                          self.presentation.presented === candidate else { return }
+                    // Structural acceptance is not a claim about physical OLED
+                    // pixels. Missing/unhosted content must restore normal mode.
+                    if !self.contentReady(candidate, modalRow) { self.rejectModal() }
+                }
+                validationWork = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+            }
         }
         func attach(_ next: NSWindow?) {
             if window === next, bar != nil { return }
             detach()
             guard let next, !commands.isEmpty else { return }
             window = next; previous = next.touchBar
-            let bar = NSTouchBar(); bar.delegate = self
-            bar.defaultItemIdentifiers = [.init("native.commandRow")]
-            bar.principalItemIdentifier = .init("native.commandRow")
-            self.bar = bar; next.touchBar = bar
+            let bar = makeBar(); self.bar = bar; next.touchBar = bar
             for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
                          NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification,
                          NSWindow.didChangeOcclusionStateNotification, NSApplication.didBecomeActiveNotification,
                          NSApplication.didResignActiveNotification, NSApplication.didHideNotification,
                          NSApplication.didUnhideNotification, NativeTouchBarPresentation.changed] {
-                observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.refreshPresentation() })
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.requestPresentation() })
             }
-            observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: next, queue: .main) { [weak self] _ in
-                self?.detach()
-            })
-            distributedObserver = DistributedNotificationCenter.default().addObserver(forName: NativeTouchBarPresentation.changed, object: nil, queue: .main) { [weak self] _ in self?.refreshPresentation() }
-            refreshPresentation()
+            observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: next, queue: .main) { [weak self] _ in self?.detach() })
+            distributedObserver = DistributedNotificationCenter.default().addObserver(forName: NativeTouchBarPresentation.changed, object: nil, queue: .main) { [weak self] _ in self?.requestPresentation() }
+            requestPresentation()
         }
         func detach() {
-            detaching = true
-            strip?.setPresentationActive(false)
-            row?.removeStrip()
-            strip = nil; playingBoot = nil; bootPlayed = false
+            detaching = true; generation += 1; presentationPending = false
+            validationWork?.cancel(); validationWork = nil
             presentation.update(nil, enabled: false, eligible: false)
+            releaseModal()
+            strip?.setPresentationActive(false); row?.removeStrip()
+            strip = nil; playingBoot = nil; bootPlayed = false
             if let distributedObserver { DistributedNotificationCenter.default().removeObserver(distributedObserver) }; distributedObserver = nil
             for observer in observers { NotificationCenter.default.removeObserver(observer) }; observers.removeAll()
             if let window, window.touchBar === bar { window.touchBar = previous }
             for button in buttons.values { button.target = nil; button.action = nil }
-            buttons.removeAll(); row = nil; bar?.delegate = nil; bar = nil; previous = nil; window = nil; detaching = false
+            buttons.removeAll(); row = nil; bar?.delegate = nil; bar = nil
+            previous = nil; window = nil; rejected = false; detaching = false
         }
         func update(_ commands: [NativeTouchBarCommand], crimson: Bool,
                     artState: MoonlightLGTouchBarArt.State? = nil, bootStartedAt: Date? = nil) {
@@ -512,9 +645,13 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             let identifiersChanged = self.commands.map(\.id) != commands.map(\.id)
             self.commands = commands; self.crimson = crimson
             if identifiersChanged { let current = window; detach(); attach(current) }
-            for command in commands { if let button = buttons[command.id] { style(button, command) } }
-            row?.setCrimson(crimson)
-            configureArt(); refreshArt(); refreshPresentation()
+            updateContents()
+            if let surface = modalSurface {
+                surface.commands = commands; surface.crimson = crimson
+                surface.artState = artState; surface.bootStartedAt = bootStartedAt
+                surface.updateContents()
+            }
+            requestPresentation()
         }
         func style(_ button: NSButton, _ command: NativeTouchBarCommand) {
             button.title = command.title; button.isEnabled = command.enabled && command.action != nil
@@ -542,6 +679,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
             guard identifier.rawValue == "native.commandRow" else { return nil }
             let item = NSCustomTouchBarItem(identifier: identifier)
+            item.visibilityPriority = .high
             var views: [(NSButton, CGFloat)] = []
             for command in commands {
                 let button = NativeTouchBarButton(title: command.title, target: self, action: #selector(press(_:)))
@@ -549,15 +687,18 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
                 style(button, command); buttons[command.id] = button; views.append((button, command.width))
             }
             let row = NativeTouchBarRow(buttons: views, pinnedStatus: commands.first?.action == nil)
-            row.setCrimson(crimson)
-            self.row = row; item.view = row
-            configureArt(); refreshArt(); refreshPresentation()
+            row.setCrimson(crimson); self.row = row; item.view = row
+            configureArt(); refreshArt(); requestPresentation()
             return item
         }
-
         @objc func press(_ sender: NSButton) {
-            guard sender.isEnabled, let window, window.touchBar === bar,
-                  let command = commands.first(where: { $0.id == sender.identifier?.rawValue }), command.enabled else { return }
+            guard sender.isEnabled, let id = sender.identifier?.rawValue, buttons[id] === sender,
+                  let command = commands.first(where: { $0.id == id }), command.enabled else { return }
+            if let owner = surfaceOwner {
+                guard owner.eligible, owner.presentation.presented === bar else { return }
+            } else {
+                guard window?.touchBar === bar, presentation.presented == nil else { return }
+            }
             command.action?()
         }
     }

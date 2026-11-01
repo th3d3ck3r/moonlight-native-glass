@@ -1,5 +1,13 @@
 # MoonlightLG changelog
 
+## 1.3.5.2U — private Touch Bar allocation and full-width recovery
+
+- Remove build 48’s 1085-point fitting-width request. Layout artwork, host status, actions and overflow against the visible AppKit allocation so the system Control Strip cannot clip commands or push the moon off centre.
+- Give frontend full-width presentation an independent bar and independent controls. Prepare its content before presenting, preserve animation clocks during handoff, and keep the normal window bar intact for restoration.
+- Check that modal content is actually hosted after presentation; on failure restore the standard bar and turn the option off with an explanatory settings message. Preserve global, Fn and other-app preferences.
+- Preflight stream controls and guard private presentation/dismissal exceptions. Preserve stream action routing, continuous volume and all existing controls, plus build 48’s boot smoothness changes.
+- Add clipped-host rendering and injected lifecycle/failure regressions. Internal build 49; physical Touch Bar and macOS-private presentation acceptance remain outside CI.
+
 ## 1.3.5.1U — private full-bar animation correction
 
 - Startup and Apollo artwork now spans the full allocated app area, behind the existing controls. Actions dock to the right so the central moon stays readable; narrow bars retain scrolling and nonblocking taps.

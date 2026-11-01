@@ -24,6 +24,7 @@ struct NativeSettingsView: View {
     @ObservedObject var store: EngineStore
     @AppStorage(NativeCrimsonTheme.key) private var crimson = true
     @AppStorage(NativeTouchBarPresentation.key) private var touchBarFullWidth = false
+    @AppStorage(NativeTouchBarPresentation.failedKey) private var touchBarFullWidthUnavailable = false
     @AppStorage("touchBarLiveStats", store: UserDefaults(suiteName: NativeCrimsonTheme.suite)) private var touchBarLiveStats = true
     @State private var touchBarError = false
     @State private var pane = SettingsPane.video
@@ -62,7 +63,7 @@ struct NativeSettingsView: View {
                                 .font(.callout).foregroundStyle(.secondary)
                             Text("Uses an undocumented AppKit presentation hook only while MoonlightLG is active. Compatibility varies by macOS version; other apps keep their normal bar.")
                                 .font(.caption).foregroundStyle(.secondary)
-                            if touchBarError { Text("Full-width presentation is unavailable on this macOS version, or the previous per-app preference could not be restored. The standard Touch Bar remains available.").foregroundStyle(.red) }
+                            if touchBarError || touchBarFullWidthUnavailable { Text("Full-width controls could not be displayed, or the previous per-app preference could not be restored. The standard Touch Bar has been restored.").foregroundStyle(.red) }
                         }
                     }
                     if pane == .recording { RecordingSettings().disabled(store.streamActive) }

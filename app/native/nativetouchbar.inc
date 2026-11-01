@@ -2,6 +2,7 @@
 // no decoder, frame-pacing, mouse tracking or recorder ownership lives here.
 #include "nativestreamstats.h"
 #import <objc/message.h>
+#import <objc/runtime.h>
 
 static NSColor* touchAccent() {
     return crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : NSColor.controlAccentColor;
@@ -254,16 +255,46 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 // regression fixture for layout QA on runners without physical Touch Bar hardware.
 // Same optional system-modal AppKit selectors as the frontend. This changes
 // presentation only for the active owner and never writes system preferences.
+static char touchPresentationFailureKey;
 static BOOL touchPresentFullWidth(NSTouchBar* bar) {
     SEL show=NSSelectorFromString(@"presentSystemModalTouchBar:placement:systemTrayItemIdentifier:");
     SEL hide=NSSelectorFromString(@"dismissSystemModalTouchBar:");
-    if (![NSTouchBar respondsToSelector:show] || ![NSTouchBar respondsToSelector:hide]) return NO;
-    ((void(*)(id,SEL,NSTouchBar*,long long,id))objc_msgSend)(NSTouchBar.class,show,bar,1,nil);
-    return YES;
+    if (!bar || ![NSTouchBar respondsToSelector:show] || ![NSTouchBar respondsToSelector:hide]) return NO;
+    BOOL attemptedShow=NO;
+    @try {
+        // Resolve the actual controls before asking AppKit to replace the normal
+        // presentation. An empty or unresolved bar must never cover system UI.
+        NSUInteger content=0;
+        for (NSTouchBarItemIdentifier identifier in bar.defaultItemIdentifiers) {
+            if ([identifier isEqual:NSTouchBarItemIdentifierFlexibleSpace] ||
+                [identifier isEqual:NSTouchBarItemIdentifierFixedSpaceSmall] ||
+                [identifier isEqual:NSTouchBarItemIdentifierFixedSpaceLarge]) continue;
+            NSTouchBarItem* item=[bar itemForIdentifier:identifier];
+            if (!item) return NO;
+            if ([item isKindOfClass:NSCustomTouchBarItem.class] && ![(NSCustomTouchBarItem*)item view]) return NO;
+            if ([item isKindOfClass:NSPopoverTouchBarItem.class] && ![(NSPopoverTouchBarItem*)item collapsedRepresentation]) return NO;
+            ++content;
+        }
+        if (!content) return NO;
+        attemptedShow=YES;
+        ((void(*)(id,SEL,NSTouchBar*,long long,id))objc_msgSend)(NSTouchBar.class,show,bar,1,nil);
+        return YES;
+    } @catch (NSException* error) {
+        // A private SPI may exist but reject this runtime. Release any partial
+        // presentation and leave the normal window-owned controls attached.
+        if (attemptedShow) {
+            @try { ((void(*)(id,SEL,NSTouchBar*))objc_msgSend)(NSTouchBar.class,hide,bar); }
+            @catch (NSException* ignored) { (void)ignored; }
+        }
+        NSLog(@"MoonlightLG: full-width presentation unavailable (%@); keeping app controls.",error.name);
+        return NO;
+    }
 }
 static void touchDismissFullWidth(NSTouchBar* bar) {
     SEL hide=NSSelectorFromString(@"dismissSystemModalTouchBar:");
-    if ([NSTouchBar respondsToSelector:hide]) ((void(*)(id,SEL,NSTouchBar*))objc_msgSend)(NSTouchBar.class,hide,bar);
+    if (!bar || ![NSTouchBar respondsToSelector:hide]) return;
+    @try { ((void(*)(id,SEL,NSTouchBar*))objc_msgSend)(NSTouchBar.class,hide,bar); }
+    @catch (NSException* error) { NSLog(@"MoonlightLG: full-width dismissal unavailable (%@).",error.name); }
 }
 static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     NSUserDefaults* preferences=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass"] autorelease];
@@ -274,18 +305,27 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
 - (void)updateTouchPresentation {
     if (self.touchPresentationUpdating) return;
     BOOL wanted=touchWantsFullWidth(self);
+    if (!wanted) objc_setAssociatedObject(self,&touchPresentationFailureKey,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (wanted && [objc_getAssociatedObject(self,&touchPresentationFailureKey) boolValue]) return;
     if (wanted==self.touchFullWidthPresented) return;
     self.touchPresentationUpdating=YES;
     if (wanted) {
         self.touchFullWidthPresented=YES;
-        if (!touchPresentFullWidth(self.streamTouchBar)) self.touchFullWidthPresented=NO;
+        if (!touchPresentFullWidth(self.streamTouchBar)) {
+            self.touchFullWidthPresented=NO;
+            // Do not retry a rejected private presentation on every stats tick.
+            objc_setAssociatedObject(self,&touchPresentationFailureKey,@YES,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
     } else { self.touchFullWidthPresented=NO; touchDismissFullWidth(self.streamTouchBar); }
     self.touchPresentationUpdating=NO;
     // React once to a real focus/preference change emitted during presentation.
     // An unsupported selector must not cause recursive retries.
     if (wanted!=touchWantsFullWidth(self)) [self updateTouchPresentation];
 }
-- (void)touchPresentationChanged:(NSNotification*)notification { [self updateTouchPresentation]; }
+- (void)touchPresentationChanged:(NSNotification*)notification {
+    objc_setAssociatedObject(self,&touchPresentationFailureKey,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [self updateTouchPresentation];
+}
 
 - (NSTouchBar*)touchBarWithItems:(NSArray*)identifiers {
     NSTouchBar* bar=[[[NSTouchBar alloc] init] autorelease]; bar.delegate=self;
