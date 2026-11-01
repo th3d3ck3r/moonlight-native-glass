@@ -4,7 +4,8 @@
 
 - Integrate the supplied cratered moon and crimson smoke GPU scenes for startup and connection, preserving finite startup, status panels, nonblocking Continue/Cancel/Retry and stream/input boundaries.
 - Adapt the supplied Touch Bar animation to the existing compact host/status tile; retain readable status, commands, scrolling, optional full width, streaming statistics and the crimson volume slider. Motion stops when inactive, hidden, detached, idle or streaming, and respects Reduce Motion.
-- Add supplied app and template menu artwork and README banner. Package the Metal library and artwork for the native app, connection helper and previews. Internal build 47; physical Touch Bar rendering and live host performance require hardware acceptance beyond CI.
+- Add supplied app and template menu artwork and README banner. Package the Metal library and artwork for the native app, connection helper and previews. Guard renderer construction against reentrant AppKit layout callbacks.
+- The supplied 13-second preview is the visual reference. Main/Touch Bar GPU rendering, compact tile/glyph visibility, animation lifecycle, numeric persistence and the 12-test Xcode UI suite passed on the integration candidate before packaging. Internal build 47; physical Touch Bar rendering and live host performance require hardware acceptance beyond CI.
 
 ## 1.3.4.2U — private Touch Bar audio navigation correction
 

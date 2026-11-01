@@ -40,7 +40,7 @@ import Combine
             return image
         }
         let suppliedGlyph = resourceURL.flatMap { NSImage(contentsOf: $0.appendingPathComponent("MenuBarMoonlightLG.png")) }
-        let newGlyph = suppliedGlyph ?? NSImage(named: "MenuBarMoonlightLG")
+        let newGlyph = NSImage(named: "MenuBarMoonlightLG") ?? suppliedGlyph
         newGlyph?.size = NSSize(width: 18, height: 18)
         newGlyph?.isTemplate = true
         menuGlyph = newGlyph
