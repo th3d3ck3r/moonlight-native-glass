@@ -355,7 +355,7 @@ static NSString* const touchSurfaceID=@"touch.surface";
 - (void)layout {
     [super layout]; if (self.arranging) return; self.arranging=YES;
     NSRect viewport=NSIntersectionRect(self.visibleRect,self.bounds); if (NSIsEmptyRect(viewport)) viewport=self.bounds;
-    self.artwork.frame=viewport; self.scroll.frame=viewport;
+    self.artwork.frame=viewport;
     NSMutableArray* widths=[NSMutableArray array]; CGFloat total=0;
     for (NSView* view in self.controls) {
         CGFloat width=MAX(30,view.intrinsicContentSize.width);
@@ -368,6 +368,9 @@ static NSString* const touchSurfaceID=@"touch.surface";
     self.owner.touchDashboard.moonCenter=-1;
     BOOL main=self.owner.touchLiveStats && [self.identifiers isEqualToArray:@[@"touch.capture",@"touch.info",@"touch.more"]];
     BOOL narrowMain=main && self.controls.count==3 && viewport.size.width<620;
+    // Set the final viewport once. Temporarily widening it to the full row
+    // clamps NSClipView's scroll origin and loses the user's metrics position.
+    self.scroll.frame=narrowMain ? NSMakeRect(viewport.origin.x+90,0,MAX(50,viewport.size.width-194),30) : viewport;
     for (NSUInteger i=0;i<self.controls.count;++i) {
         NSView* view=self.controls[i]; NSView* parent=narrowMain && i!=1 ? self : self.document;
         if (view.superview!=parent) [parent addSubview:view];
@@ -395,7 +398,6 @@ static NSString* const touchSurfaceID=@"touch.surface";
         NSView* capture=self.controls[0]; NSView* info=self.controls[1]; NSView* more=self.controls[2];
         capture.frame=NSMakeRect(viewport.origin.x,0,84,30);
         more.frame=NSMakeRect(NSMaxX(viewport)-98,0,98,30);
-        self.scroll.frame=NSMakeRect(viewport.origin.x+90,0,MAX(50,viewport.size.width-194),30);
         info.frame=NSMakeRect(0,0,350,30); self.document.frame=NSMakeRect(0,0,350,30);
         self.moonGapAvailable=NO;
     } else if (main && self.controls.count==3 && viewport.size.width>=620) {
