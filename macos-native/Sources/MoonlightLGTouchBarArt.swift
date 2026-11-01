@@ -2,11 +2,13 @@ import AppKit
 import QuartzCore
 import SwiftUI
 
-/// Touch Bar artwork for the "Smoke accretion" theme.
+/// Touch Bar artwork for the supplied Moon pulse in the Crimson Glass theme.
 /// Images live in the asset catalog (TouchBar*.imageset). Glyphs are template
 /// images, so the system tints them like any other Touch Bar icon.
 enum MoonlightLGTouchBarArt {
     enum State: Equatable { case idle, booting, connecting, connected, failed }
+
+    static let beatPeriod: Double = 10
 
     /// Set to false to use only the still strip images (no live shader on the Touch Bar).
     static let configurationChanged = Notification.Name("MoonlightLG.TouchBarArtworkConfigurationChanged")
@@ -52,7 +54,7 @@ enum MoonlightLGTouchBarArt {
 
 // MARK: - Live strip scene
 
-/// The Touch Bar framing of the scene (`smokeAccretionStrip` in SmokeAccretion.metal).
+/// The supplied Moon pulse scene, isolated from the screen animation shader.
 struct SmokeAccretionStripScene: View {
     var state: SmokeAccretionState
 
@@ -60,9 +62,10 @@ struct SmokeAccretionStripScene: View {
         GeometryReader { geometry in
             Rectangle()
                 .fill(Color.black)
-                .colorEffect(ShaderLibrary.bundle(.main).smokeAccretionStrip(
+                .colorEffect(ShaderLibrary.bundle(.main).touchBarMoonPulse(
                     .float2(Float(geometry.size.width), Float(geometry.size.height)),
-                    .float(Float(state.time.truncatingRemainder(dividingBy: 3600))),
+                    .float(Float(state.time)),
+                    .float(Float(MoonlightLGTouchBarArt.beatPeriod)),
                     .float(Float(state.bootProgress)),
                     .float(state.isBoot ? 1 : 0),
                     .float(Float(state.connected)),
@@ -91,12 +94,14 @@ struct MoonlightLGTouchBarLiveView: View {
 
 /// Decorative artwork across the existing 30-point command row. The owning
 /// coordinator controls presentation eligibility; this view never presents a
-/// Touch Bar, changes its controls or handles input. There is no animation work
-/// in the library, during streaming, or after its owner suspends/detaches it.
+/// Touch Bar, changes its controls or handles input. Only the active, visible
+/// owner schedules frames; streaming uses a lower cadence to protect decoding.
 final class MoonlightLGTouchBarStripView: NSView {
     private(set) var state: MoonlightLGTouchBarArt.State = .idle
     private(set) var presentationActive = false
     var isAnimating: Bool { timer != nil }
+    private(set) var streaming = false
+    var animationFrameInterval: TimeInterval { streaming && state == .connected ? 1 / 20.0 : 1 / 60.0 }
     var sceneSnapshot: SmokeAccretionState { model.state }
     var sceneSaturation: Double { model.saturation }
     var connectionStartedAt: CFTimeInterval? { connectedAt }
@@ -105,6 +110,7 @@ final class MoonlightLGTouchBarStripView: NSView {
     private let model = MoonlightLGTouchBarLiveModel()
     private var hostingView: NSHostingView<MoonlightLGTouchBarLiveView>?
     private var timer: Timer?
+    private var timerInterval: TimeInterval?
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     private let clock: () -> CFTimeInterval
     private let motionReduced: () -> Bool
@@ -230,9 +236,15 @@ final class MoonlightLGTouchBarStripView: NSView {
         clockStart = now - max(0, oldNow - other.clockStart)
         stateStart = now - max(0, oldNow - other.stateStart)
         connectedAt = other.connectedAt.map { now - max(0, oldNow - $0) }
-        state = other.state; bootDuration = other.bootDuration
+        state = other.state; bootDuration = other.bootDuration; streaming = other.streaming
         model.state = other.model.state; model.saturation = other.model.saturation
         updateStillImage(animated: false); refreshPresentation()
+    }
+
+    func setStreaming(_ active: Bool) {
+        guard streaming != active else { return }
+        streaming = active
+        refreshPresentation()
     }
 
     /// Called once for the current boot, using the screen's start date if known.
@@ -257,6 +269,7 @@ final class MoonlightLGTouchBarStripView: NSView {
             model.saturation = 0.25
         } else { model.saturation = 1 }
         updateStillImage(animated: animated)
+        if newState != .failed { advanceScene() }
         updateLive()
     }
 
@@ -268,7 +281,7 @@ final class MoonlightLGTouchBarStripView: NSView {
             && bounds.width > 0 && bounds.height > 0
     }
     private var wantsLive: Bool {
-        visibleToOwner && MoonlightLGTouchBarArt.liveAnimationEnabled && !motionReduced() && state != .idle
+        visibleToOwner && MoonlightLGTouchBarArt.liveAnimationEnabled
     }
 
     private func updateStillImage(animated: Bool) {
@@ -300,7 +313,11 @@ final class MoonlightLGTouchBarStripView: NSView {
         updatingLive = true
         defer { updatingLive = false }
         guard wantsLive else { clearLiveContent(); return }
-        if !liveWasVisible && state != .failed { advanceScene() }
+        if motionReduced() && state != .failed {
+            // Render the supplied scene calmly with no motion or connection flash.
+            model.state = SmokeAccretionState(time: MoonlightLGTouchBarArt.beatPeriod / 2,
+                                              connected: 1, sinceConnect: 60, progressFill: -1)
+        } else if !liveWasVisible && state != .failed { advanceScene() }
         guard wantsLive else { clearLiveContent(); return }
         liveWasVisible = true
         if rendersLiveContent && hostingView == nil {
@@ -311,23 +328,29 @@ final class MoonlightLGTouchBarStripView: NSView {
         }
         // Eligibility can change synchronously while the renderer attaches.
         guard wantsLive else { clearLiveContent(); return }
-        if state == .failed { stopTimer() }
+        if state == .failed || motionReduced() { stopTimer() }
         else { startTimer() }
     }
 
     private func startTimer() {
-        guard timer == nil else { return }
-        let next = Timer(timeInterval: 1 / 60.0, repeats: true) { [weak self] _ in self?.tick() }
+        let interval = animationFrameInterval
+        if timer != nil && timerInterval == interval { return }
+        stopTimer()
+        timerInterval = interval
+        let next = Timer(timeInterval: interval, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(next, forMode: .common); timer = next
     }
-    private func stopTimer() { timer?.invalidate(); timer = nil }
+    private func stopTimer() { timer?.invalidate(); timer = nil; timerInterval = nil }
     private func tick() {
-        guard wantsLive && state != .failed else { updateLive(); return }
+        guard wantsLive && state != .failed && !motionReduced() else { updateLive(); return }
         advanceScene()
     }
     private func advanceScene() {
         let now = clock(), elapsed = max(0, now - clockStart)
-        var scene = SmokeAccretionState(time: elapsed)
+        // Use elapsed wall time rather than capped tick deltas: a delayed UI
+        // frame must not slow down the authored sweep or beat. Offset by half
+        // a beat so opening the library starts in its calm phase.
+        var scene = SmokeAccretionState(time: elapsed + MoonlightLGTouchBarArt.beatPeriod / 2)
         scene.progressFill = (elapsed * 0.3).truncatingRemainder(dividingBy: 1)
         switch state {
         case .booting:
@@ -343,7 +366,11 @@ final class MoonlightLGTouchBarStripView: NSView {
                 let t = min(1, since / 1.2)
                 scene.connected = t * t * t * (t * (t * 6 - 15) + 10)
             }
-        case .idle, .connecting, .failed: break
+        case .idle:
+            scene.connected = 1; scene.sinceConnect = 60; scene.progressFill = -1
+        case .connecting:
+            scene.time = elapsed
+        case .failed: break
         }
         model.state = scene
     }

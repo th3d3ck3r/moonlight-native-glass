@@ -72,6 +72,27 @@ static void capture(NSTouchBar* bar,NSString* path,CGFloat available=685) {
     check(framesFit,"Touch Bar item clipped or collapsed");
     for (NSView* view in [[stack.arrangedSubviews copy] autorelease]) { [stack removeArrangedSubview:view]; [view removeFromSuperview]; }
 }
+// The native layout adapter is exercised independently of the Metal renderer.
+// Register its production runtime boundary only after the legacy/fallback tests;
+// this process must not load or present a real private Touch Bar window on CI.
+static char surfaceActiveKey,surfaceStateKey;
+static void fakeSurfaceActive(id receiver,SEL selector,BOOL active) { objc_setAssociatedObject(receiver,&surfaceActiveKey,@(active),OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+static void fakeSurfaceState(id receiver,SEL selector,NSInteger state) { objc_setAssociatedObject(receiver,&surfaceStateKey,@(state),OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+static NSButton* surfaceButton(NSTouchBar* bar,NSString* name) {
+    NSTouchBarItem* item=[bar itemForIdentifier:name];
+    return [item isKindOfClass:NSPopoverTouchBarItem.class] ? (NSButton*)[(NSPopoverTouchBarItem*)item collapsedRepresentation] : (NSButton*)[(NSCustomTouchBarItem*)item view];
+}
+static void checkSurfacePage(NSView* surface,NSArray* identifiers,const char* message) { check([[surface valueForKey:@"identifiers"] isEqualToArray:identifiers],message); }
+static void captureSurface(NSView* surface,NSString* path,CGFloat width) {
+    NSView* root=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,width,30)] autorelease];
+    [root addSubview:surface]; surface.frame=root.bounds; [surface layoutSubtreeIfNeeded];
+    NSView* artwork=[surface valueForKey:@"artwork"]; NSScrollView* scroll=[surface valueForKey:@"scroll"];
+    check(NSEqualRects(artwork.frame,root.bounds) && NSEqualRects(scroll.frame,root.bounds),"Animation and native scroll viewport must use the actual allocated width");
+    for (NSView* control in [surface valueForKey:@"controls"]) check(control.bounds.size.width>=30 && control.bounds.size.height==30,"Animated surface preserves comfortable controls");
+    NSBitmapImageRep* image=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:image];
+    check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Export actual native animated surface control composition");
+    [surface removeFromSuperview];
+}
 int main(int argc,char** argv) { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp finishLaunching]; NSApp.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
     Method showPopover=class_getInstanceMethod(NSPopoverTouchBarItem.class,@selector(showPopover:));
@@ -266,6 +287,87 @@ int main(int argc,char** argv) { @autoreleasepool {
           "Original layout retains its direct, single-level Audio popover");
     capture(legacyAudio,[directory stringByAppendingPathComponent:@"touchbar-audio-controls-layout.png"]);
     nativeOverlayDetach();
+    Class bridge=objc_allocateClassPair(NSView.class,"MLTouchBarAnimationBridge",0);
+    check(bridge!=Nil,"Create isolated animation bridge boundary");
+    class_addMethod(bridge,NSSelectorFromString(@"setPresentationActive:"),(IMP)fakeSurfaceActive,"v@:B");
+    class_addMethod(bridge,NSSelectorFromString(@"showConnectionState:"),(IMP)fakeSurfaceState,"v@:q");
+    objc_registerClassPair(bridge);
+    [preferences setBool:YES forKey:@"touchBarLiveStats"]; [preferences synchronize];
+    nativeOverlayAttach(window,"animated-touchbar"); pump();
+    NSTouchBar* animated=[window.touchBar retain];
+    check([animated.defaultItemIdentifiers isEqualToArray:@[@"touch.surface"]],"Loaded renderer uses one native surface rather than competing Touch Bar items");
+    NSView* surface=[((NSCustomTouchBarItem*)[animated itemForIdentifier:@"touch.surface"]).view retain];
+    NSArray* homeItems=@[@"touch.capture",@"touch.info",@"touch.more"];
+    NSArray* surfaceControls=@[@"touch.home",@"touch.audio",@"touch.record",@"touch.replay",@"touch.stats",@"touch.window",@"touch.disconnect"];
+    checkSurfacePage(surface,homeItems,"Animated surface starts with persistent live metrics and essential controls");
+    nativeOverlayPresentStatistics(fixture); nativeTitlebarSetConnection(NativeConnectionState::Connected); pump();
+    captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main.png"],685);
+    NSView* moon=[surface valueForKey:@"moonTarget"];
+    check(moon.frame.size.width==96 && fabs(NSMidX(moon.frame)-342.5)<.1,"Main layout keeps a centered clear moon target between metrics");
+    captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main-wide.png"],1085);
+    captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main-narrow.png"],400);
+    NSScrollView* surfaceScroll=[surface valueForKey:@"scroll"]; NSView* surfaceDocument=[surface valueForKey:@"document"];
+    CGFloat expectedOrigin=MAX(0,(surfaceDocument.frame.size.width-400)/2);
+    check(fabs(surfaceScroll.contentView.bounds.origin.x-expectedOrigin)<.1,"A narrow page initially centers its document gap on the actual visible moon");
+    NSPoint gapInSurface=[surface convertPoint:NSMakePoint(surfaceDocument.frame.size.width/2,15) fromView:surfaceDocument];
+    check(fabs(gapInSurface.x-200)<.1,"The scrolled document moon gap must align with the visible animation center at 400 points");
+    check([[[surfaceButton(animated,@"touch.info") valueForKey:@"dashboard"] valueForKey:@"moonCenter"] doubleValue]<0,"Leaving wide layout clears the previous dashboard moon offset");
+    BOOL leadingContent=NO; NSRect leading=NSMakeRect(expectedOrigin,0,24,30);
+    for (NSView* control in [surface valueForKey:@"controls"]) {
+        if (NSIntersectsRect(control.frame,leading)) leadingContent=YES;
+        check(NSMinX(control.frame)>=0 && NSMaxX(control.frame)<=surfaceDocument.frame.size.width+.1,"Every narrow main command remains reachable in the scroll document");
+    }
+    check(leadingContent,"The initial narrow viewport must show real content at its leading edge rather than a blank document margin");
+    [surfaceScroll.contentView scrollToPoint:NSMakePoint(10,0)];
+    surface.needsLayout=YES; [surface layoutSubtreeIfNeeded];
+    check(fabs(surfaceScroll.contentView.bounds.origin.x-10)<.1,"Ordinary relayout must preserve the user's scroll position");
+    captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main-reset.png"],685);
+    check(fabs(surfaceScroll.contentView.bounds.origin.x)<.1,"Resizing to the compact physical width recenters the initial layout");
+    [surfaceButton(animated,@"touch.more") performClick:nil]; pump();
+    checkSurfacePage(surface,surfaceControls,"Controls changes the existing surface without presenting a popover");
+    captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-controls-narrow.png"],400);
+    gapInSurface=[surface convertPoint:NSMakePoint(surfaceDocument.frame.size.width/2,15) fromView:surfaceDocument];
+    check(fabs(gapInSurface.x-200)<.1,"Opening a narrow Controls page centers its gap on the visible moon");
+    captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-controls.png"],685);
+    gapInSurface=[surface convertPoint:NSMakePoint(surfaceDocument.frame.size.width/2,15) fromView:surfaceDocument];
+    check(fabs(gapInSurface.x-342.5)<.1,"Compact Controls keeps its moon gap centered after resizing");
+    check(window.touchBar==animated && popoverShows==1,"Animated navigation preserves ownership and never calls showPopover");
+    [surfaceButton(animated,@"touch.audio") performClick:nil]; pump();
+    checkSurfacePage(surface,audioItems,"Animated Audio page has the continuous volume slider and explicit Back");
+    NSSliderTouchBarItem* animatedSlider=(NSSliderTouchBarItem*)[animated itemForIdentifier:@"touch.volume"];
+    check(animatedSlider.slider.continuous,"Animated layout retains continuous native volume adjustment");
+    for (NSNumber* value in @[@.24,@.68,@.31]) {
+        animatedSlider.slider.doubleValue=value.doubleValue; [(id)animatedSlider.target performSelector:animatedSlider.action withObject:animatedSlider];
+        nativeOverlayPresentStatistics(fixture); nativeTitlebarSetRecording(true,true,true,true,false,false,37,"Recording");
+        [animated.delegate performSelector:@selector(touchTick:) withObject:nil]; pump();
+        checkSurfacePage(surface,audioItems,"Telemetry and recording updates must not dismiss the animated volume page");
+        check([animated itemForIdentifier:@"touch.volume"]==animatedSlider,"Animated Audio refresh retains the actual slider instance");
+    }
+    captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-audio.png"],685);
+    [surfaceButton(animated,@"touch.back") performClick:nil]; [surfaceButton(animated,@"touch.window") performClick:nil]; pump();
+    checkSurfacePage(surface,windowItems,"Animated Window page retains every window action");
+    [surfaceButton(animated,@"touch.fullscreen") performClick:nil]; check(action(221),"Animated fullscreen preserves the native SDL action route");
+    [surfaceButton(animated,@"touch.back") performClick:nil]; [surfaceButton(animated,@"touch.home") performClick:nil];
+    [surfaceButton(animated,@"touch.info") performClick:nil]; pump();
+    checkSurfacePage(surface,@[@"touch.home",@"touch.detail"],"Detailed statistics share the same animated surface");
+    NSView* surfacePanel=((NSCustomTouchBarItem*)[animated itemForIdentifier:@"touch.detail"]).view;
+    NSView* surfaceReadings=[surfacePanel valueForKey:@"dashboard"];
+    NSButton* surfaceNext=[surfacePanel valueForKey:@"next"];
+    for (int page=0;page<6;++page) {
+        check([[surfaceReadings valueForKey:@"page"] intValue]==page,"All six animated statistics pages remain reachable");
+        [surfaceNext performClick:nil];
+    }
+    captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-details.png"],685);
+    NSUserDefaults* frontend=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass"] autorelease];
+    id oldFullWidth=[[frontend objectForKey:@"touchBarFullWidth"] retain];
+    [animated.delegate performSelector:@selector(touchRestoreControlStrip:) withObject:nil];
+    check(![frontend boolForKey:@"touchBarFullWidth"],"Moon restore changes only the per-app full-width setting");
+    if (oldFullWidth) [frontend setObject:oldFullWidth forKey:@"touchBarFullWidth"]; else [frontend removeObjectForKey:@"touchBarFullWidth"];
+    [oldFullWidth release]; [frontend synchronize];
+    nativeOverlayDetach();
+    check(window.touchBar==original && [surface valueForKey:@"owner"]==nil,"Animated detach restores responder ownership and clears retained surface targets");
+    check(![objc_getAssociatedObject([surface valueForKey:@"artwork"],&surfaceActiveKey) boolValue],"Animated renderer is stopped on detach");
+    [surface release]; [animated release];
     if (oldLayout) [preferences setObject:oldLayout forKey:@"touchBarLiveStats"]; else [preferences removeObjectForKey:@"touchBarLiveStats"];
     if (oldVolume) [preferences setObject:oldVolume forKey:@"playbackVolume"]; else [preferences removeObjectForKey:@"playbackVolume"];
     [oldVolume release];

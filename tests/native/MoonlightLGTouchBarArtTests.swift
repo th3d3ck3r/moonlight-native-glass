@@ -46,7 +46,7 @@ import QuartzCore
             clock: { now }, reduceMotion: { reducedMotion }, rendersLiveContent: false)
         window.contentView!.addSubview(strip)
         strip.setPresentationActive(true)
-        precondition(strip.state == .idle && !strip.isAnimating, "Library artwork must not run a timer")
+        precondition(strip.state == .idle && strip.isAnimating && strip.sceneSnapshot.connected == 1, "Visible library must show the calm Moon pulse")
         precondition(strip.hitTest(NSPoint(x: 10, y: 10)) == nil, "Decoration must never intercept a control tap")
         strip.show(.connecting); pump()
         precondition(strip.isAnimating, "Visible connecting artwork must animate")
@@ -85,10 +85,20 @@ import QuartzCore
                      "Metadata refresh must not restart the connected shockwave")
         now = 102.3
         waitFor("Registered timer must finish connected easing") { strip.sceneSnapshot.connected == 1 }
+        strip.setStreaming(true)
+        precondition(abs(strip.animationFrameInterval - 1 / 20.0) < 0.00001,
+                     "Streaming must use its bounded cadence")
+        let beforeStall = strip.sceneSnapshot.time
+        now += 15
+        waitFor("A delayed frame must preserve elapsed animation time instead of slowing the reference") {
+            strip.sceneSnapshot.time >= beforeStall + 14.999
+        }
+        strip.setStreaming(false)
+        precondition(abs(strip.animationFrameInterval - 1 / 60.0) < 0.00001)
         strip.show(.failed)
         let frozen = strip.sceneSnapshot
         precondition(!strip.isAnimating && strip.sceneSaturation == 0.25)
-        now = 110; strip.show(.failed); strip.refreshPresentation(); pump()
+        now = 130; strip.show(.failed); strip.refreshPresentation(); pump()
         precondition(strip.sceneSnapshot.time == frozen.time && strip.sceneSnapshot.sinceConnect == frozen.sinceConnect,
                      "Failed artwork must freeze even when state notifications repeat")
 
@@ -97,12 +107,12 @@ import QuartzCore
         strip.setPresentationActive(false)
         precondition(!strip.isAnimating, "Owning window focus loss must stop animation immediately")
         let suspended = strip.sceneSnapshot.time
-        now = 112; pump()
+        now = 132; pump()
         precondition(strip.sceneSnapshot.time == suspended)
         strip.setPresentationActive(true); pump(); precondition(strip.isAnimating)
         reducedMotion = true
         NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
-        pump(); precondition(!strip.isAnimating, "Reduce Motion changes must stop an existing timer")
+        pump(); precondition(!strip.isAnimating && strip.sceneSnapshot.time == 5 && strip.sceneSnapshot.sinceConnect == 60, "Reduce Motion must render a calm pulse frame and stop the timer")
         reducedMotion = false; strip.refreshPresentation(); pump(); precondition(strip.isAnimating)
         MoonlightLGTouchBarArt.liveAnimationEnabled = false
         pump(); precondition(!strip.isAnimating, "Runtime still-art fallback must stop existing live animation")
@@ -118,7 +128,7 @@ import QuartzCore
         window.orderOut(nil); strip.setPresentationActive(false)
         precondition(!strip.isAnimating, "The owning window's hidden state must suspend its decoration")
         window.makeKeyAndOrderFront(nil); strip.setPresentationActive(true); pump()
-        strip.show(.idle); precondition(!strip.isAnimating, "Returning to the library removes all live scheduling")
+        strip.show(.idle); precondition(strip.isAnimating && strip.sceneSnapshot.connected == 1, "Returning to library resumes Moon pulse on the same surface")
         strip.playBoot(duration: 3.8); pump(); precondition(strip.isAnimating)
         now += 1.5
         waitFor("Boot must advance before changing presentation hosts") { strip.sceneSnapshot.bootProgress > 0.3 }
@@ -130,9 +140,9 @@ import QuartzCore
                      "Moving to an independent host must not replay the boot sweep")
         now += 2.5; modalNow += 2.5
         waitFor("Registered timers must finish one finite boot across both hosts") { strip.state == .idle && modalStrip.state == .idle }
-        precondition(!modalStrip.isAnimating)
+        precondition(modalStrip.isAnimating, "The finite boot must settle into the visible library pulse")
         modalStrip.removeFromSuperview()
-        precondition(strip.state == .idle && !strip.isAnimating, "Boot must terminate rather than reschedule an idle timer")
+        precondition(strip.state == .idle && strip.isAnimating, "Boot must terminate once and settle into the library pulse")
         strip.show(.connecting); pump(); precondition(strip.isAnimating)
         strip.removeFromSuperview(); pump(); precondition(!strip.isAnimating, "Detach must stop the timer")
         window.contentView!.addSubview(strip); strip.setPresentationActive(true); pump()

@@ -35,6 +35,7 @@ static void fakeShow(id receiver,SEL selector,NSTouchBar* bar,long long placemen
     if (cleaning) return;
     check(bar && placement==1 && tray==nil,"Request full app-region placement with no Control Strip tray item");
     check(presented==nil,"Do not present the same or another bar twice without releasing ownership");
+    check(fixtureWindow.touchBar!=bar,"System-modal and ordinary responder hosts must never own the same Touch Bar simultaneously");
     NSDictionary* controls=[bar.delegate valueForKey:@"touchButtons"];
     check(bar.defaultItemIdentifiers.count>0,"Never invoke private presentation with an empty bar");
     for (NSString* identifier in bar.defaultItemIdentifiers)
@@ -69,6 +70,7 @@ static void pump() {
 struct Fixture {
     NSUserDefaults* preferences=nil;
     id savedValue=nil;
+    id savedFailure=nil;
     Class meta=Nil,applicationClass=Nil,windowGetterClass=Nil;
     IMP originalShow=nullptr,originalHide=nullptr,originalActive=nullptr;
     const char* activeEncoding=nullptr;
@@ -83,6 +85,7 @@ struct Fixture {
     Fixture() {
         preferences=[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass"];
         savedValue=[[preferences objectForKey:@"touchBarFullWidth"] retain];
+        savedFailure=[[preferences objectForKey:@"touchBarFullWidthUnavailable"] retain];
         [preferences removeObjectForKey:@"touchBarFullWidth"]; [preferences synchronize];
         meta=object_getClass(NSTouchBar.class);
         Method show=class_getClassMethod(NSTouchBar.class,showSelector),hide=class_getClassMethod(NSTouchBar.class,hideSelector);
@@ -103,7 +106,7 @@ struct Fixture {
         }
     }
     void retainCurrentBar() {
-        [retainedBar release]; retainedBar=[fixtureWindow.touchBar retain];
+        [retainedBar release]; retainedBar=[(fixtureWindow.touchBar ?: presented) retain];
     }
     ~Fixture() {
         // Also restore preferences and IMPs on a failed assertion.
@@ -120,7 +123,8 @@ struct Fixture {
         if (originalHide) class_replaceMethod(meta,hideSelector,originalHide,"v@:@");
         if (savedValue) [preferences setObject:savedValue forKey:@"touchBarFullWidth"];
         else [preferences removeObjectForKey:@"touchBarFullWidth"];
-        [preferences synchronize]; [savedValue release]; [preferences release];
+        if (savedFailure) [preferences setObject:savedFailure forKey:@"touchBarFullWidthUnavailable"]; else [preferences removeObjectForKey:@"touchBarFullWidthUnavailable"];
+        [preferences synchronize]; [savedFailure release]; [savedValue release]; [preferences release];
     }
 };
 
@@ -155,9 +159,15 @@ static void run(Fixture& fixture) {
     fprintf(stderr,"Presentation fixture: enable and focus transitions\n");
     reenterShow=true; fixture.enable(true);
     check(shown==1 && hidden==0 && presented==bar,"Enabling must invoke full-width presentation exactly once despite synchronous refresh");
+    check(fixtureWindow.touchBar==nil,"Full width transfers the retained bar out of the responder host");
+    NSDictionary* modalButtons=[(id)bar.delegate valueForKey:@"touchButtons"];
+    NSButton* capture=modalButtons[@"touch.capture"];
+    [capture performClick:nil]; SDL_Event command; bool routed=false;
+    while (SDL_PollEvent(&command)) if (command.type==nativeOverlayEventType() && (command.user.code==201 || command.user.code==202)) routed=true;
+    check(routed,"Transferred modal controls must preserve native SDL action routing");
     refresh(bar); refresh(bar); check(shown==1,"Repeated state refresh must not steal presentation again");
     mockKey=false; notify(NSWindowDidResignKeyNotification,fixtureWindow);
-    check(hidden==1 && presented==nil,"Losing window key status must release full width");
+    check(hidden==1 && presented==nil && fixtureWindow.touchBar==bar,"Losing window key status must release full width and restore the normal responder host");
     mockKey=true; notify(NSWindowDidBecomeKeyNotification,fixtureWindow);
     check(shown==2 && presented==bar,"Regaining the active stream window may reacquire full width");
     mockActive=false; notify(NSApplicationDidResignActiveNotification,NSApp);
@@ -169,7 +179,7 @@ static void run(Fixture& fixture) {
     mockVisible=true; notify(NSWindowDidChangeOcclusionStateNotification,fixtureWindow);
     check(shown==4 && presented==bar,"A visible key stream may reacquire full width");
     reenterHide=true; fixture.enable(false);
-    check(hidden==4 && presented==nil,"Disabling must release ownership once despite synchronous refresh");
+    check(hidden==4 && presented==nil && fixtureWindow.touchBar==bar,"Disabling must release ownership once and restore normal controls despite synchronous refresh");
 
     fprintf(stderr,"Presentation fixture: focus loss inside show callback\n");
     loseFocusDuringShow=true; fixture.enable(true);
@@ -211,6 +221,8 @@ static void run(Fixture& fixture) {
           "A throwing private presentation must dismiss partial ownership and retain ordinary controls");
     check(![[(id)bar.delegate valueForKey:@"touchFullWidthPresented"] boolValue],
           "Private API rejection must never claim full-width ownership");
+    check(![fixture.preferences boolForKey:@"touchBarFullWidth"] && [fixture.preferences boolForKey:@"touchBarFullWidthUnavailable"],
+          "Rejected presentation must report the normal-width fallback in shared frontend settings");
     refresh(bar); refresh(bar);
     check(shown==8 && hidden==8,"A rejected private API must not flash/retry on every state update");
     fixture.enable(false); fixture.enable(true);

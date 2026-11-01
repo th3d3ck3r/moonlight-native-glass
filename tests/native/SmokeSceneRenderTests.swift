@@ -16,8 +16,8 @@ import SwiftUI
               let library = try? device.makeLibrary(URL: url) else {
             preconditionFailure("Packaged default Metal library must load on the runner's GPU")
         }
-        precondition(library.functionNames.contains("smokeAccretion") && library.functionNames.contains("smokeAccretionStrip"),
-                     "Both packaged stitchable functions must be available")
+        precondition(library.functionNames.contains("smokeAccretion") && library.functionNames.contains("smokeAccretionStrip") && library.functionNames.contains("touchBarMoonPulse"),
+                     "Screen and supplied Moon pulse functions must be packaged together")
         let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         // Large Retina startup windows must not silently return to shading
@@ -209,6 +209,26 @@ import SwiftUI
         }
         precondition(centeredMoon > 10, "The moon must stay centred in the physically visible region")
         clippedRow.removeStrip(); clippedWindow.orderOut(nil); clippedWindow.close()
+
+        for time in [5.0, 10.1] {
+            let size = NSSize(width: 685, height: 30)
+            let w = NSWindow(contentRect: NSRect(origin: NSPoint(x: 70, y: 100), size: size),
+                             styleMask: .borderless, backing: .buffered, defer: false)
+            w.isReleasedWhenClosed = false; w.backgroundColor = .black
+            let state = SmokeAccretionState(time: time, connected: 1, sinceConnect: 60, progressFill: -1)
+            w.contentView = NSHostingView(rootView: SmokeAccretionStripScene(state: state))
+            w.makeKeyAndOrderFront(nil)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+            let name = time == 5 ? "pulse-calm" : "pulse-beat"
+            let path = directory.appendingPathComponent(name + ".png")
+            let capture = Process(); capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            capture.arguments = ["-x", "-o", "-l", String(w.windowNumber), path.path]
+            try! capture.run(); capture.waitUntilExit(); precondition(capture.terminationStatus == 0)
+            images[name] = NSBitmapImageRep(data: try! Data(contentsOf: path))!
+            w.orderOut(nil); w.close()
+        }
+        precondition(images["pulse-calm"]!.tiffRepresentation != images["pulse-beat"]!.tiffRepresentation,
+                     "Actual GPU output must change between calm and the authored ten-second beat")
 
         // Template PNGs need AppKit's image-view rendering; raw NSImage.draw
         // would leave the black mask invisible on the dark Touch Bar surface.

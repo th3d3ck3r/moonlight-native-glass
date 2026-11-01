@@ -3,6 +3,7 @@ import Combine
 
 @MainActor private final class WindowState {
     @Published var exists = false
+    @Published var started = false
 }
 
 @main struct StatusIconTests {
@@ -17,6 +18,7 @@ import Combine
         let state = WindowState()
         let menu = NativeStatusMenu(resourceURL: URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true))
         menu.bind(to: state.$exists)
+        menu.bindStreaming(to: state.$started)
         func flush() { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
         flush()
         let button = menu.item.button!
@@ -69,6 +71,46 @@ import Combine
         state.exists = true
         flush()
         precondition(button.image === fullMoon, "Rebinding must preserve state observation")
+        // An Apollo/Continue window must retain the idle glyph. Only the engine's
+        // actual start event turns it crimson; failure/end restores it even if
+        // the stream window remains open during cleanup or a retry.
+        precondition(button.image === crescent && button.image!.isTemplate)
+        state.started = true; flush()
+        let streamingGlyph = button.image!
+        precondition(streamingGlyph !== crescent && !streamingGlyph.isTemplate)
+        precondition(streamingGlyph.size == NSSize(width: 18, height: 18))
+        precondition(button.accessibilityLabel()?.contains("streaming") == true)
+        precondition(button.contentTintColor == nil, "The system must not tint over the crimson streaming glyph")
+        for scale in [1, 2] {
+            let pixels = 18 * scale
+            let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+            NSGraphicsContext.current!.cgContext.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
+            streamingGlyph.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
+            NSGraphicsContext.restoreGraphicsState()
+            var redPixels = 0
+            for y in 0..<pixels { for x in 0..<pixels {
+                let color = bitmap.colorAt(x: x, y: y)!.usingColorSpace(.deviceRGB)!
+                if color.alphaComponent > 0.1 && color.redComponent > color.greenComponent * 1.5 { redPixels += 1 }
+            } }
+            precondition(redPixels > pixels && redPixels < pixels * pixels,
+                         "Streaming glyph must remain visibly crimson with transparent space at physical/Retina sizes")
+            if CommandLine.arguments.count > 2 {
+                let directory = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
+                try! bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent("streaming-\(scale)x.png"))
+            }
+        }
+        state.started = false; flush()
+        precondition(state.exists && button.image === crescent && crescent.isTemplate)
+        state.started = true; flush()
+        precondition(button.image === streamingGlyph, "Reconnect must reuse the cached streaming glyph")
+        menu.bindStreaming(to: state.$started); flush()
+        precondition(button.image === streamingGlyph, "Rebinding must retain actual streaming state")
+        state.started = false; flush()
+        precondition(button.image === crescent)
         // No stream: app actions stay available, all stream actions are disabled.
         let idleMenu = menu.makeMenu()
         for tag in [200, 100, 201, 203, 207, 209, 212, 217, 219] {
@@ -135,6 +177,6 @@ import Combine
         }
         UserDefaults.standard.set(false, forKey: NativeCrimsonTheme.key); flush()
         precondition(button.image === crescent, "Theme changes must not reload the menu artwork")
-        print("Status icon states, menu confirmations/input handoff, click/hidden restore and hover removal checks passed")
+        print("Status idle/streaming glyphs, physical-size crimson rendering, menu input handoff and hidden restore checks passed")
     }
 }

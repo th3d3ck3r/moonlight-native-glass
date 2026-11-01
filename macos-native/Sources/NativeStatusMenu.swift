@@ -17,6 +17,9 @@ import Combine
     private var activeMenu: NSMenu?
     private var restoreInputAfterMenu = true
     private let menuGlyph: NSImage?
+    private let streamingGlyph: NSImage?
+    private var streamingObservation: AnyCancellable?
+    private var streamStarted = false
     private let crescent: NSImage?
     private let fullMoon: NSImage?
     private var windowObservation: AnyCancellable?
@@ -44,6 +47,11 @@ import Combine
         newGlyph?.size = NSSize(width: 18, height: 18)
         newGlyph?.isTemplate = true
         menuGlyph = newGlyph
+        let suppliedStreamingGlyph = resourceURL.flatMap { NSImage(contentsOf: $0.appendingPathComponent("MenuBarMoonlightLGStreaming.png")) }
+        let activeGlyph = NSImage(named: "MenuBarMoonlightLGStreaming") ?? suppliedStreamingGlyph
+        activeGlyph?.size = NSSize(width: 18, height: 18)
+        activeGlyph?.isTemplate = false
+        streamingGlyph = activeGlyph
         crescent = load("moonlight.icns")
         fullMoon = load("full-moon.png")
         crimsonCrescent = load("crimson-moon.png")
@@ -65,12 +73,22 @@ import Combine
             self?.updateWindowState(exists)
         }
     }
+    /// The engine reports this only after the stream has actually started. An
+    /// Apollo/Continue window already exists before that point and stays idle.
+    func bindStreaming(to publisher: Published<Bool>.Publisher) {
+        streamingObservation = publisher.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] started in
+            guard let self else { return }
+            self.streamStarted = started
+            self.updateWindowState(self.windowExists)
+        }
+    }
     private func updateWindowState(_ exists: Bool) {
         windowExists = exists
         let idle = NativeCrimsonTheme.enabled ? (crimsonCrescent ?? crescent) : crescent
         let active = NativeCrimsonTheme.enabled ? (crimsonFullMoon ?? fullMoon ?? idle) : (fullMoon ?? idle)
-        item.button?.image = menuGlyph ?? (exists ? active : idle)
-        let state = exists ? "stream window open" : "no stream window"
+        item.button?.image = streamStarted ? (streamingGlyph ?? menuGlyph ?? active) : (menuGlyph ?? idle)
+        item.button?.contentTintColor = nil
+        let state = streamStarted ? "streaming" : (exists ? "stream window open" : "no stream window")
         item.button?.setAccessibilityLabel("MoonlightLG — " + state)
         item.button?.toolTip = nil
         item.button?.setAccessibilityHelp("Click to restore the stream window or open the library. Right-click for stream actions and settings.")

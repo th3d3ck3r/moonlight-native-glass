@@ -31,6 +31,9 @@ for bundle, identity in [(app, "com.moonlight-stream.NativeGlass"),
     assert icon.read_bytes() == expected_icon.read_bytes(), f"{bundle}: mismatched Dock icon"
 
 assert (app / "Contents/Resources/boot-animation.mp4").read_bytes() == pathlib.Path("macos-native/Resources/boot-animation.mp4").read_bytes(), "Boot animation resource differs"
+for name in ["MenuBarMoonlightLG.png", "MenuBarMoonlightLG@2x.png", "MenuBarMoonlightLGStreaming.png", "MenuBarMoonlightLGStreaming@2x.png"]:
+    assert (app / "Contents/Resources" / name).read_bytes() == (pathlib.Path("macos-native/Resources") / name).read_bytes(), f"Mismatched menu icon: {name}"
+
 assert (app / "Contents/Resources/full-moon.png").read_bytes() == pathlib.Path("macos-native/Resources/full-moon.png").read_bytes(), "Menu bar full moon resource differs"
 
 for name in ["boot-moon.png", "crimson-moon.png", "crimson-full-moon.png", "crimson.icns"]:

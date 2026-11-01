@@ -134,6 +134,7 @@ private struct NativeStatusActions: View {
         Color.clear.frame(width: 0, height: 0).onAppear {
             if delegate.statusMenu == nil { delegate.statusMenu = NativeStatusMenu() }
             delegate.statusMenu?.bind(to: store.$streamWindowExists)
+            delegate.statusMenu?.bindStreaming(to: store.$streamStarted)
             delegate.statusMenu?.bindState(to: store.$menuState)
             let openLibrary: () -> Void = {
                     openWindow(id: "library")

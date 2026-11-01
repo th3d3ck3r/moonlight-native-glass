@@ -313,9 +313,16 @@ final class NativeTouchBarButton: ConnectionActionButton {
 
 // A single Touch Bar item preserves composition. Keep host status pinned and
 // allow the remaining controls to scroll when the system supplies less width.
+private final class NativeTouchBarMoonEscape: NSView {
+    var restore: (() -> Void)?
+    override func accessibilityPerformPress() -> Bool { restore?(); return restore != nil }
+}
+
 final class NativeTouchBarRow: NSView {
     let scroll = NSScrollView()
     let document = NSView()
+    private let moonEscape = NativeTouchBarMoonEscape()
+    var onMoonLongPress: (() -> Void)?
     let more = NativeTouchBarButton(title: "", target: nil, action: nil)
     var status: NSButton?
     private(set) var strip: MoonlightLGTouchBarStripView?
@@ -331,6 +338,16 @@ final class NativeTouchBarRow: NSView {
     init(buttons: [(NSButton, CGFloat)], pinnedStatus: Bool) {
         super.init(frame: NSRect(x: 0, y: 0, width: 640, height: 30))
         identifier = .init("TouchBarCommandRow")
+        let hold = NSPressGestureRecognizer(target: self, action: #selector(restoreControlStrip(_:)))
+        hold.minimumPressDuration = 0.5
+        moonEscape.addGestureRecognizer(hold)
+        moonEscape.setAccessibilityElement(true)
+        moonEscape.setAccessibilityRole(.button)
+        moonEscape.setAccessibilityLabel("Restore system Control Strip")
+        moonEscape.setAccessibilityHelp("Press and hold the moon to return to normal Touch Bar width")
+        moonEscape.restore = { [weak self] in self?.onMoonLongPress?() }
+        addSubview(moonEscape)
+        moonEscape.isHidden = true
         scroll.drawsBackground = false; scroll.contentView.drawsBackground = false; scroll.borderType = .noBorder
         scroll.hasVerticalScroller = false; scroll.hasHorizontalScroller = false
         scroll.horizontalScrollElasticity = .allowed; scroll.verticalScrollElasticity = .none
@@ -409,21 +426,31 @@ final class NativeTouchBarRow: NSView {
         layoutViewport = NSRect(x: area.minX, y: bounds.minY, width: area.width, height: 30)
         let width = layoutViewport.width, origin = layoutViewport.minX
         strip?.frame = layoutViewport
+        moonEscape.frame = NSRect(x: origin + width / 2 - 48, y: 0, width: 96, height: 30)
+        moonEscape.isHidden = strip == nil || !NativeTouchBarPresentation.enabled()
         let pinned = status == nil ? 0 : min(statusWidth, max(100, width * (strip == nil ? 0.4 : 0.3)))
         if let status { status.frame = NSRect(x: origin, y: 0, width: pinned, height: 30) }
         let start = pinned + (status == nil ? 0 : 6)
         let available = max(0, width - start)
-        let overflow = document.frame.width > available
+        let decoratedAvailable = strip == nil ? available : max(80, width - max(start, width / 2 + 48))
+        let overflow = document.frame.width > decoratedAvailable
         more.isHidden = !overflow
         more.frame = NSRect(x: origin + max(start, width - 30), y: 0, width: 30, height: 30)
         let viewport = max(0, available - (overflow ? 34 : 0))
-        let controlWidth = strip == nil ? viewport : min(document.frame.width, viewport)
+        // Leave the moon and its inner disk visible. Secondary actions
+        // retain their full touch targets in the scrolling right-hand group.
+        let moonRight = width / 2 + 48
+        let decoratedViewport = max(80, width - (overflow ? 34 : 0) - max(start, moonRight))
+        let controlWidth = strip == nil ? viewport : min(document.frame.width, viewport, decoratedViewport)
         scroll.frame = NSRect(x: origin + (strip == nil ? start : width - (overflow ? 34 : 0) - controlWidth),
                               y: 0, width: controlWidth, height: 30)
         let limit = max(0, document.frame.width - scroll.contentView.bounds.width)
         scroll.contentView.scroll(to: NSPoint(x: min(limit, scroll.contentView.bounds.origin.x), y: 0))
         scroll.reflectScrolledClipView(scroll.contentView)
         updateOverflowHint()
+    }
+    @objc private func restoreControlStrip(_ gesture: NSPressGestureRecognizer) {
+        if gesture.state == .began { onMoonLongPress?() }
     }
     func setCrimson(_ enabled: Bool) {
         more.bezelColor = enabled ? NSColor(srgbRed: 0.12, green: 0.035, blue: 0.055, alpha: 1) : nil
@@ -459,7 +486,7 @@ final class NativeTouchBarRow: NSView {
 struct NativeTouchBarAccessory: NSViewRepresentable {
     var commands: [NativeTouchBarCommand]
     var crimson = true
-    var artState: MoonlightLGTouchBarArt.State? = nil
+    var artState: MoonlightLGTouchBarArt.State? = .idle
     var bootStartedAt: Date? = nil
     final class AccessoryView: NSView {
         weak var owner: Coordinator?
@@ -701,6 +728,10 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
                 style(button, command); buttons[command.id] = button; views.append((button, command.width))
             }
             let row = NativeTouchBarRow(buttons: views, pinnedStatus: commands.first?.action == nil)
+            row.onMoonLongPress = {
+                guard let preferences = NativeTouchBarPresentation.sharedPreferences else { return }
+                _ = NativeTouchBarPresentation.apply(false, preferences: preferences)
+            }
             row.setCrimson(crimson); self.row = row; item.view = row
             configureArt(); refreshArt(); requestPresentation()
             return item

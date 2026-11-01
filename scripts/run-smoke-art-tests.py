@@ -11,7 +11,7 @@ import sys
 root = pathlib.Path(__file__).resolve().parent.parent
 build = root / 'build/smoke-art-tests'
 build.mkdir(parents=True, exist_ok=True)
-shared = ['SmokeAccretionScene.swift', 'MoonlightLGTouchBarArt.swift']
+shared = ['SmokeAccretionScene.swift', 'MoonlightLGTouchBarArt.swift', 'NativeTouchBarAnimationBridge.swift']
 fixtures = [
     ('TouchBarFrontend', ['EngineProtocol.swift', 'NativeCrimsonTheme.swift', *shared, 'NativeConnectionView.swift'], 'TouchBarFrontendTests.swift', []),
     ('TouchBarArt', shared, 'MoonlightLGTouchBarArtTests.swift', []),
