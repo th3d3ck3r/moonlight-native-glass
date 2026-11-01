@@ -320,6 +320,7 @@ private final class NativeTouchBarMoonEscape: NSView {
     override func accessibilityPerformPress() -> Bool { restore?(); return restore != nil }
 }
 
+/// A flexible app-region canvas; the system may change its allocation while visible.
 final class NativeTouchBarRow: NSView {
     let scroll = NSScrollView()
     let document = NSView()
