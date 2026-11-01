@@ -367,6 +367,11 @@ static NSString* const touchSurfaceID=@"touch.surface";
     self.owner.touchInlineDashboard.moonCenter=-1;
     self.owner.touchDashboard.moonCenter=-1;
     BOOL main=self.owner.touchLiveStats && [self.identifiers isEqualToArray:@[@"touch.capture",@"touch.info",@"touch.more"]];
+    BOOL narrowMain=main && self.controls.count==3 && viewport.size.width<620;
+    for (NSUInteger i=0;i<self.controls.count;++i) {
+        NSView* view=self.controls[i]; NSView* parent=narrowMain && i!=1 ? self : self.document;
+        if (view.superview!=parent) [parent addSubview:view];
+    }
     CGFloat gap=96,leftWidth=0,rightWidth=0,balance=CGFLOAT_MAX; NSUInteger split=1;
     for (NSUInteger candidate=1;candidate<widths.count;++candidate) {
         CGFloat left=0,right=0;
@@ -384,7 +389,16 @@ static NSString* const touchSurfaceID=@"touch.surface";
     }
     // The live readout owns three cells. Reserve its central moon space inside
     // the readout instead of forcing all three measurements to one side.
-    if (main && self.controls.count==3 && viewport.size.width>=620) {
+    if (narrowMain) {
+        // Keep capture and Controls visible when the system allocates a small
+        // app area. Only the live measurements scroll between these anchors.
+        NSView* capture=self.controls[0]; NSView* info=self.controls[1]; NSView* more=self.controls[2];
+        capture.frame=NSMakeRect(viewport.origin.x,0,84,30);
+        more.frame=NSMakeRect(NSMaxX(viewport)-98,0,98,30);
+        self.scroll.frame=NSMakeRect(viewport.origin.x+90,0,MAX(50,viewport.size.width-194),30);
+        info.frame=NSMakeRect(0,0,350,30); self.document.frame=NSMakeRect(0,0,350,30);
+        self.moonGapAvailable=NO;
+    } else if (main && self.controls.count==3 && viewport.size.width>=620) {
         NSView* capture=self.controls[0]; NSView* info=self.controls[1]; NSView* more=self.controls[2];
         capture.frame=NSMakeRect(0,0,84,30); more.frame=NSMakeRect(viewport.size.width-98,0,98,30);
         info.frame=NSMakeRect(90,0,MAX(350,viewport.size.width-194),30);
@@ -408,7 +422,7 @@ static NSString* const touchSurfaceID=@"touch.surface";
     BOOL changed=self.centerOnLayout || fabs(self.lastViewportWidth-viewport.size.width)>.5 || fabs(self.lastContentWidth-documentWidth)>.5;
     if (changed) {
         NSPoint origin=self.scroll.contentView.bounds.origin;
-        origin.x=MAX(0,(documentWidth-viewport.size.width)/2); origin.y=0;
+        origin.x=narrowMain ? 0 : MAX(0,(documentWidth-viewport.size.width)/2); origin.y=0;
         [self.scroll.contentView scrollToPoint:origin]; [self.scroll reflectScrolledClipView:self.scroll.contentView];
     }
     self.centerOnLayout=NO; self.lastViewportWidth=viewport.size.width; self.lastContentWidth=documentWidth;

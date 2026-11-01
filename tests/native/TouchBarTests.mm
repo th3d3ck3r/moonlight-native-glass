@@ -96,7 +96,7 @@ static void captureSurface(NSView* surface,NSString* path,CGFloat width) {
     fprintf(stderr,"SURFACE %s root=%s frame=%s bounds=%s visible=%s art=%s scroll=%s\n",path.lastPathComponent.UTF8String,
         NSStringFromRect(root.bounds).UTF8String,NSStringFromRect(surface.frame).UTF8String,NSStringFromRect(surface.bounds).UTF8String,
         NSStringFromRect(surface.visibleRect).UTF8String,NSStringFromRect(artwork.frame).UTF8String,NSStringFromRect(scroll.frame).UTF8String);
-    check(NSEqualRects(artwork.frame,root.bounds) && NSEqualRects(scroll.frame,root.bounds),"Animation and native scroll viewport must use the actual allocated width");
+    check(NSEqualRects(artwork.frame,root.bounds) && NSContainsRect(root.bounds,scroll.frame),"Artwork must fill and the native scroll viewport must fit the actual allocation");
     for (NSView* control in [surface valueForKey:@"controls"]) check(control.bounds.size.width>=30 && control.bounds.size.height==30,"Animated surface preserves comfortable controls");
     NSBitmapImageRep* image=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:image];
     check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Export actual native animated surface control composition");
@@ -316,17 +316,17 @@ int main(int argc,char** argv) { @autoreleasepool {
     captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main-wide.png"],1085);
     captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main-narrow.png"],400);
     NSScrollView* surfaceScroll=[surface valueForKey:@"scroll"]; NSView* surfaceDocument=[surface valueForKey:@"document"];
-    CGFloat expectedOrigin=MAX(0,(surfaceDocument.frame.size.width-400)/2);
-    check(fabs(surfaceScroll.contentView.bounds.origin.x-expectedOrigin)<.1,"A narrow page initially centers its document gap on the actual visible moon");
-    NSPoint gapInSurface=[surface convertPoint:NSMakePoint(surfaceDocument.frame.size.width/2,15) fromView:surfaceDocument];
-    check(fabs(gapInSurface.x-200)<.1,"The scrolled document moon gap must align with the visible animation center at 400 points");
-    check([[[surfaceButton(animated,@"touch.info") valueForKey:@"dashboard"] valueForKey:@"moonCenter"] doubleValue]<0,"Leaving wide layout clears the previous dashboard moon offset");
-    BOOL leadingContent=NO; NSRect leading=NSMakeRect(expectedOrigin,0,24,30);
-    for (NSView* control in [surface valueForKey:@"controls"]) {
-        if (NSIntersectsRect(control.frame,leading)) leadingContent=YES;
-        check(NSMinX(control.frame)>=0 && NSMaxX(control.frame)<=surfaceDocument.frame.size.width+.1,"Every narrow main command remains reachable in the scroll document");
-    }
-    check(leadingContent,"The initial narrow viewport must show real content at its leading edge rather than a blank document margin");
+    NSButton* narrowCapture=surfaceButton(animated,@"touch.capture"),*narrowControls=surfaceButton(animated,@"touch.more");
+    check(narrowCapture.superview==surface && narrowControls.superview==surface &&
+          fabs(narrowCapture.frame.origin.x)<.1 && fabs(NSMaxX(narrowControls.frame)-400)<.1,
+          "Narrow main bar must keep Capture and Controls pinned and fully visible");
+    check(NSMinX(surfaceScroll.frame)>=NSMaxX(narrowCapture.frame) && NSMaxX(surfaceScroll.frame)<=NSMinX(narrowControls.frame),
+          "Live measurements scroll between the essential controls without covering them");
+    check([[[surfaceButton(animated,@"touch.info") valueForKey:@"dashboard"] valueForKey:@"moonCenter"] doubleValue]<0,
+          "Narrow measurements must clear the previous wide dashboard offset");
+    check(surfaceDocument.frame.size.width>=350 && surfaceScroll.contentView.bounds.origin.x==0,
+          "Narrow main starts with incoming FPS; RTT and bitrate remain reachable by scrolling");
+    NSPoint gapInSurface=NSZeroPoint;
     [surfaceScroll.contentView scrollToPoint:NSMakePoint(10,0)];
     surface.needsLayout=YES; [surface layoutSubtreeIfNeeded];
     check(fabs(surfaceScroll.contentView.bounds.origin.x-10)<.1,"Ordinary relayout must preserve the user's scroll position");

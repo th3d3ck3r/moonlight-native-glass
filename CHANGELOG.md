@@ -7,7 +7,7 @@
 - Check that modal content is actually hosted after presentation; on failure restore the standard bar and turn the option off with an explanatory settings message. Preserve global, Fn and other-app preferences.
 - Preflight stream controls and guard private presentation/dismissal exceptions. Preserve stream action routing, continuous volume and all existing controls, plus build 48’s boot smoothness changes.
 - Adopt the supplied Moon pulse across the Touch Bar, including the finite startup sweep, connecting sweep and one-time connected shockwave. Use elapsed wall time, stop work with hidden/inactive owners, respect Reduce Motion, and lower the animation cadence during streaming. Keep the screen startup/connection artwork unchanged.
-- Keep the central moon clear and commands reachable through scrolling. The menu bar moon stays a system template at idle and turns crimson only after the stream actually starts.
+- Keep the central moon clear and commands reachable through scrolling. Pin Capture and Controls in narrow streaming allocations while measurements scroll between them. Use a short Continue label with its full accessible name so Continue, Retry and Cancel fit together at normal physical width. The menu bar moon stays a system template at idle and turns crimson only after the stream actually starts.
 - Add clipped-host rendering and injected lifecycle/failure regressions. Internal build 49; physical Touch Bar and macOS-private presentation acceptance remain outside CI.
 
 ## 1.3.5.1U — private full-bar animation correction

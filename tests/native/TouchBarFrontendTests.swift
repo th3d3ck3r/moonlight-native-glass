@@ -39,6 +39,12 @@ import SwiftUI
         owner.update([connected], crimson: true)
         precondition(window.touchBar === bar, "State updates must preserve the current bar and its focus")
         button.performClick(nil); precondition(presses == 1)
+        let compactContinue = NativeTouchBarCommand("apollo.continue", "Continue", "play.fill", width: 104,
+            accessibilityTitle: "Continue to Stream") { presses += 1 }
+        owner.update([compactContinue], crimson: true)
+        precondition(button.title == "Continue" && button.accessibilityLabel() == "Continue to Stream" && button.toolTip == "Continue to Stream",
+                     "Deliberate short labels retain the full accessible meaning")
+        owner.update([connected], crimson: true)
         let iconPoint = NSPoint(x: button.frame.minX + 12, y: button.frame.minY + 15)
         precondition(button.hitTest(iconPoint) === button, "The template glyph must forward icon taps to the nonblocking native button")
         precondition(button.image != nil && button.contentTintColor != nil, "Use native symbols and Crimson Glass tint")

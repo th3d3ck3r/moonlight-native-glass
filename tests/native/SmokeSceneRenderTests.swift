@@ -110,14 +110,14 @@ import SwiftUI
                 status.statusOnly = true; status.isEnabled = false
                 status.templateGlyph = MoonlightLGTouchBarArt.appGlyph
                 status.image = status.templateGlyph
-                let primary = NativeTouchBarButton(title: boot ? "Skip to Library" : "Continue to Stream", target: nil, action: nil)
+                let primary = NativeTouchBarButton(title: boot ? "Skip to Library" : "Continue", target: nil, action: nil)
                 primary.image = NSImage(systemSymbolName: boot ? "forward.end.fill" : "play.fill", accessibilityDescription: nil)
                 let cancel = NativeTouchBarButton(title: "Cancel", target: nil, action: nil)
                 cancel.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
                 let retry = NativeTouchBarButton(title: "Retry", target: nil, action: nil)
                 retry.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
                 retry.isEnabled = false
-                var buttons: [(NSButton, CGFloat)] = [(status, 200), (primary, 150)]
+                var buttons: [(NSButton, CGFloat)] = [(status, 200), (primary, boot ? 150 : 104)]
                 if !boot { buttons += [(retry, 65), (cancel, 80)] }
                 for (button, _) in buttons {
                     button.bezelColor = NSColor(srgbRed: 0.12, green: 0.035, blue: 0.055, alpha: 1)
@@ -140,6 +140,7 @@ import SwiftUI
                 precondition(strip.bounds.width == width && strip.bounds.height == 30 && strip.isAnimating)
                 precondition(row.status!.frame.maxX < width / 2 && row.scroll.frame.minX > width / 2,
                              "Foreground status/actions must leave the central moon readable")
+                if !boot { precondition(row.more.isHidden, "Continue, Retry and Cancel must all fit the ordinary physical bar beside the moon") }
                 precondition(buttons.allSatisfy { $0.0.frame.height == 30 }, "Controls retain physical Touch Bar height")
                 let path = directory.appendingPathComponent("smoke-row-\(boot ? "boot" : "connected")-\(Int(width)).png")
                 let capture = Process(); capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")

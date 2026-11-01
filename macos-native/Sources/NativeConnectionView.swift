@@ -97,8 +97,9 @@ struct NativeConnectionView: View {
         .environment(\.colorScheme, .dark)
         .background(NativeTouchBarAccessory(commands: [
             .init("apollo.status", "\(journey.computer.name)\n\(journey.detail)", "moon.fill", width: 240, enabled: false),
-            .init("apollo.continue", journey.phase == .entering ? "Opening…" : "Continue to Stream", "play.fill", width: 150,
-                  enabled: journey.phase == .connected && !journey.continueRequested, action: proceed),
+            .init("apollo.continue", journey.phase == .entering ? "Opening…" : "Continue", "play.fill", width: 104,
+                  enabled: journey.phase == .connected && !journey.continueRequested,
+                  accessibilityTitle: journey.phase == .entering ? "Opening stream" : "Continue to Stream", action: proceed),
             .init("apollo.retry", "Retry", "arrow.clockwise", width: 65, enabled: journey.phase == .failed && canRetry, action: retry),
             .init("apollo.cancel", journey.phase == .failed ? "Library" : "Cancel", "xmark", width: 80, action: cancel)
         ], crimson: crimson, artState: journey.phase == .failed ? .failed : ready ? .connected : .connecting).frame(width: 0, height: 0))
@@ -126,11 +127,12 @@ struct NativeTouchBarCommand {
     var symbol: String
     var width: CGFloat
     var enabled: Bool
+    var accessibilityTitle: String?
     var action: (() -> Void)?
     init(_ id: String, _ title: String, _ symbol: String, width: CGFloat = 70,
-         enabled: Bool = true, action: (() -> Void)? = nil) {
+         enabled: Bool = true, accessibilityTitle: String? = nil, action: (() -> Void)? = nil) {
         self.id = id; self.title = title; self.symbol = symbol
-        self.width = width; self.enabled = enabled; self.action = action
+        self.width = width; self.enabled = enabled; self.accessibilityTitle = accessibilityTitle; self.action = action
     }
 }
 
@@ -713,8 +715,8 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             button.lineBreakMode = .byTruncatingMiddle
             button.bezelColor = crimson ? NSColor(srgbRed: 0.12, green: 0.035, blue: 0.055, alpha: 1) : nil
             button.contentTintColor = crimson ? NSColor(srgbRed: 0.95, green: 0.19, blue: 0.32, alpha: 1) : nil
-            button.setAccessibilityLabel(command.title.replacingOccurrences(of: "\n", with: "; "))
-            button.toolTip = command.title
+            button.setAccessibilityLabel((command.accessibilityTitle ?? command.title).replacingOccurrences(of: "\n", with: "; "))
+            button.toolTip = command.accessibilityTitle ?? command.title
             (button as? NativeTouchBarButton)?.statusOnly = command.action == nil
             button.needsDisplay = true
         }
