@@ -14,7 +14,19 @@ import Metal
             guard let function = library.makeFunction(name: "smokeProbe") else {
                 preconditionFailure("The test-only dispatch wrapper must compile")
             }
-            return try device.makeComputePipelineState(function: function)
+            // Stitchable entrypoints are visible functions. The test kernel
+            // must link them explicitly, just as SwiftUI's generated pipeline does.
+            let linked = MTLLinkedFunctions()
+            linked.functions = try ["smokeAccretion", "smokeAccretionStrip"].map { name in
+                guard let entry = library.makeFunction(name: name) else {
+                    throw NSError(domain: "SmokeShaderProbe", code: 1,
+                                  userInfo: [NSLocalizedDescriptionKey: "Missing stitchable function: \(name)"])
+                }
+                return entry
+            }
+            let descriptor = MTLComputePipelineDescriptor()
+            descriptor.computeFunction = function; descriptor.linkedFunctions = linked
+            return try device.makeComputePipelineState(descriptor: descriptor, options: [], reflection: nil)
         }
         let reference = try pipeline("reference"), optimized = try pipeline("optimized")
         // time, boot progress, boot flag, connected, since connected, progress fill
