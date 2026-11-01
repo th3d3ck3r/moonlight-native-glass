@@ -251,8 +251,14 @@ import SwiftUI
                 row.scrollMore()
                 precondition(row.scroll.contentView.bounds.origin.x > 0)
             } else {
-                precondition(row.more.isHidden, "The common library commands should fit the ordinary allocation")
+                let needsScrolling = row.document.frame.width > row.scroll.contentView.bounds.width
+                precondition(row.more.isHidden != needsScrolling,
+                             "The moon gap may require scrolling; overflow must always expose that navigation")
+                precondition(row.scroll.frame.minX >= width / 2 + 48,
+                             "The ordinary physical allocation must keep the authored central moon clear")
             }
+            precondition(row.controls.allSatisfy { $0.1 <= row.scroll.contentView.bounds.width },
+                         "Every full touch target must fit the scroll viewport even on a narrow bar")
             // A gesture can fully expose every command; an offscreen control
             // is never permanently lost behind the system strip.
             let end = max(0, row.document.frame.width - row.scroll.contentView.bounds.width)

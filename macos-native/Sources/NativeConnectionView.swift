@@ -432,7 +432,8 @@ final class NativeTouchBarRow: NSView {
         if let status { status.frame = NSRect(x: origin, y: 0, width: pinned, height: 30) }
         let start = pinned + (status == nil ? 0 : 6)
         let available = max(0, width - start)
-        let decoratedAvailable = strip == nil ? available : max(80, width - max(start, width / 2 + 48))
+        let largestControl = controls.map { $0.1 }.max() ?? 0
+        let decoratedAvailable = strip == nil ? available : min(available, max(largestControl, width - max(start, width / 2 + 48)))
         let overflow = document.frame.width > decoratedAvailable
         more.isHidden = !overflow
         more.frame = NSRect(x: origin + max(start, width - 30), y: 0, width: 30, height: 30)
@@ -440,7 +441,7 @@ final class NativeTouchBarRow: NSView {
         // Leave the moon and its inner disk visible. Secondary actions
         // retain their full touch targets in the scrolling right-hand group.
         let moonRight = width / 2 + 48
-        let decoratedViewport = max(80, width - (overflow ? 34 : 0) - max(start, moonRight))
+        let decoratedViewport = max(largestControl, width - (overflow ? 34 : 0) - max(start, moonRight))
         let controlWidth = strip == nil ? viewport : min(document.frame.width, viewport, decoratedViewport)
         scroll.frame = NSRect(x: origin + (strip == nil ? start : width - (overflow ? 34 : 0) - controlWidth),
                               y: 0, width: controlWidth, height: 30)
