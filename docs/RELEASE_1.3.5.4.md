@@ -1,6 +1,6 @@
 # 🌙 MoonlightLG 1.3.5.4 · Crimson Glass
 
-Prepared release · internal build 52 · Apple Silicon
+Apple Silicon · internal build 52
 
 ## ✨ Touch Bar
 
@@ -19,13 +19,13 @@ Prepared release · internal build 52 · Apple Silicon
 ## 📦 Packages and source
 
 - Apple Silicon-only app ZIP for M-series Macs; macOS 15 or later.
+- Packages are ad-hoc signed and verified, but not Developer ID signed or notarized. Installation guidance is in the README.
 - Complete corresponding application, submodule and third-party dependency source archive.
 - SHA-256 checksums, GPL license, third-party notices and source manifest accompany the release. Existing upstream copyright and About credits are retained.
 
 ## 🧪 Validation and limits
 
-The prepared package must pass exact-source macOS and Xcode validation, Startup Preview build/run, UI Preview tests, connection/window/input regressions, architecture, version, checksum, source and legal checks before staging the draft assets.
+Validation covers exact-source macOS and Xcode builds, Startup Preview build/run, UI Preview tests, connection/window/input regressions, architecture, version, checksum, source and legal checks.
 
 CI has no physical Touch Bar or live streaming host. The owner has demonstrated the in-stream layout on an M1; the latest library placement, full-width system presentation and real-host playback performance still require on-device acceptance. Full width uses guarded private AppKit APIs and can fall back to the normal bar on unsupported runtimes. These checks do not certify every physical action or guarantee compatibility with future macOS versions.
 
-Publication is explicitly on hold. No public tag, latest-release change or public download-link update is authorized until the owner gives the go.

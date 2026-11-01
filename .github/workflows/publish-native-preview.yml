@@ -17,9 +17,9 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VALIDATED_SHA: PENDING_VALIDATION
-      BUILD_RUN: 'PENDING'
-      XCODE_RUN: 'PENDING'
+      VALIDATED_SHA: 0998e563c5e237bc3cc8a81cd55a38897d253877
+      BUILD_RUN: '41361342517'
+      XCODE_RUN: '41361342458'
       RELEASE_TAG: moonlightlg-v1.3.5.4
       VERSION: '1.3.5.4'
     steps:
@@ -89,7 +89,7 @@ jobs:
           download_artifact Native-UI-Quick-Window-Captures capture-assets
           download_artifact Native-Stream-Overlay-Previews overlay-assets
           python3 - <<'PY'
-          import hashlib, json, os, pathlib, shutil, tarfile, zipfile
+          import hashlib, json, os, pathlib, plistlib, shutil, struct, tarfile, zipfile
           root = pathlib.Path('release-assets')
           lines = []
           for arch in ['arm64', 'source']:
@@ -106,14 +106,55 @@ jobs:
               legal = 'MoonlightLG.app/Contents/Helpers/MoonlightLGEngine.app/Contents/Resources/Legal/'
               for original, destination in [('GPL-3.0.txt', 'LICENSE.txt'), ('THIRD_PARTY_NOTICES.txt', 'THIRD_PARTY_NOTICES.txt'), ('SOURCES.json', 'SOURCE_MANIFEST.json')]:
                   (root / destination).write_bytes(package.read(legal + original))
-          with tarfile.open(root / f"MoonlightLG-{os.environ['VERSION']}-source.tar.gz") as source:
-              names = set(source.getnames())
-              files = {m.name for m in source.getmembers() if m.isfile()}
-              prefix = f"MoonlightLG-{os.environ['VERSION']}-source/"
-              for path in ['macos-native/Sources/MoonlightLGApp.swift', 'scripts/build-native-macos.sh', 'third-party-source/qtbase.tar.gz', 'third-party-source/SOURCES.json']:
-                  assert prefix + path in names, 'Incomplete corresponding source: ' + path
-              for path in ['moonlight-common-c/moonlight-common-c/', 'moonlight-common-c/moonlight-common-c/enet/', 'moonlight-common-c/moonlight-common-c/nanors/', 'qmdnsengine/qmdnsengine/', 'app/SDL_GameControllerDB/', 'h264bitstream/']:
-                  assert any(name.startswith(prefix + path) for name in files), 'Missing bundled submodule source: ' + path
+          # Stream corresponding source once; verify every dependency archive.
+          names, files, dependencies = set(), set(), {}
+          source_info, inventory = None, None
+          prefix = f"MoonlightLG-{os.environ['VERSION']}-source/"
+          with tarfile.open(root / f"MoonlightLG-{os.environ['VERSION']}-source.tar.gz", mode='r|gz') as source:
+              for member in source:
+                  names.add(member.name)
+                  if not member.isfile(): continue
+                  files.add(member.name)
+                  assert member.name.startswith(prefix), member.name
+                  name = member.name[len(prefix):]
+                  if name == 'SOURCE_INFORMATION.txt':
+                      source_info = source.extractfile(member).read().decode()
+                  elif name == 'third-party-source/SOURCES.json':
+                      inventory = json.load(source.extractfile(member))
+                  elif name.startswith('third-party-source/'):
+                      digest = hashlib.sha256()
+                      with source.extractfile(member) as stream:
+                          for block in iter(lambda: stream.read(1024 * 1024), b''): digest.update(block)
+                      dependencies[pathlib.Path(name).name] = digest.hexdigest()
+          assert source_info and os.environ['VALIDATED_SHA'] in source_info
+          assert inventory and len(inventory['components']) >= 36
+          for component in inventory['components']:
+              assert dependencies[pathlib.Path(component['archive']).name] == component['sha256'], component['name']
+          for path in ['macos-native/Sources/MoonlightLGApp.swift', 'scripts/build-native-macos.sh', 'third-party-source/qtbase.tar.gz', 'third-party-source/SOURCES.json']:
+              assert prefix + path in names, 'Incomplete corresponding source: ' + path
+          for path in ['moonlight-common-c/moonlight-common-c/', 'moonlight-common-c/moonlight-common-c/enet/', 'moonlight-common-c/moonlight-common-c/nanors/', 'qmdnsengine/qmdnsengine/', 'app/SDL_GameControllerDB/', 'h264bitstream/']:
+              assert any(name.startswith(prefix + path) for name in files), 'Missing bundled submodule source: ' + path
+          with zipfile.ZipFile(root / f"MoonlightLG-{os.environ['VERSION']}-arm64.zip") as package:
+              info = plistlib.loads(package.read('MoonlightLG.app/Contents/Info.plist'))
+              assert (info['MoonlightLGVersion'], info['MoonlightLGReleaseChannel'], info['CFBundleVersion']) == (os.environ['VERSION'], 'stable', '52')
+              count = 0
+              for name in package.namelist():
+                  if package.getinfo(name).file_size < 8: continue
+                  with package.open(name) as stream: header = stream.read(4096)
+                  magic = header[:4].hex()
+                  if magic in ['cffaedfe', 'cefaedfe', 'feedfacf', 'feedface']:
+                      endian = '<' if magic.startswith(('cf', 'ce')) else '>'
+                      assert struct.unpack(endian + 'I', header[4:8])[0] == 0x100000c, name
+                      count += 1
+                  elif magic in ['cafebabe', 'cafebabf', 'bebafeca', 'bfbafeca']:
+                      endian = '>' if magic.startswith('ca') else '<'
+                      stride = 32 if magic in ['cafebabf', 'bfbafeca'] else 20
+                      slices = struct.unpack(endian + 'I', header[4:8])[0]
+                      assert 0 < slices < 128
+                      assert all(struct.unpack(endian + 'I', header[8+i*stride:12+i*stride])[0] == 0x100000c for i in range(slices)), name
+                      count += 1
+              assert count == 107, count
+          print(f"Verified {count} ARM64-only Mach-O files and {len(inventory['components'])} dependency source archives")
           captures = pathlib.Path('capture-assets')
           attachments = [a for test in json.loads((captures / 'manifest.json').read_text()) for a in test['attachments']]
           for name in ['main-dark', 'main-compact', 'settings-video', 'native-startup-warp', 'about-dark']:
@@ -124,6 +165,7 @@ jobs:
           assert len(overlays) == 1, overlays
           shutil.copyfile(overlays[0], root / 'overlay-controls-dark.png')
           PY
+          cat release-assets/SHA256SUMS.txt
       - name: Stage unpublished draft with the exact validated assets
         run: |
           gh release create "$RELEASE_TAG" --target "$VALIDATED_SHA" --draft \
@@ -133,3 +175,7 @@ jobs:
             release-assets/LICENSE.txt release-assets/THIRD_PARTY_NOTICES.txt release-assets/SOURCE_MANIFEST.json release-assets/*.png
           # Explicit owner hold: this workflow must never publish the draft.
           gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' | grep -qx true
+          if gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'Unexpected public tag during draft preparation; refusing further actions.' >&2
+            exit 1
+          fi
