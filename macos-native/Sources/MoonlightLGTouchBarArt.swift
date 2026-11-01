@@ -355,7 +355,7 @@ final class MoonlightLGTouchBarStripView: NSView {
         switch state {
         case .booting:
             let since = max(0, now - stateStart)
-            scene.time = since; scene.isBoot = true
+            scene.isBoot = true
             scene.bootProgress = min(since / bootDuration, 1)
             model.state = scene
             if scene.bootProgress >= 1 { show(.idle); return }
@@ -368,8 +368,7 @@ final class MoonlightLGTouchBarStripView: NSView {
             }
         case .idle:
             scene.connected = 1; scene.sinceConnect = 60; scene.progressFill = -1
-        case .connecting:
-            scene.time = elapsed
+        case .connecting: break
         case .failed: break
         }
         model.state = scene

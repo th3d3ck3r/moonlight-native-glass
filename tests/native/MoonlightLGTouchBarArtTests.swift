@@ -48,14 +48,18 @@ import QuartzCore
         strip.setPresentationActive(true)
         precondition(strip.state == .idle && strip.isAnimating && strip.sceneSnapshot.connected == 1, "Visible library must show the calm Moon pulse")
         precondition(strip.hitTest(NSPoint(x: 10, y: 10)) == nil, "Decoration must never intercept a control tap")
+        let idleTime = strip.sceneSnapshot.time
         strip.show(.connecting); pump()
+        precondition(strip.sceneSnapshot.time == idleTime, "Changing from library to connection must not rephase the smoke or moon")
         precondition(strip.isAnimating, "Visible connecting artwork must animate")
         now = 101
-        waitFor("Registered timer must advance the injected clock; active=\(strip.presentationActive), timer=\(strip.isAnimating), attached=\(strip.window != nil), visible=\(strip.visibleRect), hidden=\(strip.isHiddenOrHasHiddenAncestor)") { strip.sceneSnapshot.time == 1 }
+        waitFor("Registered timer must advance the injected clock; active=\(strip.presentationActive), timer=\(strip.isAnimating), attached=\(strip.window != nil), visible=\(strip.visibleRect), hidden=\(strip.isHiddenOrHasHiddenAncestor)") { strip.sceneSnapshot.time == 6 }
         strip.setFrameSize(NSSize(width: 685, height: 30)); strip.refreshPresentation(); pump()
         precondition(strip.isAnimating && strip.bounds.width == 685,
                      "Whole app-area framing must preserve live scheduling")
+        let connectingTime = strip.sceneSnapshot.time
         strip.show(.connected); pump()
+        precondition(strip.sceneSnapshot.time == connectingTime, "The connected shockwave must not reset the underlying scene clock")
         let connectedAt = strip.connectionStartedAt
         precondition(connectedAt == now)
         now = 101.7
@@ -129,7 +133,9 @@ import QuartzCore
         precondition(!strip.isAnimating, "The owning window's hidden state must suspend its decoration")
         window.makeKeyAndOrderFront(nil); strip.setPresentationActive(true); pump()
         strip.show(.idle); precondition(strip.isAnimating && strip.sceneSnapshot.connected == 1, "Returning to library resumes Moon pulse on the same surface")
+        let beforeBoot = strip.sceneSnapshot.time
         strip.playBoot(duration: 3.8); pump(); precondition(strip.isAnimating)
+        precondition(strip.sceneSnapshot.time == beforeBoot, "Boot progress has its own clock and must not rephase the scene")
         now += 1.5
         waitFor("Boot must advance before changing presentation hosts") { strip.sceneSnapshot.bootProgress > 0.3 }
         modalNow = 2000
