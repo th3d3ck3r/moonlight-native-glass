@@ -25,6 +25,19 @@ static NSString* cardValue(NSView* dashboard,NSString* label) {
     for (NSArray* entry in [dashboard valueForKey:@"cards"]) if ([entry[0] isEqual:label]) return entry[1];
     return nil;
 }
+static void checkMetricFrames(NSView* dashboard) {
+    NSArray* cards=[dashboard valueForKey:@"cards"];
+    NSArray* frames=[dashboard performSelector:@selector(cardFrames)];
+    check(frames.count==cards.count,"Every metric must retain a drawable cell after a Control Strip resize");
+    CGFloat previous=-1;
+    for (NSValue* value in frames) {
+        NSRect cell=value.rectValue;
+        check(NSContainsRect(dashboard.bounds,cell) && cell.size.width>=50 && cell.size.height==30,
+              "Metric cells must remain readable and completely inside their actual allocation");
+        check(NSMinX(cell)>=previous,"Control Strip compression must not overlap neighboring measurements");
+        previous=NSMaxX(cell);
+    }
+}
 static void capture(NSTouchBar* bar,NSString* path,CGFloat available=685) {
     NSView* root=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,available,54)] autorelease];
     root.wantsLayer=YES; root.layer.backgroundColor=NSColor.blackColor.CGColor;
@@ -97,10 +110,51 @@ static void captureSurface(NSView* surface,NSString* path,CGFloat width) {
         NSStringFromRect(root.bounds).UTF8String,NSStringFromRect(surface.frame).UTF8String,NSStringFromRect(surface.bounds).UTF8String,
         NSStringFromRect(surface.visibleRect).UTF8String,NSStringFromRect(artwork.frame).UTF8String,NSStringFromRect(scroll.frame).UTF8String);
     check(NSEqualRects(artwork.frame,root.bounds) && NSContainsRect(root.bounds,scroll.frame),"Artwork must fill and the native scroll viewport must fit the actual allocation");
-    for (NSView* control in [surface valueForKey:@"controls"]) check(control.bounds.size.width>=30 && control.bounds.size.height==30,"Animated surface preserves comfortable controls");
+    for (NSView* control in [surface valueForKey:@"controls"]) {
+        check(control.bounds.size.width>=30 && control.bounds.size.height==30,"Animated surface preserves comfortable controls");
+        if ([control isKindOfClass:NSClassFromString(@"MLTouchStatsButton")] || [control isKindOfClass:NSClassFromString(@"MLTouchInfoPanel")])
+            checkMetricFrames([control valueForKey:@"dashboard"]);
+    }
     NSBitmapImageRep* image=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:image];
     check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Export actual native animated surface control composition");
     [NSLayoutConstraint deactivateConstraints:allocation]; [surface removeFromSuperview];
+}
+// Negotiate space through real Auto Layout instead of assigning a width to the
+// surface. A second arranged view represents the space owned by the Control
+// Strip; hiding/showing/resizing it must transfer the available app area.
+static void exerciseFlexibleSurface(NSView* surface) {
+    check(surface.intrinsicContentSize.width==NSViewNoIntrinsicMetric && surface.intrinsicContentSize.height==30,
+          "The single native Touch Bar item must advertise a flexible width, not a centered content-sized width");
+    for (NSLayoutConstraint* constraint in surface.constraints)
+        check(!(constraint.firstAttribute==NSLayoutAttributeWidth && constraint.relation==NSLayoutRelationEqual && !constraint.secondItem),
+              "A full-bar item must not impose a fixed physical width beside the Control Strip");
+    NSStackView* host=[[[NSStackView alloc] initWithFrame:NSMakeRect(0,0,1085,30)] autorelease];
+    host.orientation=NSUserInterfaceLayoutOrientationHorizontal; host.spacing=0;
+    host.alignment=NSLayoutAttributeCenterY; host.distribution=NSStackViewDistributionFill; host.detachesHiddenViews=YES;
+    [host.widthAnchor constraintEqualToConstant:1085].active=YES;
+    [host.heightAnchor constraintEqualToConstant:30].active=YES;
+    NSView* systemStrip=[[[NSView alloc] initWithFrame:NSMakeRect(0,0,260,30)] autorelease];
+    systemStrip.translatesAutoresizingMaskIntoConstraints=NO;
+    NSLayoutConstraint* stripWidth=[systemStrip.widthAnchor constraintEqualToConstant:260]; stripWidth.active=YES;
+    [systemStrip.heightAnchor constraintEqualToConstant:30].active=YES;
+    [systemStrip setContentHuggingPriority:1000 forOrientation:NSLayoutConstraintOrientationHorizontal];
+    [systemStrip setContentCompressionResistancePriority:1000 forOrientation:NSLayoutConstraintOrientationHorizontal];
+    surface.translatesAutoresizingMaskIntoConstraints=NO;
+    [host addArrangedSubview:surface]; [host addArrangedSubview:systemStrip];
+    struct Allocation { CGFloat strip; BOOL hidden; } allocations[]={{260,NO},{260,YES},{400,NO},{285,NO},{465,NO},{685,NO},{260,YES}};
+    for (const auto& allocation:allocations) {
+        stripWidth.constant=allocation.strip; systemStrip.hidden=allocation.hidden;
+        host.needsLayout=YES; [host layoutSubtreeIfNeeded]; surface.needsLayout=YES; [surface layoutSubtreeIfNeeded];
+        CGFloat available=1085-(allocation.hidden ? 0 : allocation.strip);
+        fprintf(stderr,"NEGOTIATED SURFACE strip=%.0f hidden=%d expected=%.0f actual=%s\n",allocation.strip,allocation.hidden,available,NSStringFromRect(surface.frame).UTF8String);
+        check(fabs(surface.frame.size.width-available)<.5 && surface.frame.size.height==30,
+              "The native item must fill all available space as the Control Strip changes, including full width");
+        NSView* artwork=[surface valueForKey:@"artwork"];
+        check(fabs(artwork.frame.size.width-available)<.5,"The animation must follow the negotiated app area rather than the controls' natural width");
+        for (NSView* control in [surface valueForKey:@"controls"])
+            if ([control isKindOfClass:NSClassFromString(@"MLTouchStatsButton")]) checkMetricFrames([control valueForKey:@"dashboard"]);
+    }
+    [host removeArrangedSubview:surface]; [surface removeFromSuperview];
 }
 int main(int argc,char** argv) { @autoreleasepool {
     [NSApplication sharedApplication]; [NSApp finishLaunching]; NSApp.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
@@ -208,6 +262,12 @@ int main(int argc,char** argv) { @autoreleasepool {
     check([readings.accessibilityLabel containsString:@"60.00 FPS"] && [readings.accessibilityLabel containsString:@"4 ms"],"Stream values come from actual engine statistics");
     NSButton* mainStats=((NSPopoverTouchBarItem*)[bar itemForIdentifier:@"touch.info"]).collapsedRepresentation;
     NSView* inlineReadings=[mainStats valueForKey:@"dashboard"];
+    nativeOverlayPresentStatistics("Incoming frame rate from network: 60.00 FPS\nAverage network latency: 4 ms (variance: 1 ms)\nBitrate: 25 Mbps"); pump();
+    check([cardValue(inlineReadings,@"NETWORK RTT") isEqual:@"4 ms"],
+          "The compact live bar must use a deliberate short RTT value rather than a truncated variance suffix");
+    check([inlineReadings.accessibilityLabel containsString:@"4 ms (variance: 1 ms)"] &&
+          [cardValue(readings,@"NETWORK RTT") isEqual:@"4 ms (variance: 1 ms)"],
+          "The full latency and variance must remain available in accessibility and detailed measurements");
     for (NSView* view in @[readings,inlineReadings]) {
         [view setValue:@(NSProcessInfo.processInfo.systemUptime-5) forKey:@"streamUpdated"];
         [view performSelector:@selector(refreshCards)];
@@ -310,6 +370,9 @@ int main(int argc,char** argv) { @autoreleasepool {
     NSArray* surfaceControls=@[@"touch.home",@"touch.audio",@"touch.record",@"touch.replay",@"touch.stats",@"touch.window",@"touch.disconnect"];
     checkSurfacePage(surface,homeItems,"Animated surface starts with persistent live metrics and essential controls");
     nativeOverlayPresentStatistics(fixture); nativeTitlebarSetConnection(NativeConnectionState::Connected); pump();
+    exerciseFlexibleSurface(surface);
+    for (NSNumber* width in @[@620,@800])
+        captureSurface(surface,[directory stringByAppendingPathComponent:[NSString stringWithFormat:@"touchbar-surface-strip-%.0f.png",width.doubleValue]],width.doubleValue);
     captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main.png"],685);
     NSView* moon=[surface valueForKey:@"moonTarget"];
     check(moon.frame.size.width==96 && fabs(NSMidX(moon.frame)-342.5)<.1,"Main layout keeps a centered clear moon target between metrics");

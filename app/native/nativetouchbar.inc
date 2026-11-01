@@ -79,6 +79,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 - (void)sample;
 - (void)refreshCards;
 - (void)copyHardwareFrom:(MLTouchDashboard*)source;
+- (NSArray*)cardFrames;
 @end
 @implementation MLTouchDashboard
 - (instancetype)initWithFrame:(NSRect)frame {
@@ -123,12 +124,15 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     // host encode timing is optional and must not masquerade as old telemetry.
     BOOL stale=self.streamText.length && NSProcessInfo.processInfo.systemUptime-self.streamUpdated>4;
     NSString* missing=!self.streamText.length ? @"Waiting for data" : stale ? @"Stale" : @"Not reported";
+    NSString* fullNetworkLatency=nil;
     if (self.inlineMode) {
+        fullNetworkLatency=[self metric:@"Average network latency" fallback:missing];
+        NSString* compactNetworkLatency=[[fullNetworkLatency componentsSeparatedByString:@" ("] firstObject];
         NSString* bitrate=[self metric:@"Bitrate" fallback:missing];
         bitrate=[[bitrate componentsSeparatedByString:@","] firstObject];
         NSMutableArray* cards=[NSMutableArray arrayWithArray:@[
             @[(self.connectionState==2 ? @"FPS" : [NSString stringWithFormat:@"FPS · %@",@[@"Idle",@"Connecting",@"Connected",@"Poor link",@"Disconnected"][MIN(4,MAX(0,self.connectionState))]]),[self metric:@"Incoming frame rate" fallback:missing]],
-            @[@"NETWORK RTT",[self metric:@"Average network latency" fallback:missing]],
+            @[@"NETWORK RTT",compactNetworkLatency],
             @[@"BITRATE",bitrate]]];
         if (self.bounds.size.width>=840) {
             [cards addObject:@[@"DECODE",[self metric:@"Average decoding time" fallback:missing]]];
@@ -165,6 +169,8 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     }
     NSMutableArray* spoken=[NSMutableArray array];
     for (NSArray* card in self.cards) [spoken addObject:[card componentsJoinedByString:@": "]];
+    if (fullNetworkLatency && ![fullNetworkLatency isEqual:[[fullNetworkLatency componentsSeparatedByString:@" ("] firstObject]])
+        [spoken addObject:[@"Network latency detail: " stringByAppendingString:fullNetworkLatency]];
     if (!self.inlineMode && self.page==1) [spoken addObject:@"Host latency is reported only when supplied by the streaming host; codec identifies the negotiated video format"];
     [self setAccessibilityLabel:[spoken componentsJoinedByString:@"; "]];
     self.needsDisplay=YES;
@@ -198,19 +204,32 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         });
     });
 }
-- (void)drawRect:(NSRect)dirty {
-    if (self.moonCenter<0) { [NSColor.blackColor setFill]; NSRectFill(self.bounds); }
+// Keep drawing and accessibility/layout QA on the same cell geometry. The
+// Control Strip can resize this view between frames; no minimum card width may
+// push a measurement outside the allocation or across the central moon gap.
+- (NSArray*)cardFrames {
+    NSMutableArray* frames=[NSMutableArray arrayWithCapacity:self.cards.count];
     CGFloat width=self.bounds.size.width/MAX((NSUInteger)1,self.cards.count);
     for (NSUInteger i=0;i<self.cards.count;++i) {
-        NSRect cell=NSMakeRect(i*width,0,width-4,30);
+        NSRect cell=NSMakeRect(i*width,0,MAX(0,width-4),MIN(30,self.bounds.size.height));
         if (self.moonCenter>=0 && self.cards.count>=3) {
             NSUInteger leftCount=self.cards.count/2,rightCount=self.cards.count-leftCount;
             CGFloat left=(self.moonCenter-54)/MAX((NSUInteger)1,leftCount)-4;
             CGFloat right=(self.bounds.size.width-self.moonCenter-54)/MAX((NSUInteger)1,rightCount)-4;
-            CGFloat w=MAX(50,MIN(115,MIN(left,right)));
+            CGFloat w=MAX(0,MIN(115,MIN(left,right)));
             CGFloat x=i<leftCount ? self.moonCenter-54-leftCount*(w+4)+4+i*(w+4) : self.moonCenter+54+(i-leftCount)*(w+4);
-            cell=NSMakeRect(x,0,w,30);
+            cell=NSMakeRect(x,0,w,MIN(30,self.bounds.size.height));
         }
+        [frames addObject:[NSValue valueWithRect:NSIntersectionRect(self.bounds,cell)]];
+    }
+    return frames;
+}
+- (void)drawRect:(NSRect)dirty {
+    if (self.moonCenter<0) { [NSColor.blackColor setFill]; NSRectFill(self.bounds); }
+    NSArray* frames=[self cardFrames];
+    for (NSUInteger i=0;i<self.cards.count;++i) {
+        NSRect cell=[frames[i] rectValue];
+        if (NSIsEmptyRect(cell) || cell.size.width<=10) continue;
         [touchSurface() setFill];
         [[NSBezierPath bezierPathWithRoundedRect:cell xRadius:5 yRadius:5] fill];
         NSInteger channel=self.inlineMode ? (NSInteger)i-(NSInteger)self.cards.count+3 : (NSInteger)i;
@@ -293,6 +312,7 @@ static NSString* const touchSurfaceID=@"touch.surface";
             [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(ancestorGeometryChanged:) name:name object:nil];
         self.translatesAutoresizingMaskIntoConstraints=NO;
         [self.heightAnchor constraintEqualToConstant:30].active=YES;
+        [self.widthAnchor constraintGreaterThanOrEqualToConstant:320].active=YES;
         [self setContentHuggingPriority:50 forOrientation:NSLayoutConstraintOrientationHorizontal];
         [self setContentCompressionResistancePriority:50 forOrientation:NSLayoutConstraintOrientationHorizontal];
         Class bridge=NSClassFromString(@"MLTouchBarAnimationBridge");
@@ -313,7 +333,9 @@ static NSString* const touchSurfaceID=@"touch.surface";
         [self addSubview:self.moonTarget];
     } return self;
 }
-- (NSSize)intrinsicContentSize { return NSMakeSize(620,30); }
+// A finite intrinsic width makes NSTouchBar treat the surface as a small
+// centered control. A flexible item consumes the app area assigned by AppKit.
+- (NSSize)intrinsicContentSize { return NSMakeSize(NSViewNoIntrinsicMetric,30); }
 - (void)showItems:(NSArray*)identifiers {
     if ([self.identifiers isEqualToArray:identifiers]) return;
     self.identifiers=identifiers;

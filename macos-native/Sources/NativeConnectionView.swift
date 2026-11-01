@@ -335,7 +335,10 @@ final class NativeTouchBarRow: NSView {
     private var layingOut = false
     var controls: [(NSButton, CGFloat)] = []
     override var intrinsicContentSize: NSSize {
-        NSSize(width: max(320, statusWidth + (status == nil ? 0 : 6) + document.frame.width), height: 30)
+        // A natural/content width makes NSTouchBar center a small item instead
+        // of allocating the available app region. This is a flexible canvas;
+        // AppKit supplies its width, including changes to the Control Strip.
+        NSSize(width: NSView.noIntrinsicMetric, height: 30)
     }
     init(buttons: [(NSButton, CGFloat)], pinnedStatus: Bool) {
         super.init(frame: NSRect(x: 0, y: 0, width: 640, height: 30))

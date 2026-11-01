@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 1.3.5.3U — private adaptive Touch Bar sizing
+
+- Make the home/connection Touch Bar item flexible so AppKit gives it the available app area instead of centering a content-sized row. The animation follows that allocation in normal and full-width modes.
+- Adapt stream measurements to the actual Control Strip reservation, retaining essential controls, scrolling, detailed statistics and the crimson volume slider. Keep full network-latency details accessible while the main bar uses a compact value.
+- Add allocation regressions with the Control Strip hidden, shown and expanded. Internal build 50; the owner’s M1 videos identify the physical regression, while CI still cannot certify on-device presentation.
+
 ## 1.3.5.2U — private Moon pulse and Touch Bar recovery
 
 - Remove build 48’s 1085-point fitting-width request. Layout artwork, host status, actions and overflow against the visible AppKit allocation so the system Control Strip cannot clip commands or push the moon off centre.

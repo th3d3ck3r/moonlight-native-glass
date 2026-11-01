@@ -11,9 +11,9 @@
     <key>CFBundleIconFile</key><string>crimson</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.3.5</string>
-    <key>MoonlightLGVersion</key><string>1.3.5.2</string>
+    <key>MoonlightLGVersion</key><string>1.3.5.3</string>
     <key>MoonlightLGReleaseChannel</key><string>U</string>
-    <key>CFBundleVersion</key><string>49</string>
+    <key>CFBundleVersion</key><string>50</string>
     <key>LSMinimumSystemVersion</key><string>15.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
     <key>NSPrincipalClass</key><string>NSApplication</string>

@@ -209,11 +209,64 @@ import SwiftUI
         precondition(!NativeTouchBarPresentation.apply(true, preferences: prefs, agent: agent, available: false))
         precondition(!prefs.bool(forKey: NativeTouchBarPresentation.key), "Unsupported persisted ON must be cleared")
         reentrant = nil; interrupted = nil
+        exerciseFlexibleAllocation()
         exerciseClippedHost()
         exerciseModalPresentation()
         window.close()
         print("PASS: frontend Touch Bar actions, physical layout, full-width focus lifetime, unsupported fallback and legacy preference recovery")
     }
+    @MainActor private static func exerciseFlexibleAllocation() {
+        let window = NSWindow(contentRect: NSRect(x: 20, y: 50, width: 1085, height: 30),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let status = NativeTouchBarButton(title: "Th3D3ck3r-R7\nReady to stream", target: nil, action: nil)
+        status.statusOnly = true
+        let labels: [(String, CGFloat)] = [("Back", 50), ("Next", 50), ("Refresh", 82), ("Select game", 104), ("Add", 58), ("Settings", 86)]
+        let row = NativeTouchBarRow(buttons: [(status, 178)] + labels.map {
+            (NativeTouchBarButton(title: $0.0, target: nil, action: nil) as NSButton, $0.1)
+        }, pinnedStatus: true)
+        let strip = MoonlightLGTouchBarStripView(frame: .zero,
+            clock: { 100 }, reduceMotion: { false }, rendersLiveContent: false)
+        row.installStrip(strip)
+        precondition(row.intrinsicContentSize.width == NSView.noIntrinsicMetric,
+                     "NSTouchBar must classify the home canvas as flexible rather than content-sized")
+        let system = NSView(); system.translatesAutoresizingMaskIntoConstraints = false
+        let reservation = system.widthAnchor.constraint(equalToConstant: 240)
+        reservation.isActive = true
+        system.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        system.setContentHuggingPriority(.required, for: .horizontal)
+        system.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let stack = NSStackView(views: [row, system])
+        stack.orientation = .horizontal; stack.distribution = .fill
+        stack.spacing = 0; stack.alignment = .centerY; stack.detachesHiddenViews = true
+        window.contentView = stack; window.orderFront(nil)
+        defer { row.removeStrip(); window.close() }
+        let folder = URL(fileURLWithPath: "build/touchbar-previews")
+        try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        // Let actual Auto Layout allocate the flexible row. There is no row
+        // width constraint and no direct row.frame assignment in this fixture.
+        for (index, reserved) in [CGFloat(0), 240, 350, 500, 240, 0].enumerated() {
+            system.isHidden = reserved == 0; reservation.constant = max(1, reserved)
+            stack.needsLayout = true; stack.layoutSubtreeIfNeeded(); row.layoutControls()
+            let available = stack.bounds.width - reserved
+            precondition(abs(row.frame.width - available) < 1,
+                         "Home row \(row.frame.width) must fill \(available) points with \(reserved) reserved by the system Control Strip")
+            precondition(abs(row.layoutViewport.width - available) < 1 && strip.frame == row.layoutViewport,
+                         "The artwork and controls must follow the allocated canvas on every resize")
+            precondition(row.layoutViewport.contains(row.scroll.frame) && row.layoutViewport.contains(row.status!.frame))
+            let end = max(0, row.document.frame.width - row.scroll.contentView.bounds.width)
+            for (control, _) in row.controls {
+                row.scroll.contentView.scroll(to: NSPoint(x: min(end, control.frame.minX), y: 0))
+                precondition(row.scroll.contentView.bounds.contains(control.frame), "Every command stays fully reachable")
+            }
+            row.scroll.contentView.scroll(to: .zero)
+            let bitmap = row.bitmapImageRepForCachingDisplay(in: row.bounds)!
+            row.cacheDisplay(in: row.bounds, to: bitmap)
+            try! bitmap.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent("touchbar-home-system-allocation-\(index).png"))
+        }
+        print("PASS: flexible home row consumes full allocation as the Control Strip appears, expands and disappears")
+    }
+
     @MainActor private static func exerciseClippedHost() {
         let window = NSWindow(contentRect: NSRect(x: 20, y: 50, width: 800, height: 120),
                               styleMask: [.titled], backing: .buffered, defer: false)
