@@ -1,5 +1,12 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.5.4 — prepared, unpublished
+
+- Prepare the stable-labelled Apple Silicon package, complete corresponding source and legal notices. Internal build 52; publication requires the owner’s explicit go.
+- Includes the native black/crimson Touch Bar, live statistics, six detailed pages, continuous volume control, recording/replay actions and optional full-width presentation.
+- Includes settings persistence, startup safety, animation/rendering refinements and the library placement correction described in the private entries below. Physical M1 layout and full-width compatibility remain hardware acceptance limits.
+- Public downloads remain on 1.3.2.0 until publication.
+
 ## 1.3.5.4U — private library Touch Bar placement
 
 - Remove physical-bar principal-item centering from the library, startup and Apollo canvases. Use the same ordinary placement as the working stream bar so the available app region is not shifted toward the Control Strip.

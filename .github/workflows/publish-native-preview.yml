@@ -1,4 +1,4 @@
-name: Publish MoonlightLG Release
+name: Prepare MoonlightLG Draft Release
 on:
   push:
     branches: [feature/recording-plugin]
@@ -10,18 +10,18 @@ concurrency:
   group: publish-moonlightlg-stable
   cancel-in-progress: false
 jobs:
-  publish:
-    if: contains(github.event.head_commit.message, '[publish stable]')
+  prepare:
+    if: contains(github.event.head_commit.message, '[prepare stable]')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VALIDATED_SHA: 1f09e8a58949debacf9fbe9749710c7ca55de50f
-      BUILD_RUN: '41050060725'
-      XCODE_RUN: '41050060748'
-      RELEASE_TAG: moonlightlg-v1.3.2.0
-      VERSION: '1.3.2.0'
+      VALIDATED_SHA: PENDING_VALIDATION
+      BUILD_RUN: 'PENDING'
+      XCODE_RUN: 'PENDING'
+      RELEASE_TAG: moonlightlg-v1.3.5.4
+      VERSION: '1.3.5.4'
     steps:
       - uses: actions/checkout@v5
       - name: Verify stable metadata and exact validated source
@@ -43,7 +43,7 @@ jobs:
           info = plistlib.load(open('macos-native/Info.plist', 'rb'))
           assert info['MoonlightLGReleaseChannel'] == 'stable', 'U/E builds must not be published as stable'
           assert info['MoonlightLGVersion'] == os.environ['VERSION']
-          assert info['CFBundleVersion'] == '42'
+          assert info['CFBundleVersion'] == '52'
           for path, name in [('/tmp/build-run.json', 'MoonlightLG macOS Validation'), ('/tmp/xcode-run.json', 'MoonlightLG Xcode Project Validation')]:
               run = json.load(open(path))
               assert run['head_sha'] == os.environ['VALIDATED_SHA']
@@ -82,7 +82,7 @@ jobs:
             rm -rf "$temporary"
             return 1
           }
-          for arch in arm64 x86_64 universal; do
+          for arch in arm64; do
             download_artifact "MoonlightLG-$VERSION-$arch" release-assets
           done
           download_artifact "MoonlightLG-$VERSION-source" release-assets
@@ -92,7 +92,7 @@ jobs:
           import hashlib, json, os, pathlib, shutil, tarfile, zipfile
           root = pathlib.Path('release-assets')
           lines = []
-          for arch in ['arm64', 'x86_64', 'universal', 'source']:
+          for arch in ['arm64', 'source']:
               ending = 'source.tar.gz' if arch == 'source' else arch + '.zip'
               package = root / f"MoonlightLG-{os.environ['VERSION']}-{ending}"
               recorded = (root / f'SHA256-{arch}.txt').read_text().split()
@@ -124,11 +124,12 @@ jobs:
           assert len(overlays) == 1, overlays
           shutil.copyfile(overlays[0], root / 'overlay-controls-dark.png')
           PY
-      - name: Publish full release with the exact validated assets
+      - name: Stage unpublished draft with the exact validated assets
         run: |
-          gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --draft \
+          gh release create "$RELEASE_TAG" --target "$VALIDATED_SHA" --draft \
             --title "🌙 MoonlightLG $VERSION · Crimson Glass" \
-            --notes-file docs/RELEASE_1.3.2.0.md \
+            --notes-file docs/RELEASE_1.3.5.4.md \
             release-assets/*.zip release-assets/*.tar.gz release-assets/SHA256SUMS.txt \
             release-assets/LICENSE.txt release-assets/THIRD_PARTY_NOTICES.txt release-assets/SOURCE_MANIFEST.json release-assets/*.png
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest=true
+          # Explicit owner hold: this workflow must never publish the draft.
+          gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' | grep -qx true

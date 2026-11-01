@@ -9,7 +9,7 @@ and macOS permissions. Do not rebrand upstream copyright/license attribution.
 ## Versions (user-required)
 
 The user-facing scheme is `redesign.major.minor.hotfix`, without leading zeros.
-The current release version is **1.3.5.4U** (internal build 51). Each component is a nonnegative
+The current release version is **1.3.5.4** (prepared, unpublished; internal build 52). Each component is a nonnegative
 integer with no decimal rollover: `1.2.9.0` → `1.2.10.0` → `1.2.11.0`.
 
 - `U`: unreleased development work. Share U build links only directly with the user.
@@ -51,3 +51,10 @@ networking, decoder or settings changes. Existing streaming-boundary hashes may
 change only for reviewed native UI/action hooks. Report physical-host/Intel limits
 honestly; CI cross-builds Intel on Apple Silicon.
 
+
+## Publication hold
+
+The owner requested release preparation only. Do not publish the prepared 1.3.5.4
+release, create a public release tag, mark it latest, or change the public download
+links until the owner explicitly gives the go. Preparation must stop at a draft.
+The public stable downloads remain 1.3.2.0 during this hold.

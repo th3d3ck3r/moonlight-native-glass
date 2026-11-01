@@ -21,7 +21,7 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
-Private development: **1.3.5.4U · library Touch Bar placement** is in validation. U packages are shared only with the owner; the stable downloads below remain 1.3.2.0.
+Release preparation: **1.3.5.4 · Touch Bar and animations** is unpublished and on hold for owner approval. The public stable downloads below remain 1.3.2.0.
 
 ## 📦 Download
 
