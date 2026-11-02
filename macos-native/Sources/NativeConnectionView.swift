@@ -434,6 +434,10 @@ final class NativeTouchBarRow: NSView {
         strip?.frame = layoutViewport
         moonEscape.frame = NSRect(x: origin + width / 2 - 48, y: 0, width: 96, height: 30)
         moonEscape.isHidden = strip == nil || !NativeTouchBarPresentation.enabled()
+        if status?.identifier?.rawValue == "library.status" {
+            layoutLibrary(width: width, origin: origin)
+            return
+        }
         let pinned = status == nil ? 0 : min(statusWidth, max(100, width * (strip == nil ? 0.4 : 0.3)))
         if let status { status.frame = NSRect(x: origin, y: 0, width: pinned, height: 30) }
         let start = pinned + (status == nil ? 0 : 6)
@@ -453,6 +457,48 @@ final class NativeTouchBarRow: NSView {
                               y: 0, width: controlWidth, height: 30)
         let limit = max(0, document.frame.width - scroll.contentView.bounds.width)
         scroll.contentView.scroll(to: NSPoint(x: min(limit, scroll.contentView.bounds.origin.x), y: 0))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        updateOverflowHint()
+    }
+    private func layoutLibrary(width: CGFloat, origin: CGFloat) {
+        guard let status else { return }
+        // Balance occupied space, rather than pinning a host on one edge and
+        // docking every action on the other. Compact glyphs keep their complete
+        // tooltips/accessibility labels and existing targets/disabled states.
+        let compact = width < 800
+        var entries: [(NSButton, CGFloat)] = [(status, min(statusWidth, compact ? 164 : statusWidth))]
+        for (button, naturalWidth) in controls {
+            let glyphOnly = compact && ["library.refresh", "library.add", "library.settings"].contains(button.identifier?.rawValue ?? "")
+            if glyphOnly { button.title = "" }
+            else { button.title = button.toolTip ?? button.title }
+            entries.append((button, glyphOnly ? 36 : naturalWidth))
+        }
+        for (button, _) in entries where button.superview !== document { document.addSubview(button) }
+        let total = entries.reduce(CGFloat(0)) { $0 + $1.1 } + CGFloat(max(0, entries.count - 1)) * 6
+        let gap: CGFloat = strip != nil && width >= 620 ? 96 : 6
+        var split = 1, left: CGFloat = 0, right: CGFloat = 0, score = CGFloat.greatestFiniteMagnitude
+        for candidate in 1..<entries.count {
+            let l = entries.prefix(candidate).reduce(CGFloat(0)) { $0 + $1.1 } + CGFloat(candidate - 1) * 6
+            let r = entries.suffix(entries.count - candidate).reduce(CGFloat(0)) { $0 + $1.1 } + CGFloat(entries.count - candidate - 1) * 6
+            if max(l, r) < score { score = max(l, r); split = candidate; left = l; right = r }
+        }
+        let balanced = gap > 6 && entries.count > 1
+        let content = balanced ? 2 * max(left, right) + gap : total
+        let overflow = content > width
+        more.isHidden = !overflow
+        more.frame = NSRect(x: origin + max(0, width - 30), y: 0, width: 30, height: 30)
+        let viewport = max(0, width - (overflow ? 34 : 0))
+        scroll.frame = NSRect(x: origin, y: 0, width: viewport, height: 30)
+        document.frame = NSRect(x: 0, y: 0, width: max(viewport, content), height: 30)
+        var x = balanced ? document.frame.width / 2 - gap / 2 - left : max(0, (viewport - total) / 2)
+        for (index, entry) in entries.enumerated() {
+            if balanced && index == split { x = document.frame.width / 2 + gap / 2 }
+            entry.0.frame = NSRect(x: x, y: 0, width: entry.1, height: 30)
+            x += entry.1 + 6
+        }
+        moonEscape.isHidden = !balanced || overflow || !NativeTouchBarPresentation.enabled()
+        let limit = max(0, document.frame.width - viewport)
+        scroll.contentView.scroll(to: NSPoint(x: min(limit, max(0, scroll.contentView.bounds.origin.x)), y: 0))
         scroll.reflectScrolledClipView(scroll.contentView)
         updateOverflowHint()
     }
@@ -506,6 +552,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         var previous: NSTouchBar?
         var bar: NSTouchBar?
         var buttons: [String: NSButton] = [:]
+        private var systemControls: NativeTouchBarSystemControls?
         let presentation: NativeTouchBarPresentation.Session
         private let fullWidthEnabled: () -> Bool
         private let ownerEligible: (NSWindow) -> Bool
@@ -547,6 +594,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         private func makeBar() -> NSTouchBar {
             let result = NSTouchBar(); result.delegate = self
             result.defaultItemIdentifiers = [.init("native.commandRow")]
+            if surfaceOwner != nil { result.defaultItemIdentifiers.append(.init("touch.system")) }
             // The row is the entire flexible app region, not a centered item.
             // principalItemIdentifier centers within the physical Touch Bar;
             // with the Control Strip present that can shift/clip this canvas.
@@ -646,6 +694,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             guard presentation.presented === candidate else { rejectModal(); return }
             strip?.setPresentationActive(false)
             surface.strip?.setPresentationActive(true)
+            surface.systemControls?.setActive(true)
             if !wasPresented {
                 let expected = generation
                 let work = DispatchWorkItem { [weak self, weak candidate, weak modalRow] in
@@ -678,6 +727,7 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             requestPresentation()
         }
         func detach() {
+            systemControls?.invalidate(); systemControls = nil
             detaching = true; generation += 1; presentationPending = false
             validationWork?.cancel(); validationWork = nil
             presentation.update(nil, enabled: false, eligible: false)
@@ -729,6 +779,10 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             button.needsDisplay = true
         }
         func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
+            if identifier.rawValue == "touch.system", surfaceOwner != nil {
+                let controls = NativeTouchBarSystemControls(); systemControls = controls
+                return controls.makeItem()
+            }
             guard identifier.rawValue == "native.commandRow" else { return nil }
             let item = NSCustomTouchBarItem(identifier: identifier)
             item.visibilityPriority = .high

@@ -23,6 +23,8 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 Release preparation: **1.3.5.4 · Touch Bar and animations** is unpublished and on hold for owner approval. The public stable downloads below remain 1.3.2.0.
 
+Private development: **1.3.5.5U · build 53** refines Touch Bar balance and native slider handling, adds optional full-width Mac controls, and requests periodic host keyframes during original-quality recording. Long recording playback remains an owner acceptance check.
+
 ## 📦 Download
 
 ### 🌙 MoonlightLG 1.3.2.0

@@ -37,6 +37,24 @@ int main() {
     recovery.reset();
     assert(recovery.update(false,20000)==mlg::KeyframeRecovery::None);
 
+    mlg::RecordingKeyframes periodic;
+    assert(!periodic.update(false,false,0,0)); // disabled/custom/replay-only
+    assert(!periodic.update(true,true,100,0)); // startup recovery owns requests
+    assert(!periodic.update(true,false,200,100));
+    assert(!periodic.update(true,false,2199,100));
+    assert(periodic.update(true,false,2200,100));
+    assert(!periodic.update(true,false,2200,100)); // duplicate polls
+    assert(!periodic.update(true,false,4200,3500)); // natural IDR postpones request
+    assert(periodic.update(true,false,5500,3500));
+    assert(!periodic.update(false,false,6000,3500));
+    assert(!periodic.update(true,false,9000,3500)); // restart gets a fresh interval
+    assert(periodic.update(true,false,11000,3500));
+    assert(!periodic.update(true,true,12000,3500));
+    assert(!periodic.update(true,false,13000,3500));
+    assert(periodic.update(true,false,15000,3500));
+    periodic.reset();assert(!periodic.update(true,false,16000,0));
+    assert(!periodic.update(true,false,15000,0)); // backwards clock never floods
+
     const uint8_t sample[]={0,0,0,1,0x67,0x12,0,0,3,1,0,0,1,0x68,0x34,0,0,0,1,0x65,0x56,0,0};
     auto n=mlg::annexB(sample,sizeof(sample));
     assert(n.size()==3 && n[0].size()==6 && n[1][0]==0x68 && n[2].size()==2);

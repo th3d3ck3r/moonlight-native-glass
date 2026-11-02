@@ -1,5 +1,13 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.5.5U — private Touch Bar and recording refinements
+
+- Balance the library controls and regular-mode live statistics; retain artwork and overflow access.
+- Keep the crimson playback slider inside its native AppKit Touch Bar item so horizontal drags do not scroll the command row.
+- Add full-width Mac volume and built-in brightness controls, runtime availability checks and a system-strip fallback.
+- Request host keyframes about every two seconds during Original Stream Quality recording, with natural-keyframe suppression and separate startup recovery. Incoming video remains compressed; the recorder ABI and custom encoding path are unchanged.
+- Internal build 53. No long-duration recording tests requested; physical M1 gestures/brightness and long playback remain owner acceptance limits. No publication.
+
 ## 🌙 1.3.5.4 — prepared, unpublished
 
 - Prepare the stable-labelled Apple Silicon package, complete corresponding source and legal notices. Internal build 52; publication requires the owner’s explicit go.

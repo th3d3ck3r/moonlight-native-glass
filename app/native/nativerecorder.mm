@@ -24,6 +24,8 @@ std::atomic<unsigned> wanted{0};
 SDL_TimerID timer=0, commandPoll=0;
 std::atomic<bool> stopped{true};
 mlg::KeyframeRecovery keyframeRecovery;
+mlg::RecordingKeyframes recordingKeyframes;
+std::atomic<uint64_t> lastRecordingKeyMs{0};
 Uint32 tick(Uint32 interval,void*) { nativeOverlayPerformAction(218);return interval; }
 Uint32 pollCommand(Uint32,void*) {nativeOverlayPerformAction(218);return 0;}
 void poll() {
@@ -33,12 +35,17 @@ void poll() {
     // Interest is published before requesting the frame so the recorder can
     // receive the response even when it missed the initial stream IDR.
     const bool waiting=config.mode==0 && (wanted.load()&1) && status.waiting_keyframe && !status.failed;
-    const auto recovery=keyframeRecovery.update(waiting,LiGetMicroseconds()/1000);
+    const uint64_t nowMs=LiGetMicroseconds()/1000;
+    const auto recovery=keyframeRecovery.update(waiting,nowMs);
     if(recovery==mlg::KeyframeRecovery::Request) {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"Recorder requests host keyframe for recording/replay startup or buffer recovery");
         LiRequestIdrFrame();
     } else if(recovery==mlg::KeyframeRecovery::Timeout) {
         api->command(instance,4);
+    }
+    const bool periodic=config.mode==0 && (wanted.load()&1) && status.recording && !status.failed;
+    if(recordingKeyframes.update(periodic,waiting,nowMs,lastRecordingKeyMs.load(std::memory_order_relaxed))) {
+        LiRequestIdrFrame();
     }
     nativeTitlebarSetRecording(true,status.recording,status.buffering,status.replay_ready,status.saving,status.failed,status.elapsed_seconds,status.message);
 }
@@ -82,11 +89,13 @@ void nativeRecorderStart() {
     config.directory=directory.fileSystemRepresentation;
     {std::unique_lock<std::shared_mutex> lock(lifetime);instance=api->create(&config);}
     if(!instance) {nativeTitlebarSetRecording(false,false,false,false,false,true,0,"Recording plugin could not start; streaming continues");return;}
-    keyframeRecovery.reset();stopped.store(false);poll();timer=SDL_AddTimer(1000,tick,nullptr);
+    keyframeRecovery.reset();recordingKeyframes.reset();lastRecordingKeyMs.store(0);
+    stopped.store(false);poll();timer=SDL_AddTimer(1000,tick,nullptr);
 }
 void nativeRecorderQuiesce() {
     stopped.store(true);
     keyframeRecovery.reset();
+    recordingKeyframes.reset();lastRecordingKeyMs.store(0);
     wanted.store(0,std::memory_order_release);
     if(timer) {SDL_RemoveTimer(timer);timer=0;}
     if(commandPoll) {SDL_RemoveTimer(commandPoll);commandPoll=0;}
@@ -103,7 +112,7 @@ void nativeRecorderStop() {
 void nativeRecorderCommand(unsigned action) {
     if(stopped.load()) return;
     if(instance && action!=218) {
-        if(action==217) keyframeRecovery.reset();
+        if(action==217) {keyframeRecovery.reset();recordingKeyframes.reset();}
         api->command(instance,action==217?1:2);
         if(commandPoll) SDL_RemoveTimer(commandPoll);
         commandPoll=SDL_AddTimer(20,pollCommand,nullptr);
@@ -119,7 +128,9 @@ void nativeRecorderVideo(PDECODE_UNIT du) {
     thread_local mlg::FragmentCollector collector;
     const auto frame=collector.collect(du->bufferList);
     if(frame.error) {api->reject(instance,frame.error);return;}
-    api->video(instance,frame.chunks,frame.count,du->rtpTimestamp,du->receiveTimeUs,du->frameType==FRAME_TYPE_IDR);
+    const bool accepted=api->video(instance,frame.chunks,frame.count,du->rtpTimestamp,du->receiveTimeUs,du->frameType==FRAME_TYPE_IDR);
+    if(accepted && du->frameType==FRAME_TYPE_IDR)
+        lastRecordingKeyMs.store(LiGetMicroseconds()/1000,std::memory_order_relaxed);
 }
 void nativeRecorderPixel(const AVFrame* frame) {
     if(!(wanted.load(std::memory_order_acquire)&2)) return;

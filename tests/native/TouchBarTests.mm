@@ -394,7 +394,12 @@ int main(int argc,char** argv) { @autoreleasepool {
         captureSurface(surface,[directory stringByAppendingPathComponent:[NSString stringWithFormat:@"touchbar-surface-strip-%.0f.png",width.doubleValue]],width.doubleValue);
     captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main.png"],685);
     NSView* moon=[surface valueForKey:@"moonTarget"];
-    check(moon.frame.size.width==96 && fabs(NSMidX(moon.frame)-342.5)<.1,"Main layout keeps a centered clear moon target between metrics");
+    check(moon.hidden,"Regular mode must not reserve an asymmetric moon gap between three metrics");
+    NSView* regularReadings=[surfaceButton(animated,@"touch.info") valueForKey:@"dashboard"];
+    NSArray* regularCells=[regularReadings performSelector:@selector(cardFrames)];
+    check(regularCells.count==3,"Regular main retains FPS, RTT and bitrate");
+    CGFloat regularWidth=[regularCells[0] rectValue].size.width;
+    for (NSValue* cell in regularCells) check(fabs(cell.rectValue.size.width-regularWidth)<.1,"Regular metrics have equal cell widths");
     captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main-wide.png"],1085);
     captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main-narrow.png"],400);
     NSScrollView* surfaceScroll=[surface valueForKey:@"scroll"]; NSView* surfaceDocument=[surface valueForKey:@"document"];
@@ -426,6 +431,9 @@ int main(int argc,char** argv) { @autoreleasepool {
     [surfaceButton(animated,@"touch.audio") performClick:nil]; pump();
     checkSurfacePage(surface,audioItems,"Animated Audio page has the continuous volume slider and explicit Back");
     NSSliderTouchBarItem* animatedSlider=(NSSliderTouchBarItem*)[animated itemForIdentifier:@"touch.volume"];
+    check([animated.defaultItemIdentifiers isEqualToArray:audioItems] && ![animated.defaultItemIdentifiers containsObject:@"touch.surface"],
+          "Audio uses real AppKit slider items, not a slider extracted into the scrolling surface");
+    check(![animatedSlider.slider isDescendantOf:[surface valueForKey:@"scroll"]],"Slider gestures cannot scroll the command surface");
     check(animatedSlider.slider.continuous,"Animated layout retains continuous native volume adjustment");
     for (NSNumber* value in @[@.24,@.68,@.31]) {
         animatedSlider.slider.doubleValue=value.doubleValue; [(id)animatedSlider.target performSelector:animatedSlider.action withObject:animatedSlider];
@@ -434,7 +442,7 @@ int main(int argc,char** argv) { @autoreleasepool {
         checkSurfacePage(surface,audioItems,"Telemetry and recording updates must not dismiss the animated volume page");
         check([animated itemForIdentifier:@"touch.volume"]==animatedSlider,"Animated Audio refresh retains the actual slider instance");
     }
-    captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-audio.png"],685);
+    capture(animated,[directory stringByAppendingPathComponent:@"touchbar-surface-audio.png"],685);
     [surfaceButton(animated,@"touch.back") performClick:nil]; [surfaceButton(animated,@"touch.window") performClick:nil]; pump();
     checkSurfacePage(surface,windowItems,"Animated Window page retains every window action");
     [surfaceButton(animated,@"touch.fullscreen") performClick:nil]; check(action(221),"Animated fullscreen preserves the native SDL action route");

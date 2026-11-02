@@ -21,6 +21,17 @@ import SwiftUI
         precondition(!NativeTouchBarPresentation.enabled(in: hostedPrefs),
                      "Unavailable frontend preferences must safely keep normal width")
         _ = NSApplication.shared
+        // Provider injection creates no hardware writes, framework loads, or
+        // preference changes in the runner. AppKit must own both system sliders.
+        let mac = NativeTouchBarSystemControls()
+        mac.volume = { _ in nil }; mac.brightness = { _ in nil }
+        let macItem = mac.makeItem() as! NSPopoverTouchBarItem
+        for id in ["system.volume", "system.brightness"] {
+            let item = macItem.popoverTouchBar.item(forIdentifier: .init(id)) as! NSSliderTouchBarItem
+            precondition(!item.slider.isEnabled && item.slider.isContinuous)
+            precondition(item.label?.contains("Unavailable") == true)
+        }
+        mac.invalidate()
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -77,6 +88,17 @@ import SwiftUI
             view.frame = originalFrame
         }
         let row = owner.row!
+        // Exercise the actual library identifiers used to select compact glyphs.
+        for (index, id) in ["library.previous", "library.next", "library.refresh", "library.host", "library.add", "library.settings"].enumerated() {
+            row.controls[index].0.identifier = .init(id)
+        }
+        row.frame.size.width = 685; row.layoutControls()
+        precondition(row.more.isHidden, "Regular library fits balanced compact actions without overflow")
+        let hostMid = row.status!.frame.midX
+        let last = row.controls.last!.0.frame
+        precondition(hostMid < 685 / 2 && last.midX > 685 / 2)
+        precondition(row.controls.prefix(2).allSatisfy { $0.0.frame.maxX < 685 / 2 }, "Host navigation shares the leading group")
+        precondition(row.controls.suffix(4).allSatisfy { $0.0.frame.minX > 685 / 2 }, "Primary actions balance the opposite group")
         precondition(owner.strip != nil && row.strip === owner.strip && owner.strip?.state == .idle && owner.strip?.isAnimating == false,
                      "An inactive library keeps its backdrop without scheduling animation")
         let originalStrip = owner.strip
