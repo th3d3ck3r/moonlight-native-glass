@@ -358,6 +358,13 @@ static NSString* const touchSurfaceID=@"touch.surface";
         } else if ([item isKindOfClass:NSCustomTouchBarItem.class]) view=[(NSCustomTouchBarItem*)item view];
         else if ([item isKindOfClass:NSSliderTouchBarItem.class]) view=(NSView*)[(NSSliderTouchBarItem*)item view];
         if (!view) continue;
+        // This composed canvas owns geometry. Standalone item width budgets
+        // must not expand compact controls back over the artwork or neighbors.
+        for (NSLayoutConstraint* c in view.constraints)
+            if ([c.identifier isEqual:@"MoonlightLG.TouchWidth"] && c.firstAttribute==NSLayoutAttributeWidth) c.active=NO;
+        if ([view isKindOfClass:MLTouchStatsButton.class])
+            for (NSLayoutConstraint* c in ((MLTouchStatsButton*)view).dashboard.constraints)
+                if ([c.identifier isEqual:@"MoonlightLG.TouchWidth"]) c.active=NO;
         if ([identifier isEqual:@"touch.back"] || [identifier isEqual:@"touch.home"]) {
             [(NSButton*)view setTarget:self.owner]; [(NSButton*)view setAction:@selector(touchSurfaceNavigate:)];
         }
@@ -401,8 +408,9 @@ static NSString* const touchSurfaceID=@"touch.surface";
     // Set the final viewport once. Temporarily widening it to the full row
     // clamps NSClipView's scroll origin and loses the user's metrics position.
     self.scroll.frame=viewport;
+    BOOL audioPage=[self.identifiers containsObject:@"touch.volume"];
     for (NSUInteger i=0;i<self.controls.count;++i) {
-        NSView* view=self.controls[i]; NSView* parent=self.document;
+        NSView* view=self.controls[i]; NSView* parent=audioPage ? self : self.document;
         if (view.superview!=parent) [parent addSubview:view];
     }
     CGFloat gap=96,leftWidth=0,rightWidth=0,balance=CGFLOAT_MAX; NSUInteger split=1;

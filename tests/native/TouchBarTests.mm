@@ -119,11 +119,13 @@ static void captureSurface(NSView* surface,NSString* path,CGFloat width) {
     }
     NSBitmapImageRep* image=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:image];
     NSColor* center=[[image colorAtX:(NSInteger)(image.pixelsWide/2) y:(NSInteger)(image.pixelsHigh/2)] colorUsingColorSpace:NSColorSpace.deviceRGBColorSpace];
+    NSBitmapImageRep* reference=[artwork bitmapImageRepForCachingDisplayInRect:artwork.bounds];
+    [artwork cacheDisplayInRect:artwork.bounds toBitmapImageRep:reference];
+    NSColor* expected=[[reference colorAtX:(NSInteger)(reference.pixelsWide/2) y:(NSInteger)(reference.pixelsHigh/2)] colorUsingColorSpace:NSColorSpace.deviceRGBColorSpace];
     check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Export actual native animated surface control composition");
     fprintf(stderr,"MOON PIXEL %s: %.3f %.3f %.3f\n",path.lastPathComponent.UTF8String,center.redComponent,center.greenComponent,center.blueComponent);
-    check(center.redComponent>.9 && center.blueComponent>.9 && center.greenComponent<.1,
+    check(fabs(center.redComponent-expected.redComponent)<.02 && fabs(center.blueComponent-expected.blueComponent)<.02 && fabs(center.greenComponent-expected.greenComponent)<.02,
           "The composited center pixel must expose the moon artwork, never a metric card or black fill");
-    check([[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:path atomically:YES],"Export actual native animated surface control composition");
     [NSLayoutConstraint deactivateConstraints:allocation]; [surface removeFromSuperview];
 }
 // Negotiate space through real Auto Layout instead of assigning a width to the
