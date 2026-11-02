@@ -28,6 +28,8 @@ jobs:
           build/settings-persistence-tests
       - name: Test stream Touch Bar routing, state, layout and lifetime
         run: |
+          xcrun clang++ -std=c++17 -fsanitize=address,undefined tests/native/TouchBarHistoryTests.cpp -o build/touchbar-history-tests
+          ASAN_OPTIONS=detect_leaks=0 build/touchbar-history-tests
           python3 setup-deps.py
           xcrun clang++ -std=c++17 -fno-objc-arc -I libs/mac/include/SDL2 -I app/native \
             app/native/nativeoverlay.mm app/native/nativetitlebar.mm tests/native/TouchBarTests.mm \

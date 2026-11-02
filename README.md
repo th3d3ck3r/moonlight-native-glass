@@ -23,7 +23,7 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 Release preparation: **1.3.5.4 · Touch Bar and animations** is unpublished and on hold for owner approval. The public stable downloads below remain 1.3.2.0.
 
-Private development: **1.3.5.6U · build 54** repairs the rejected build 53 Touch Bar navigation and artwork regressions. The protected moon area and owning canvas persist across Audio/Back; the native slider host sits outside scrolling. Physical M1 acceptance remains required.
+Private development: **1.3.6.0U · build 55** adds auto-scaling three-minute graphs inside the existing Touch Bar statistics cards. Layout, buttons, protected moon area and Audio/Back navigation are unchanged. Physical M1 acceptance remains required.
 
 ## 📦 Download
 

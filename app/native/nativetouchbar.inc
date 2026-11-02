@@ -1,6 +1,7 @@
 // Compiled with nativetitlebar.mm. Touch Bar actions use the existing SDL queue;
 // no decoder, frame-pacing, mouse tracking or recorder ownership lives here.
 #include "nativestreamstats.h"
+#include "touchbarhistory.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
@@ -57,11 +58,14 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     return button;
 }
 
+enum MLTouchMetric { TouchFPS,TouchRTT,TouchBitrate,TouchDecode,TouchHost,TouchQueue,TouchRender,
+    TouchDrops,TouchJitter,TouchRenderFPS,TouchCPU,TouchRAM,TouchGPU,TouchRX,TouchTX,TouchMetricCount };
 @interface MLTouchDashboard : NSView {
     MLHardwareReading previous;
     double previousTime;
     BOOL havePrevious,busy;
-    std::array<std::vector<double>,3> samples;
+    std::array<mlg::TouchBarHistory,TouchMetricCount> histories;
+    double historyStreamUpdated;
 }
 @property(nonatomic,assign) BOOL active;
 @property(nonatomic,assign) BOOL inlineMode;
@@ -82,11 +86,14 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 - (void)copyHardwareFrom:(MLTouchDashboard*)source;
 - (NSArray*)cardFrames;
 - (NSString*)displayValueForCard:(NSUInteger)index width:(CGFloat)width;
+- (void)recordStreamHistory;
+- (NSInteger)graphMetricForLabel:(NSString*)label;
 @end
 @implementation MLTouchDashboard
 - (instancetype)initWithFrame:(NSRect)frame {
     if ((self=[super initWithFrame:frame])) {
         self.moonCenter=-1; self.active=YES; self.cpu=self.ram=self.gpu=self.rx=self.tx=-1;
+        historyStreamUpdated=-1;
         self.identifier=@"TouchDashboard"; self.streamText=@""; self.devicesText=@"No controller connected";
         NSLayoutConstraint* constraint=[self.widthAnchor constraintGreaterThanOrEqualToConstant:350];
         constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES;
@@ -122,6 +129,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     return fallback;
 }
 - (void)refreshCards {
+    [self recordStreamHistory];
     // A missing field in a fresh snapshot is not a stale stream. In particular,
     // host encode timing is optional and must not masquerade as old telemetry.
     BOOL stale=self.streamText.length && NSProcessInfo.processInfo.systemUptime-self.streamUpdated>4;
@@ -181,7 +189,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 }
 - (void)copyHardwareFrom:(MLTouchDashboard*)source {
     self.cpu=source.cpu; self.ram=source.ram; self.gpu=source.gpu; self.rx=source.rx; self.tx=source.tx;
-    samples=source->samples;
+    histories=source->histories; historyStreamUpdated=source->historyStreamUpdated;
 }
 - (void)sample {
     if (!self.active || busy) return;
@@ -202,11 +210,38 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
             }
             previous=current; previousTime=now; havePrevious=YES;
             self.ram=current.memory<0 ? -1 : current.memory/double(NSProcessInfo.processInfo.physicalMemory)*100.; self.gpu=current.gpu;
-            double values[]={self.cpu,self.ram,self.gpu};
-            for (int i=0;i<3;++i) { samples[i].push_back(values[i]); if (samples[i].size()>60) samples[i].erase(samples[i].begin()); }
+            histories[TouchCPU].append(now,self.cpu); histories[TouchRAM].append(now,self.ram);
+            histories[TouchGPU].append(now,self.gpu); histories[TouchRX].append(now,self.rx); histories[TouchTX].append(now,self.tx);
             [self refreshCards];
         });
     });
+}
+- (void)recordStreamHistory {
+    if (!self.streamText.length || self.streamUpdated<=historyStreamUpdated ||
+        NSProcessInfo.processInfo.systemUptime-self.streamUpdated>4) return;
+    historyStreamUpdated=self.streamUpdated;
+    static const char* prefixes[]={"Incoming frame rate","Average network latency","Bitrate","Average decoding time",
+        "Host processing latency","Average frame queue delay","Average rendering time","Frames dropped by",
+        "Frames dropped due","Rendering frame rate"};
+    const auto rows=NativeStreamStats::parse(self.streamText.UTF8String ?: "");
+    for (int metric=0;metric<TouchCPU;++metric) {
+        double value=NAN;
+        for (const auto& row:rows) if (row.label.rfind(prefixes[metric],0)==0) {
+            // Reuse validated telemetry parsing, including host min/max/average.
+            value=row.number;
+            break;
+        }
+        histories[metric].append(self.streamUpdated,value);
+    }
+}
+- (NSInteger)graphMetricForLabel:(NSString*)label {
+    if ([label hasPrefix:@"FPS"] || [label isEqual:@"INCOMING FPS"]) return TouchFPS;
+    NSDictionary* metrics=@{@"NETWORK RTT":@(TouchRTT),@"BITRATE":@(TouchBitrate),@"DECODE":@(TouchDecode),
+        @"HOST LATENCY":@(TouchHost),@"FRAME QUEUE":@(TouchQueue),@"RENDER TIME":@(TouchRender),
+        @"DROPS":@(TouchDrops),@"NETWORK DROPS":@(TouchDrops),@"JITTER DROPS":@(TouchJitter),@"RENDER FPS":@(TouchRenderFPS),
+        @"MAC CPU":@(TouchCPU),@"LOCAL CPU":@(TouchCPU),@"MAC RAM":@(TouchRAM),@"LOCAL RAM":@(TouchRAM),
+        @"MAC GPU":@(TouchGPU),@"LOCAL GPU":@(TouchGPU),@"LOCAL NETWORK":@(TouchRX)};
+    NSNumber* metric=metrics[label]; return metric ? metric.integerValue : -1;
 }
 // Keep drawing and accessibility/layout QA on the same cell geometry. The
 // Control Strip can resize this view between frames; no minimum card width may
@@ -247,15 +282,27 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         if (NSIsEmptyRect(cell) || cell.size.width<=10) continue;
         [touchSurface() setFill];
         [[NSBezierPath bezierPathWithRoundedRect:cell xRadius:5 yRadius:5] fill];
-        NSInteger channel=self.inlineMode ? (NSInteger)i-(NSInteger)self.cards.count+3 : (NSInteger)i;
-        if ((!self.inlineMode && self.page==4) || (self.inlineMode && self.cards.count>=6 && channel>=0 && channel<3)) {
-            NSBezierPath* graph=[NSBezierPath bezierPath]; BOOL started=NO;
-            for (size_t n=0;n<samples[channel].size();++n) {
-                double value=samples[channel][n]; if (value<0) { started=NO; continue; }
-                NSPoint point=NSMakePoint(NSMaxX(cell)-3-double(samples[channel].size()-1-n)/59.*(cell.size.width-6),29-MIN(100.,value)/100.*12);
-                if (started) [graph lineToPoint:point]; else [graph moveToPoint:point]; started=YES;
+        NSInteger metric=[self graphMetricForLabel:self.cards[i][0]];
+        if (metric>=0) {
+            const double now=NSProcessInfo.processInfo.systemUptime;
+            auto scale=histories[metric].range(now);
+            BOOL network=metric==TouchRX;
+            if (network) scale.include(histories[TouchTX].range(now));
+            scale=scale.padded();
+            // Draw only inside this existing card, under its unchanged value.
+            NSRect plot=NSMakeRect(NSMinX(cell)+4,NSMinY(cell)+14,MAX(1,cell.size.width-8),12);
+            [NSGraphicsContext saveGraphicsState];
+            [[NSBezierPath bezierPathWithRoundedRect:cell xRadius:5 yRadius:5] addClip];
+            for (int line=0;line<(network ? 2 : 1);++line) {
+                NSBezierPath* graph=[NSBezierPath bezierPath];
+                for (auto point:histories[line ? TouchTX : metric].points(now,scale)) {
+                    NSPoint p=NSMakePoint(NSMinX(plot)+point.x*plot.size.width,NSMaxY(plot)-point.y*plot.size.height);
+                    if (point.move) [graph moveToPoint:p]; else [graph lineToPoint:p];
+                }
+                [[(line ? NSColor.whiteColor : touchAccent()) colorWithAlphaComponent:.5] setStroke];
+                graph.lineWidth=1; [graph stroke];
             }
-            [[touchAccent() colorWithAlphaComponent:.45] setStroke]; graph.lineWidth=1; [graph stroke];
+            [NSGraphicsContext restoreGraphicsState];
         }
         NSMutableParagraphStyle* paragraph=[[[NSMutableParagraphStyle alloc] init] autorelease]; paragraph.lineBreakMode=NSLineBreakByTruncatingTail;
         NSString* label=self.inlineMode && cell.size.width<70 && i<2 ? (i==0 ? @"FPS" : @"RTT") : self.cards[i][0];

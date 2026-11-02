@@ -291,6 +291,17 @@ int main(int argc,char** argv) { @autoreleasepool {
     check([readings.accessibilityLabel containsString:@"60.00 FPS"] && [readings.accessibilityLabel containsString:@"4 ms"],"Stream values come from actual engine statistics");
     NSButton* mainStats=((NSPopoverTouchBarItem*)[bar itemForIdentifier:@"touch.info"]).collapsedRepresentation;
     NSView* inlineReadings=[mainStats valueForKey:@"dashboard"];
+    // Graphs must map only measured cards and never alter their existing geometry.
+    for (NSView* view in @[readings,inlineReadings]) {
+        NSArray* originalFrames=[[view performSelector:@selector(cardFrames)] copy];
+        [view performSelector:@selector(refreshCards)];
+        check([originalFrames isEqual:[view performSelector:@selector(cardFrames)]],"Graph refresh must preserve card geometry");
+        [originalFrames release];
+        for (NSString* label in @[@"FPS",@"FPS · Poor link",@"INCOMING FPS",@"NETWORK RTT",@"BITRATE",@"DECODE",@"HOST LATENCY",@"FRAME QUEUE",@"RENDER TIME",@"DROPS",@"NETWORK DROPS",@"JITTER DROPS",@"RENDER FPS",@"MAC CPU",@"LOCAL CPU",@"MAC RAM",@"LOCAL RAM",@"MAC GPU",@"LOCAL GPU",@"LOCAL NETWORK"])
+            check(((NSInteger(*)(id,SEL,id))objc_msgSend)(view,@selector(graphMetricForLabel:),label)>=0,"Every numeric card must retain its graph mapping");
+        for (NSString* label in @[@"STATE",@"VIDEO",@"CODEC",@"THERMAL",@"CONTROLLERS"])
+            check(((NSInteger(*)(id,SEL,id))objc_msgSend)(view,@selector(graphMetricForLabel:),label)==-1,"Categorical cards must never invent numeric history");
+    }
     nativeOverlayPresentStatistics("Incoming frame rate from network: 60.00 FPS\nAverage network latency: 4 ms (variance: 1 ms)\nBitrate: 25 Mbps"); pump();
     check([cardValue(inlineReadings,@"NETWORK RTT") isEqual:@"4 ms"],
           "The compact live bar must use a deliberate short RTT value rather than a truncated variance suffix");

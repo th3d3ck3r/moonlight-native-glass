@@ -1,5 +1,12 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.6.0U — Touch Bar stats graphs
+
+- Add auto-scaling sparklines with a rolling three-minute history to numeric statistics cards, retaining current values and accessibility meanings.
+- Preserve existing card geometry, buttons, navigation, volume slider and protected moon area in regular and full-width modes.
+- Reuse existing sampling; bound history memory and leave gaps for unavailable or interrupted telemetry. Categorical status cards remain text.
+- Internal build 55; physical M1 appearance remains an owner acceptance check. No publication.
+
 ## 🌙 1.3.5.6U — Touch Bar regression repair
 
 - Build 53 was rejected after the owner found a covered moon and a crash on Back from Audio in regular mode.
