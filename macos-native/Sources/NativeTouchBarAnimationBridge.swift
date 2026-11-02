@@ -58,6 +58,7 @@ enum NativeMacControls {
 final class NativeTouchBarSystemControls: NSObject, NSTouchBarDelegate {
     var volume: (Float?) -> Float? = NativeMacControls.outputVolume
     var brightness: (Float?) -> Float? = NativeMacControls.brightness
+    var ownerEligible: () -> Bool = { NSApp.isActive && NSApp.keyWindow != nil }
     private var active = false
     private var sliders: [String: NSSliderTouchBarItem] = [:]
     private var timer: Timer?
@@ -79,7 +80,7 @@ final class NativeTouchBarSystemControls: NSObject, NSTouchBarDelegate {
         if !value { popover?.dismissPopover(nil) }
         refresh()
     }
-    private var eligible: Bool { active && NSApp.isActive && NSApp.keyWindow != nil }
+    private var eligible: Bool { active && ownerEligible() }
     func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
         if identifier.rawValue == "system.restore" {
             let item = NSCustomTouchBarItem(identifier: identifier)

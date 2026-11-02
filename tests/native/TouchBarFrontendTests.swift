@@ -31,7 +31,23 @@ import SwiftUI
             precondition(!item.slider.isEnabled && item.slider.isContinuous)
             precondition(item.label?.contains("Unavailable") == true)
         }
+        var output = Float(0.4), writes = 0
+        mac.ownerEligible = { true }
+        mac.volume = { value in
+            if let value { output = value; writes += 1 }
+            return output
+        }
+        mac.setActive(true)
+        let systemVolume = macItem.popoverTouchBar.item(forIdentifier: .init("system.volume")) as! NSSliderTouchBarItem
+        precondition(systemVolume.slider.isEnabled && abs(systemVolume.slider.floatValue - 0.4) < 0.01)
+        systemVolume.slider.floatValue = 0.7
+        NSApp.sendAction(systemVolume.action!, to: systemVolume.target, from: systemVolume)
+        precondition(writes == 1 && abs(output - 0.7) < 0.01)
+        mac.setActive(false)
+        NSApp.sendAction(systemVolume.action!, to: systemVolume.target, from: systemVolume)
+        precondition(writes == 1 && !systemVolume.slider.isEnabled, "Focus loss must stop system writes")
         mac.invalidate()
+        precondition(systemVolume.target == nil && systemVolume.action == nil)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false

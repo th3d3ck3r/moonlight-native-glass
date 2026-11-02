@@ -3,7 +3,7 @@
 namespace mlg {
 // Called only by the engine's UI/status poll, never by a decoder callback.
 // Ask once immediately, retry twice at three-second intervals, then report
-// failure. No periodic IDRs while a usable recording/replay keyframe exists.
+// failure. This recovery policy is separate from periodic recording requests.
 class KeyframeRecovery {
 public:
     enum Result { None, Request, Timeout };
