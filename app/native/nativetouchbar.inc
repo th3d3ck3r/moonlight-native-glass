@@ -81,6 +81,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 - (void)refreshCards;
 - (void)copyHardwareFrom:(MLTouchDashboard*)source;
 - (NSArray*)cardFrames;
+- (NSString*)displayValueForCard:(NSUInteger)index width:(CGFloat)width;
 @end
 @implementation MLTouchDashboard
 - (instancetype)initWithFrame:(NSRect)frame {
@@ -227,6 +228,17 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
     }
     return frames;
 }
+- (NSString*)displayValueForCard:(NSUInteger)index width:(CGFloat)width {
+    NSString* value=self.cards[index][1];
+    if (!self.inlineMode || width>=70) return value;
+    if ([value isEqual:@"Waiting for data"]) return @"Wait";
+    if ([value isEqual:@"Not reported"]) return @"N/R";
+    if ([value isEqual:@"Stale"]) return value;
+    if (index==3) return @[@"Idle",@"Link",@"Live",@"Poor",@"Off"][MIN(4,MAX(0,self.connectionState))];
+    if (index==0) return [NSString stringWithFormat:@"%.0f",value.doubleValue];
+    if (index==1 && value.doubleValue>=1000) return [NSString stringWithFormat:@"%.1fs",value.doubleValue/1000.];
+    return [[value stringByReplacingOccurrencesOfString:@" Mbps" withString:@"M"] stringByReplacingOccurrencesOfString:@" " withString:@""];
+}
 - (void)drawRect:(NSRect)dirty {
     if (self.moonCenter<0) { [NSColor.blackColor setFill]; NSRectFill(self.bounds); }
     NSArray* frames=[self cardFrames];
@@ -246,8 +258,9 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
             [[touchAccent() colorWithAlphaComponent:.45] setStroke]; graph.lineWidth=1; [graph stroke];
         }
         NSMutableParagraphStyle* paragraph=[[[NSMutableParagraphStyle alloc] init] autorelease]; paragraph.lineBreakMode=NSLineBreakByTruncatingTail;
-        [self.cards[i][0] drawInRect:NSInsetRect(NSMakeRect(cell.origin.x,1,cell.size.width,10),5,0) withAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:8 weight:NSFontWeightSemibold],NSForegroundColorAttributeName:touchAccent(),NSParagraphStyleAttributeName:paragraph}];
-        [self.cards[i][1] drawInRect:NSInsetRect(NSMakeRect(cell.origin.x,12,cell.size.width,17),5,0) withAttributes:@{NSFontAttributeName:[NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightSemibold],NSForegroundColorAttributeName:NSColor.whiteColor,NSParagraphStyleAttributeName:paragraph}];
+        NSString* label=self.inlineMode && cell.size.width<70 && i<2 ? (i==0 ? @"FPS" : @"RTT") : self.cards[i][0];
+        [label drawInRect:NSInsetRect(NSMakeRect(cell.origin.x,1,cell.size.width,10),5,0) withAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:8 weight:NSFontWeightSemibold],NSForegroundColorAttributeName:touchAccent(),NSParagraphStyleAttributeName:paragraph}];
+        [[self displayValueForCard:i width:cell.size.width] drawInRect:NSInsetRect(NSMakeRect(cell.origin.x,12,cell.size.width,17),5,0) withAttributes:@{NSFontAttributeName:[NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightSemibold],NSForegroundColorAttributeName:NSColor.whiteColor,NSParagraphStyleAttributeName:paragraph}];
     }
 }
 - (void)dealloc { self.active=NO; [_cards release]; [_streamText release]; [_devicesText release]; [super dealloc]; }

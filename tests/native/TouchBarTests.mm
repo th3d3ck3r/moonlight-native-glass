@@ -1,5 +1,6 @@
 #import <AppKit/AppKit.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
 #import <SDL.h>
 #import <SDL_syswm.h>
 #include "nativeoverlay.h"
@@ -422,6 +423,14 @@ int main(int argc,char** argv) { @autoreleasepool {
     for (NSValue* cell in [narrowReadings performSelector:@selector(cardFrames)]) {
         NSRect inSurface=[surface convertRect:cell.rectValue fromView:narrowReadings];
         check(NSMaxX(inSurface)<=152.1 || NSMinX(inSurface)>=247.9,"Narrow metrics cannot cover the central moon");
+    }
+    SEL displayValue=NSSelectorFromString(@"displayValueForCard:width:");
+    NSArray* narrowCells=[narrowReadings performSelector:@selector(cardFrames)];
+    for (NSUInteger i=0;i<narrowCells.count;++i) {
+        CGFloat width=[narrowCells[i] rectValue].size.width;
+        NSString* value=((id(*)(id,SEL,NSUInteger,CGFloat))objc_msgSend)(narrowReadings,displayValue,i,width);
+        CGFloat text=[value sizeWithAttributes:@{NSFontAttributeName:[NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightSemibold]}].width;
+        check(text<=width-10,"Compact live values must fit their actual drawing cells without truncation");
     }
     NSPoint gapInSurface=NSZeroPoint;
     captureSurface(surface,[directory stringByAppendingPathComponent:@"touchbar-surface-main-reset.png"],685);
