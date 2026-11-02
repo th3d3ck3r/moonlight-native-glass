@@ -21,9 +21,18 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
-Release preparation: **1.3.5.4 · Touch Bar and animations** is unpublished and on hold for owner approval. The public stable downloads below remain 1.3.2.0.
+Release preparation: **1.3.6.0 · Touch Bar graphs & Crimson Glass** is approved by the owner for publication. A fresh stable-labelled build 56 is being validated; GitHub release-create access remains blocked. The public downloads below remain 1.3.2.0 until the new assets are published.
 
-Private development: **1.3.6.0U · build 55** adds auto-scaling three-minute graphs inside the existing Touch Bar statistics cards. Layout, buttons, protected moon area and Audio/Back navigation are unchanged. Physical M1 acceptance remains required.
+### ✨ Coming in 1.3.6.0
+
+- 🎛️ Native Touch Bar controls across the library, Apollo connection screen and stream, with an optional full-width mode.
+- 📈 Auto-scaling three-minute graphs inside the existing statistics cards, with current values, six detailed pages and honest missing/stale readings.
+- 🌑 Protected moon artwork, balanced compact cards and the crimson volume slider, with stable Audio/Back navigation.
+- 🌌 Smoke accretion and Moon pulse animations, Reduce Motion support and finite startup/recovery.
+- 💾 Bandwidth autosave through restart into the next stream.
+- 🎬 Periodic host keyframe requests during Original Stream Quality recording. Hour-long playback is not established by CI.
+
+Physical M1 graph legibility, Touch Bar gestures and optional full-width compatibility remain owner acceptance limits.
 
 ## 📦 Download
 

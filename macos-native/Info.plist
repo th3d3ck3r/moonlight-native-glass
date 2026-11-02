@@ -12,8 +12,8 @@
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.3.6</string>
     <key>MoonlightLGVersion</key><string>1.3.6.0</string>
-    <key>MoonlightLGReleaseChannel</key><string>U</string>
-    <key>CFBundleVersion</key><string>55</string>
+    <key>MoonlightLGReleaseChannel</key><string>stable</string>
+    <key>CFBundleVersion</key><string>56</string>
     <key>LSMinimumSystemVersion</key><string>15.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
     <key>NSPrincipalClass</key><string>NSApplication</string>

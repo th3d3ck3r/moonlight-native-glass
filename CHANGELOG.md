@@ -1,5 +1,12 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.6.0 — publication approved, access blocked
+
+- Promote the validated build 55 functionality to stable-labelled build 56 with no feature changes; the app is rebuilt with stable metadata rather than relabelling a U ZIP.
+- Includes three-minute Touch Bar graphs, preserved layout/buttons and the build 54 Audio/Back/moon repairs.
+- Prepare release notes and the emoji-styled README, complete corresponding source, checksums, notices and screenshots. Public links remain on 1.3.2.0 until publication succeeds.
+- Owner authorized publication. The prior GitHub release-create HTTP 403 remains unresolved; do not bypass it through alternate credentials, interfaces or targets.
+
 ## 🌙 1.3.6.0U — Touch Bar stats graphs
 
 - Add auto-scaling sparklines with a rolling three-minute history to numeric statistics cards, retaining current values and accessibility meanings.

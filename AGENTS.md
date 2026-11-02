@@ -9,7 +9,7 @@ and macOS permissions. Do not rebrand upstream copyright/license attribution.
 ## Versions (user-required)
 
 The user-facing scheme is `redesign.major.minor.hotfix`, without leading zeros.
-The current release version is **1.3.5.4** (prepared, unpublished; internal build 52). Each component is a nonnegative
+The current release candidate is **1.3.6.0** (owner approved for publication, not yet published; stable-labelled internal build 56). Each component is a nonnegative
 integer with no decimal rollover: `1.2.9.0` → `1.2.10.0` → `1.2.11.0`.
 
 - `U`: unreleased development work. Share U build links only directly with the user.
@@ -52,9 +52,10 @@ change only for reviewed native UI/action hooks. Report physical-host/Intel limi
 honestly; CI cross-builds Intel on Apple Silicon.
 
 
-## Publication hold
+## Publication access blocker
 
-The owner requested release preparation only. Do not publish the prepared 1.3.5.4
-release, create a public release tag, mark it latest, or change the public download
-links until the owner explicitly gives the go. Preparation must stop at a draft.
-The public stable downloads remain 1.3.2.0 during this hold.
+The owner authorized publication of 1.3.6.0 after private build 55. Prepare and validate stable-labelled build 56 before publication; do not relabel the existing U ZIP. This supersedes the earlier preparation-only hold for the new 1.3.6.0 release, not permission restrictions.
+
+Release creation previously failed with HTTP 403, `Resource not accessible by integration`, despite Contents: write in the workflow token summary. Authorized release-write access must be restored before publishing. Do not bypass the denial through alternate credentials, interfaces or targets. The current preparation workflow must remain read-only and contain no release-create/publish command until that access issue is resolved.
+
+Public downloads remain 1.3.2.0 until new assets are actually published. Keep the post-publication README staged in docs/README_1.3.6.0_RELEASE.md. Preserve historical 1.3.5.4 preparation records. Do not merge or delete branches as part of publication.
