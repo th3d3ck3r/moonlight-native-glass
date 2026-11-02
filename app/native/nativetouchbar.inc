@@ -257,6 +257,11 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 @property(nonatomic,retain) MLTouchDashboard* dashboard;
 @end
 @implementation MLTouchStatsButton
+- (BOOL)isOpaque { return NO; }
+- (void)drawRect:(NSRect)dirty {
+    // The dashboard draws its own cards. NSButtonCell must not paint a bezel
+    // or background across the transparent moon region behind this tap target.
+}
 - (NSSize)intrinsicContentSize { return NSMakeSize(350,30); }
 - (void)setFrameSize:(NSSize)size { [super setFrameSize:size]; self.dashboard.frame=self.bounds; }
 - (void)dealloc { [_dashboard release]; [super dealloc]; }
