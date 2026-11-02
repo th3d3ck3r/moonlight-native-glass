@@ -21,33 +21,6 @@ import SwiftUI
         precondition(!NativeTouchBarPresentation.enabled(in: hostedPrefs),
                      "Unavailable frontend preferences must safely keep normal width")
         _ = NSApplication.shared
-        // Provider injection creates no hardware writes, framework loads, or
-        // preference changes in the runner. AppKit must own both system sliders.
-        let mac = NativeTouchBarSystemControls()
-        mac.volume = { _ in nil }; mac.brightness = { _ in nil }
-        let macItem = mac.makeItem() as! NSPopoverTouchBarItem
-        for id in ["system.volume", "system.brightness"] {
-            let item = macItem.popoverTouchBar.item(forIdentifier: .init(id)) as! NSSliderTouchBarItem
-            precondition(!item.slider.isEnabled && item.slider.isContinuous)
-            precondition(item.label?.contains("Unavailable") == true)
-        }
-        var output = Float(0.4), writes = 0
-        mac.ownerEligible = { true }
-        mac.volume = { value in
-            if let value { output = value; writes += 1 }
-            return output
-        }
-        mac.setActive(true)
-        let systemVolume = macItem.popoverTouchBar.item(forIdentifier: .init("system.volume")) as! NSSliderTouchBarItem
-        precondition(systemVolume.slider.isEnabled && abs(systemVolume.slider.floatValue - 0.4) < 0.01)
-        systemVolume.slider.floatValue = 0.7
-        NSApp.sendAction(systemVolume.action!, to: systemVolume.target, from: systemVolume)
-        precondition(writes == 1 && abs(output - 0.7) < 0.01)
-        mac.setActive(false)
-        NSApp.sendAction(systemVolume.action!, to: systemVolume.target, from: systemVolume)
-        precondition(writes == 1 && !systemVolume.slider.isEnabled, "Focus loss must stop system writes")
-        mac.invalidate()
-        precondition(systemVolume.target == nil && systemVolume.action == nil)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -115,6 +88,13 @@ import SwiftUI
         precondition(hostMid < 685 / 2 && last.midX > 685 / 2)
         precondition(row.controls.prefix(2).allSatisfy { $0.0.frame.maxX < 685 / 2 }, "Host navigation shares the leading group")
         precondition(row.controls.suffix(4).allSatisfy { $0.0.frame.minX > 685 / 2 }, "Primary actions balance the opposite group")
+        let moonTarget = row.subviews.first { $0.accessibilityLabel() == "Restore system Control Strip" }!
+        let wasHidden = moonTarget.isHidden
+        moonTarget.isHidden = false // Simulate modal eligibility without presenting system UI.
+        let moonPoint = row.convert(NSPoint(x: 342.5, y: 15), to: row.superview)
+        precondition(row.hitTest(moonPoint) === moonTarget,
+                     "The scroll view must not intercept the moon restore gesture")
+        moonTarget.isHidden = wasHidden
         precondition(owner.strip != nil && row.strip === owner.strip && owner.strip?.state == .idle && owner.strip?.isAnimating == false,
                      "An inactive library keeps its backdrop without scheduling animation")
         let originalStrip = owner.strip
@@ -388,6 +368,8 @@ import SwiftUI
             let item = candidate.item(forIdentifier: .init("native.commandRow")) as? NSCustomTouchBarItem
             precondition(item?.view != nil && item?.view === owner.modalSurface?.row,
                          "Modal controls must be fully materialized before entering the presentation API")
+            precondition(candidate.defaultItemIdentifiers == [.init("native.commandRow")],
+                         "Mac controls must not take a separate slice of the full-width artwork canvas")
             precondition(item?.visibilityPriority == .high, "The only command item must not be discarded as low priority")
             if loseFocusDuringShow {
                 loseFocusDuringShow = false; eligible = false; owner.requestPresentation()

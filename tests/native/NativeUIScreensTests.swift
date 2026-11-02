@@ -211,7 +211,7 @@ import XCTest
         let about = app.descendants(matching: .any)["native-about"].firstMatch
         XCTAssertTrue(about.waitForExistence(timeout: 10))
         XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", "MoonlightLG", "MoonlightLG")).firstMatch.exists)
-        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "1.3.5.5", "1.3.5.5")).firstMatch.exists)
+        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "1.3.5.6", "1.3.5.6")).firstMatch.exists)
         XCTAssertTrue(about.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Moonlight Qt 6.2.0")).firstMatch.exists)
         let shot = XCTAttachment(screenshot: about.screenshot())
         shot.name = "moonlightlg-about-version"; shot.lifetime = .keepAlways; add(shot)

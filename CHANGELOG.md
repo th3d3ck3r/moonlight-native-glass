@@ -1,5 +1,15 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.5.6U — Touch Bar regression repair
+
+- Build 53 was rejected after the owner found a covered moon and a crash on Back from Audio in regular mode.
+- Preserve the owning canvas across Audio/Back, keep the complete native slider host outside scrolling, and defer navigation until its button callback completes.
+- Restore a protected 96-point moon region on every composed page; balance compact live cards as FPS/RTT and bitrate/state.
+- Clip scrolling controls away from the stationary moon and keep its restore gesture above the library scroll view.
+- Remove the Mac button and system volume/brightness implementation at the owner’s request; preserve the full-width artwork allocation.
+- Add composited moon visibility and repeated Audio/Back lifetime checks. Build 54; physical M1 acceptance is still required. The periodic recording-keyframe implementation is unchanged.
+
+
 ## 🌙 1.3.5.5U — private Touch Bar and recording refinements
 
 - Balance the library controls and regular-mode live statistics; retain artwork and overflow access.

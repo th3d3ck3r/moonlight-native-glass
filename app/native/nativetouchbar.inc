@@ -3,6 +3,7 @@
 #include "nativestreamstats.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
+#import <QuartzCore/QuartzCore.h>
 
 static NSColor* touchAccent() {
     return crimsonEnabled() ? [NSColor colorWithSRGBRed:.95 green:.19 blue:.32 alpha:1] : NSColor.controlAccentColor;
@@ -143,6 +144,8 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
             [cards addObject:@[@"MAC RAM",self.ram<0 ? @"Unavailable" : [NSString stringWithFormat:@"%.1f GB",self.ram/100.*NSProcessInfo.processInfo.physicalMemory/1073741824.]]];
             [cards addObject:@[@"MAC GPU",self.gpu<0 ? @"Unavailable" : [NSString stringWithFormat:@"%.0f%%",self.gpu]]];
         }
+        if (self.moonCenter>=0 && cards.count==3)
+            [cards addObject:@[@"STATE",@[@"Idle",@"Connecting",@"Connected",@"Poor link",@"Disconnected"][MIN(4,MAX(0,self.connectionState))]]];
         self.cards=cards;
     } else switch (self.page) {
         case 0: self.cards=@[@[@"INCOMING FPS",[self metric:@"Incoming frame rate" fallback:missing]],
@@ -214,10 +217,10 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
         NSRect cell=NSMakeRect(i*width,0,MAX(0,width-4),MIN(30,self.bounds.size.height));
         if (self.moonCenter>=0 && self.cards.count>=3) {
             NSUInteger leftCount=self.cards.count/2,rightCount=self.cards.count-leftCount;
-            CGFloat left=(self.moonCenter-54)/MAX((NSUInteger)1,leftCount)-4;
-            CGFloat right=(self.bounds.size.width-self.moonCenter-54)/MAX((NSUInteger)1,rightCount)-4;
+            CGFloat left=(self.moonCenter-48)/MAX((NSUInteger)1,leftCount)-4;
+            CGFloat right=(self.bounds.size.width-self.moonCenter-48)/MAX((NSUInteger)1,rightCount)-4;
             CGFloat w=MAX(0,MIN(115,MIN(left,right)));
-            CGFloat x=i<leftCount ? self.moonCenter-54-leftCount*(w+4)+4+i*(w+4) : self.moonCenter+54+(i-leftCount)*(w+4);
+            CGFloat x=i<leftCount ? self.moonCenter-48-leftCount*(w+4)+4+i*(w+4) : self.moonCenter+48+(i-leftCount)*(w+4);
             cell=NSMakeRect(x,0,w,MIN(30,self.bounds.size.height));
         }
         [frames addObject:[NSValue valueWithRect:NSIntersectionRect(self.bounds,cell)]];
@@ -283,7 +286,7 @@ static NSButton* touchButton(NSString* title,NSString* symbol,id target,SEL acti
 // path is used only when the packaged Swift renderer is loaded. Runners or older
 // helpers without it keep the established native-only layout below.
 static char touchSurfaceKey;
-static char touchSystemControlsKey;
+static char touchNavigationKey;
 static NSString* const touchSurfaceID=@"touch.surface";
 @interface MLTouchSurface : NSView
 @property(nonatomic,assign) MLStreamTitlebar* owner;
@@ -341,15 +344,6 @@ static NSString* const touchSurfaceID=@"touch.surface";
     if ([self.identifiers isEqualToArray:identifiers]) return;
     self.identifiers=identifiers;
     for (NSView* view in self.controls) [view removeFromSuperview];
-    if ([identifiers containsObject:@"touch.volume"]) {
-        // NSSliderTouchBarItem must retain its AppKit touch host. Extracting its
-        // slider into this scrolling document steals horizontal drag gestures.
-        self.controls=@[]; self.scroll.hidden=YES; self.moonTarget.hidden=YES;
-        self.owner.streamTouchBar.defaultItemIdentifiers=self.owner.touchFullWidthPresented && objc_getAssociatedObject(self.owner.streamTouchBar,&touchSystemControlsKey) ? [identifiers arrayByAddingObject:@"touch.system"] : identifiers;
-        return;
-    }
-    self.scroll.hidden=NO;
-    self.owner.streamTouchBar.defaultItemIdentifiers=self.owner.touchFullWidthPresented && objc_getAssociatedObject(self.owner.streamTouchBar,&touchSystemControlsKey) ? @[touchSurfaceID,@"touch.system"] : @[touchSurfaceID];
     NSMutableArray* controls=[NSMutableArray array];
     for (NSString* identifier in identifiers) {
         NSTouchBarItem* item=[self.owner.streamTouchBar itemForIdentifier:identifier]; NSView* view=nil;
@@ -357,7 +351,7 @@ static NSString* const touchSurfaceID=@"touch.surface";
             NSButton* button=(NSButton*)[(NSPopoverTouchBarItem*)item collapsedRepresentation];
             button.target=self.owner; button.action=@selector(touchSurfaceNavigate:); view=button;
         } else if ([item isKindOfClass:NSCustomTouchBarItem.class]) view=[(NSCustomTouchBarItem*)item view];
-        else if ([item isKindOfClass:NSSliderTouchBarItem.class]) view=[(NSSliderTouchBarItem*)item slider];
+        else if ([item isKindOfClass:NSSliderTouchBarItem.class]) view=(NSView*)[(NSSliderTouchBarItem*)item view];
         if (!view) continue;
         if ([identifier isEqual:@"touch.back"] || [identifier isEqual:@"touch.home"]) {
             [(NSButton*)view setTarget:self.owner]; [(NSButton*)view setAction:@selector(touchSurfaceNavigate:)];
@@ -386,7 +380,6 @@ static NSString* const touchSurfaceID=@"touch.surface";
 - (void)viewDidUnhide { [super viewDidUnhide]; self.needsLayout=YES; [self updateArtwork]; }
 - (void)layout {
     [super layout]; if (self.arranging) return; self.arranging=YES;
-    if ([self.identifiers containsObject:@"touch.volume"]) { self.arranging=NO; return; }
     NSRect viewport=NSIntersectionRect(self.visibleRect,self.bounds); if (NSIsEmptyRect(viewport)) viewport=self.bounds;
     self.artwork.frame=viewport;
     NSMutableArray* widths=[NSMutableArray array]; CGFloat total=0;
@@ -400,12 +393,11 @@ static NSString* const touchSurfaceID=@"touch.surface";
     self.owner.touchInlineDashboard.moonCenter=-1;
     self.owner.touchDashboard.moonCenter=-1;
     BOOL main=self.owner.touchLiveStats && [self.identifiers isEqualToArray:@[@"touch.capture",@"touch.info",@"touch.more"]];
-    BOOL narrowMain=main && self.controls.count==3 && viewport.size.width<620;
     // Set the final viewport once. Temporarily widening it to the full row
     // clamps NSClipView's scroll origin and loses the user's metrics position.
-    self.scroll.frame=narrowMain ? NSMakeRect(viewport.origin.x+90,0,MAX(50,viewport.size.width-194),30) : viewport;
+    self.scroll.frame=viewport;
     for (NSUInteger i=0;i<self.controls.count;++i) {
-        NSView* view=self.controls[i]; NSView* parent=narrowMain && i!=1 ? self : self.document;
+        NSView* view=self.controls[i]; NSView* parent=self.document;
         if (view.superview!=parent) [parent addSubview:view];
     }
     CGFloat gap=96,leftWidth=0,rightWidth=0,balance=CGFLOAT_MAX; NSUInteger split=1;
@@ -423,25 +415,41 @@ static NSString* const touchSurfaceID=@"touch.surface";
         if (i==split) x=contentWidth/2+gap/2;
         view.frame=NSMakeRect(x,0,width,30); x+=width+6;
     }
+    if ([self.identifiers containsObject:@"touch.volume"] && self.controls.count==4) {
+        self.scroll.hidden=YES;
+        CGFloat mid=NSMidX(viewport), left=viewport.origin.x, right=NSMaxX(viewport);
+        for (NSView* view in self.controls) if (view.superview!=self) [self addSubview:view];
+        NSView* back=self.controls[0]; NSView* mute=self.controls[1];
+        NSView* volume=self.controls[2]; NSView* percent=self.controls[3];
+        back.frame=NSMakeRect(left,0,36,30);
+        mute.frame=NSMakeRect(left+42,0,MAX(30,MIN(74,mid-48-left-42)),30);
+        volume.frame=NSMakeRect(mid+48,0,MAX(1,right-mid-48-54-6),30);
+        volume.wantsLayer=YES; volume.layer.masksToBounds=YES;
+        percent.frame=NSMakeRect(right-54,0,54,30);
+        for (NSLayoutConstraint* c in self.owner.touchVolume.slider.constraints)
+            if ([c.identifier isEqual:@"MoonlightLG.TouchWidth"]) c.active=NO;
+        for (NSLayoutConstraint* c in percent.constraints)
+            if ([c.identifier isEqual:@"MoonlightLG.TouchWidth"]) c.active=NO;
+        self.moonTarget.frame=NSMakeRect(mid-48,0,96,30);
+        self.moonGapAvailable=YES;
+        self.arranging=NO; [self updateArtwork]; return;
+    }
+    self.scroll.hidden=NO;
     // The live readout owns three cells. Reserve its central moon space inside
     // the readout instead of forcing all three measurements to one side.
-    if (narrowMain) {
-        // Keep capture and Controls visible when the system allocates a small
-        // app area. Only the live measurements scroll between these anchors.
+    if (main && self.controls.count==3) {
         NSView* capture=self.controls[0]; NSView* info=self.controls[1]; NSView* more=self.controls[2];
-        capture.frame=NSMakeRect(viewport.origin.x,0,84,30);
-        more.frame=NSMakeRect(NSMaxX(viewport)-98,0,98,30);
-        info.frame=NSMakeRect(0,0,350,30); self.document.frame=NSMakeRect(0,0,350,30);
-        self.moonGapAvailable=NO;
-    } else if (main && self.controls.count==3 && viewport.size.width>=620) {
-        NSView* capture=self.controls[0]; NSView* info=self.controls[1]; NSView* more=self.controls[2];
-        capture.frame=NSMakeRect(0,0,84,30); more.frame=NSMakeRect(viewport.size.width-98,0,98,30);
-        info.frame=NSMakeRect(90,0,MAX(350,viewport.size.width-194),30);
+        BOOL compact=viewport.size.width<620;
+        CGFloat leading=compact ? 36 : 84, trailing=compact ? 36 : 98;
+        capture.frame=NSMakeRect(0,0,leading,30); more.frame=NSMakeRect(viewport.size.width-trailing,0,trailing,30);
+        if (compact) { ((NSButton*)capture).title=@""; ((NSButton*)more).title=@""; }
+        info.frame=NSMakeRect(leading+6,0,MAX(1,viewport.size.width-leading-trailing-12),30);
         MLTouchDashboard* dashboard=((MLTouchStatsButton*)info).dashboard;
-        dashboard.moonCenter=self.owner.touchFullWidthPresented ? viewport.size.width/2-90 : -1;
+        dashboard.moonCenter=viewport.size.width/2-(leading+6);
+        [dashboard refreshCards];
         self.document.frame=NSMakeRect(0,0,viewport.size.width,30);
         self.moonTarget.frame=NSMakeRect(viewport.origin.x+viewport.size.width/2-48,0,96,30);
-        self.moonGapAvailable=self.owner.touchFullWidthPresented;
+        self.moonGapAvailable=YES;
     } else if ([self.identifiers isEqualToArray:@[@"touch.home",@"touch.detail"]] && self.controls.count==2 && viewport.size.width>=620) {
         NSView* home=self.controls[0]; MLTouchInfoPanel* panel=(MLTouchInfoPanel*)self.controls[1];
         home.frame=NSMakeRect(0,0,36,30); panel.frame=NSMakeRect(42,0,viewport.size.width-42,30);
@@ -453,11 +461,17 @@ static NSString* const touchSurfaceID=@"touch.surface";
         self.moonGapAvailable=contentWidth<=viewport.size.width;
         self.moonTarget.frame=NSMakeRect(viewport.origin.x+viewport.size.width/2-48,0,96,30);
     }
+    self.scroll.wantsLayer=YES;
+    CAShapeLayer* mask=[CAShapeLayer layer]; CGMutablePathRef path=CGPathCreateMutable();
+    CGPathAddRect(path,NULL,self.scroll.bounds);
+    CGPathAddRect(path,NULL,NSMakeRect(viewport.size.width/2-48,0,96,30));
+    mask.frame=self.scroll.bounds; mask.path=path; mask.fillRule=kCAFillRuleEvenOdd; self.scroll.layer.mask=mask;
+    CGPathRelease(path);
     CGFloat documentWidth=self.document.frame.size.width;
     BOOL changed=self.centerOnLayout || fabs(self.lastViewportWidth-viewport.size.width)>.5 || fabs(self.lastContentWidth-documentWidth)>.5;
     if (changed) {
         NSPoint origin=self.scroll.contentView.bounds.origin;
-        origin.x=narrowMain ? 0 : MAX(0,(documentWidth-viewport.size.width)/2); origin.y=0;
+        origin.x=MAX(0,(documentWidth-viewport.size.width)/2); origin.y=0;
         [self.scroll.contentView scrollToPoint:origin]; [self.scroll reflectScrolledClipView:self.scroll.contentView];
     }
     self.centerOnLayout=NO; self.lastViewportWidth=viewport.size.width; self.lastContentWidth=documentWidth;
@@ -547,14 +561,6 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     if (wanted && [objc_getAssociatedObject(self,&touchPresentationFailureKey) boolValue]) return;
     if (wanted==self.touchFullWidthPresented) return;
     self.touchPresentationUpdating=YES;
-    id system=objc_getAssociatedObject(self.streamTouchBar,&touchSystemControlsKey);
-    if (system) {
-        NSMutableArray* items=[[self.streamTouchBar.defaultItemIdentifiers mutableCopy] autorelease];
-        [items removeObject:@"touch.system"];
-        if (wanted) [items addObject:@"touch.system"];
-        self.streamTouchBar.defaultItemIdentifiers=items;
-        ((void(*)(id,SEL,BOOL))objc_msgSend)(system,@selector(setActive:),wanted);
-    }
     if (wanted) {
         self.touchFullWidthPresented=YES;
         // A bar must have one AppKit presentation host at a time. Keep our
@@ -564,11 +570,6 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
         if (self.window.touchBar==self.streamTouchBar) self.window.touchBar=nil;
         if (!touchPresentFullWidth(self.streamTouchBar)) {
             self.touchFullWidthPresented=NO;
-            if (system) {
-                ((void(*)(id,SEL,BOOL))objc_msgSend)(system,@selector(setActive:),NO);
-                NSMutableArray* items=[[self.streamTouchBar.defaultItemIdentifiers mutableCopy] autorelease];
-                [items removeObject:@"touch.system"]; self.streamTouchBar.defaultItemIdentifiers=items;
-            }
             if (self.window && !self.window.touchBar) self.window.touchBar=self.streamTouchBar;
             // Do not retry a rejected private presentation on every stats tick.
             objc_setAssociatedObject(self,&touchPresentationFailureKey,@YES,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -628,11 +629,6 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
         self.streamTouchBar.defaultItemIdentifiers=@[touchSurfaceID];
         [self.streamTouchBar itemForIdentifier:touchSurfaceID];
     }
-    Class systemClass=NSClassFromString(@"MLTouchBarSystemControls");
-    if (systemClass) {
-        id controls=[[[systemClass alloc] init] autorelease];
-        objc_setAssociatedObject(self.streamTouchBar,&touchSystemControlsKey,controls,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
     self.window.touchBar=self.streamTouchBar;
     [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(touchPresentationChanged:) name:@"com.moonlight-stream.NativeGlass.touchBarPresentationChanged" object:nil];
     [self updateTouchPresentation];
@@ -678,8 +674,18 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     else if ([sender.identifier isEqual:@"touch.window"]) items=@[@"touch.back",@"touch.hardware",@"touch.fullscreen",@"touch.controls",@"touch.hide"];
     else if ([sender.identifier isEqual:@"touch.home"]) items=self.touchLiveStats ? @[@"touch.capture",@"touch.info",@"touch.more"] : @[@"touch.info",@"touch.capture",@"touch.audio",@"touch.record",@"touch.replay",@"touch.more"];
     else items=@[@"touch.home",@"touch.audio",@"touch.record",@"touch.replay",@"touch.stats",@"touch.window",@"touch.disconnect"];
-    [(MLTouchSurface*)objc_getAssociatedObject(self.streamTouchBar,&touchSurfaceKey) showItems:items];
-    [self refreshTouchBar];
+    NSTouchBar* expected=self.streamTouchBar;
+    MLTouchSurface* surface=objc_getAssociatedObject(expected,&touchSurfaceKey);
+    NSUInteger revision=[objc_getAssociatedObject(self,&touchNavigationKey) unsignedIntegerValue]+1;
+    objc_setAssociatedObject(self,&touchNavigationKey,@(revision),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    // Leave the AppKit button/tracking callback before changing its view tree.
+    // Captured objects stay alive through the queued transition; close/detach
+    // invalidates the owner and the bar identity prevents late-session writes.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.touchInvalidating || self.streamTouchBar!=expected || !touchOwnsControls(self) ||
+            [objc_getAssociatedObject(self,&touchNavigationKey) unsignedIntegerValue]!=revision) return;
+        [surface showItems:items]; [self refreshTouchBar];
+    });
 }
 - (void)touchRestoreControlStrip:(id)sender {
     NSUserDefaults* preferences=[[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass"] autorelease];
@@ -688,10 +694,6 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     [self updateTouchPresentation];
 }
 - (NSTouchBarItem*)touchBar:(NSTouchBar*)bar makeItemForIdentifier:(NSTouchBarItemIdentifier)identifier {
-    if ([identifier isEqual:@"touch.system"]) {
-        id controls=objc_getAssociatedObject(self.streamTouchBar,&touchSystemControlsKey);
-        return controls ? ((id(*)(id,SEL))objc_msgSend)(controls,@selector(makeItem)) : nil;
-    }
     if ([identifier isEqual:touchSurfaceID]) {
         NSCustomTouchBarItem* item=[[[NSCustomTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
         MLTouchSurface* surface=[[[MLTouchSurface alloc] initWithFrame:NSMakeRect(0,0,685,30)] autorelease];
@@ -742,7 +744,7 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     }
     if ([identifier isEqual:@"touch.volume"]) {
         NSSliderTouchBarItem* item=[[[NSSliderTouchBarItem alloc] initWithIdentifier:identifier] autorelease];
-        item.slider.minValue=0; item.slider.maxValue=1; item.slider.continuous=YES;
+        item.minimumSliderWidth=20; item.slider.minValue=0; item.slider.maxValue=1; item.slider.continuous=YES;
         item.slider.doubleValue=nativePlaybackVolume(); item.slider.trackFillColor=touchAccent(); item.target=self; item.action=@selector(touchVolume:);
         NSLayoutConstraint* constraint=[item.slider.widthAnchor constraintGreaterThanOrEqualToConstant:220];
         constraint.identifier=@"MoonlightLG.TouchWidth"; constraint.active=YES;
@@ -876,9 +878,6 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
 }
 - (void)invalidateTouchBar {
     self.touchInvalidating=YES;
-    id system=objc_getAssociatedObject(self.streamTouchBar,&touchSystemControlsKey);
-    if (system) ((void(*)(id,SEL))objc_msgSend)(system,@selector(invalidate));
-    objc_setAssociatedObject(self.streamTouchBar,&touchSystemControlsKey,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [(MLTouchSurface*)objc_getAssociatedObject(self.streamTouchBar,&touchSurfaceKey) updateArtwork];
     if (self.touchFullWidthPresented) {
         self.touchFullWidthPresented=NO; touchDismissFullWidth(self.streamTouchBar);

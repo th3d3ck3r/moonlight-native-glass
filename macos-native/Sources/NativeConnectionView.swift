@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 import ObjectiveC.runtime
 
@@ -475,7 +476,7 @@ final class NativeTouchBarRow: NSView {
         }
         for (button, _) in entries where button.superview !== document { document.addSubview(button) }
         let total = entries.reduce(CGFloat(0)) { $0 + $1.1 } + CGFloat(max(0, entries.count - 1)) * 6
-        let gap: CGFloat = strip != nil && width >= 620 ? 96 : 6
+        let gap: CGFloat = strip != nil ? 96 : 6
         var split = 1, left: CGFloat = 0, right: CGFloat = 0, score = CGFloat.greatestFiniteMagnitude
         for candidate in 1..<entries.count {
             let l = entries.prefix(candidate).reduce(CGFloat(0)) { $0 + $1.1 } + CGFloat(candidate - 1) * 6
@@ -489,6 +490,15 @@ final class NativeTouchBarRow: NSView {
         more.frame = NSRect(x: origin + max(0, width - 30), y: 0, width: 30, height: 30)
         let viewport = max(0, width - (overflow ? 34 : 0))
         scroll.frame = NSRect(x: origin, y: 0, width: viewport, height: 30)
+        // Keep scrolling controls from ever painting over the stationary moon.
+        // The clear region belongs to the viewport, not to the moving document.
+        scroll.wantsLayer = true
+        if balanced {
+            let mask = CAShapeLayer(), path = CGMutablePath()
+            path.addRect(scroll.bounds)
+            path.addRect(CGRect(x: width / 2 - 48, y: 0, width: 96, height: 30))
+            mask.frame = scroll.bounds; mask.path = path; mask.fillRule = .evenOdd; scroll.layer?.mask = mask
+        } else { scroll.layer?.mask = nil }
         document.frame = NSRect(x: 0, y: 0, width: max(viewport, content), height: 30)
         var x = balanced ? document.frame.width / 2 - gap / 2 - left : max(0, (viewport - total) / 2)
         for (index, entry) in entries.enumerated() {
@@ -496,7 +506,8 @@ final class NativeTouchBarRow: NSView {
             entry.0.frame = NSRect(x: x, y: 0, width: entry.1, height: 30)
             x += entry.1 + 6
         }
-        moonEscape.isHidden = !balanced || overflow || !NativeTouchBarPresentation.enabled()
+        moonEscape.isHidden = !balanced || !NativeTouchBarPresentation.enabled()
+        addSubview(moonEscape, positioned: .above, relativeTo: scroll)
         let limit = max(0, document.frame.width - viewport)
         scroll.contentView.scroll(to: NSPoint(x: min(limit, max(0, scroll.contentView.bounds.origin.x)), y: 0))
         scroll.reflectScrolledClipView(scroll.contentView)
@@ -552,7 +563,6 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         var previous: NSTouchBar?
         var bar: NSTouchBar?
         var buttons: [String: NSButton] = [:]
-        private var systemControls: NativeTouchBarSystemControls?
         let presentation: NativeTouchBarPresentation.Session
         private let fullWidthEnabled: () -> Bool
         private let ownerEligible: (NSWindow) -> Bool
@@ -594,7 +604,6 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
         private func makeBar() -> NSTouchBar {
             let result = NSTouchBar(); result.delegate = self
             result.defaultItemIdentifiers = [.init("native.commandRow")]
-            if surfaceOwner != nil { result.defaultItemIdentifiers.append(.init("touch.system")) }
             // The row is the entire flexible app region, not a centered item.
             // principalItemIdentifier centers within the physical Touch Bar;
             // with the Control Strip present that can shift/clip this canvas.
@@ -694,7 +703,6 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             guard presentation.presented === candidate else { rejectModal(); return }
             strip?.setPresentationActive(false)
             surface.strip?.setPresentationActive(true)
-            surface.systemControls?.setActive(true)
             if !wasPresented {
                 let expected = generation
                 let work = DispatchWorkItem { [weak self, weak candidate, weak modalRow] in
@@ -727,7 +735,6 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             requestPresentation()
         }
         func detach() {
-            systemControls?.invalidate(); systemControls = nil
             detaching = true; generation += 1; presentationPending = false
             validationWork?.cancel(); validationWork = nil
             presentation.update(nil, enabled: false, eligible: false)
@@ -779,10 +786,6 @@ struct NativeTouchBarAccessory: NSViewRepresentable {
             button.needsDisplay = true
         }
         func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
-            if identifier.rawValue == "touch.system", surfaceOwner != nil {
-                let controls = NativeTouchBarSystemControls(); systemControls = controls
-                return controls.makeItem()
-            }
             guard identifier.rawValue == "native.commandRow" else { return nil }
             let item = NSCustomTouchBarItem(identifier: identifier)
             item.visibilityPriority = .high
