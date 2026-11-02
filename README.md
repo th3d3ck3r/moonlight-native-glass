@@ -21,7 +21,7 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
-Release preparation: **1.3.6.0 · Touch Bar graphs & Crimson Glass** is approved by the owner for publication. A fresh stable-labelled build 56 is being validated; GitHub release-create access remains blocked. The public downloads below remain 1.3.2.0 until the new assets are published.
+Release preparation: **1.3.6.0 · Touch Bar graphs & Crimson Glass** is approved by the owner for publication. Stable-labelled build 56 passed macOS/Xcode validation and is staged with complete source, checksums and release materials; GitHub release-create access remains blocked. The public downloads below remain 1.3.2.0 until the new assets are published.
 
 ### ✨ Coming in 1.3.6.0
 
