@@ -1,6 +1,7 @@
 #include "../../recording/AnnexB.h"
 #include "../../recording/RecorderABI.h"
 #include "../../recording/KeyframeRecovery.h"
+#include "../../recording/WriterReadiness.h"
 #include "../../recording/FragmentCollector.h"
 #include <cassert>
 #include "../../recording/BoundedQueue.h"
@@ -54,5 +55,31 @@ int main() {
     while(received<30000) {if(queue.pop(p)) {received++;total+=*p;} else std::this_thread::yield();}
     a.join();b.join();c.join();assert(done==3 && total==29999ULL*30000/2);
     assert(!queue.pop(p));
-    static_assert(MLG_RECORDER_ABI==4,"Explicit ABI version required");
+    static_assert(MLG_RECORDER_ABI==5,"Explicit ABI version required");
+
+    mlg::RecordingKeyframes periodic;
+    assert(!periodic.update(false,true,50000,1));
+    assert(!periodic.update(true,true,0,0));
+    assert(!periodic.update(true,true,100,1));
+    assert(!periodic.update(true,true,10099,1));
+    assert(!periodic.update(true,false,10100,1));
+    assert(periodic.update(true,true,10200,1));
+    assert(!periodic.update(true,true,10201,1));
+    assert(!periodic.update(true,true,12000,2)); // an appended keyframe restarts the cooldown
+    assert(!periodic.update(true,true,21999,2));
+    assert(periodic.update(true,true,22000,2));
+    assert(!periodic.update(true,true,31999,2));
+    assert(periodic.update(true,true,32000,2)); // missing response, still rate limited
+    assert(!periodic.update(false,true,40000,2));
+    assert(!periodic.update(true,true,45000,1)); // new clip
+
+    unsigned waits=0;
+    assert(mlg::waitForWriterReady(15, [] {return true;}, [&] {return waits==3;}, [&] {++waits;}));
+    assert(waits==3);
+    waits=0;
+    assert(!mlg::waitForWriterReady(15, [] {return true;}, [] {return false;}, [&] {++waits;}));
+    assert(waits==15);
+    waits=0;
+    assert(!mlg::waitForWriterReady(15, [&] {return waits<2;}, [] {return false;}, [&] {++waits;}));
+    assert(waits==2);
 }

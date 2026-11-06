@@ -63,7 +63,7 @@ static void verify(NSString* file,bool audio) {
 int main(int argc,char** argv) {
     @autoreleasepool {
         assert(argc==3);void* library=dlopen(argv[1],RTLD_NOW|RTLD_LOCAL);if(!library) {fprintf(stderr,"%s\n",dlerror());return 1;}
-        auto entry=reinterpret_cast<MLGRecorderEntry>(dlsym(library,"MoonlightLGRecorderGetAPI"));assert(entry && !entry(999) && !entry(2) && !entry(3));api=entry(MLG_RECORDER_ABI);assert(api && api->size==sizeof(*api));
+        auto entry=reinterpret_cast<MLGRecorderEntry>(dlsym(library,"MoonlightLGRecorderGetAPI"));assert(entry && !entry(999) && !entry(2) && !entry(3) && !entry(4));api=entry(MLG_RECORDER_ABI);assert(api && api->size==sizeof(*api));
         NSString* dir=[NSString stringWithUTF8String:argv[2]];
         [[NSFileManager defaultManager] removeItemAtPath:dir error:nullptr];
         MLGRecorderConfig cfg{};cfg.size=sizeof(cfg);cfg.abi=MLG_RECORDER_ABI;cfg.codec=1;cfg.width=640;cfg.height=360;cfg.fps=60;cfg.memory_megabytes=16;cfg.directory=argv[2];
@@ -77,7 +77,7 @@ int main(int argc,char** argv) {
         api->command(waiting,4);pauseMs(100);
         assert(state(waiting).failed && !state(waiting).waiting_keyframe && !api->interest(waiting));
         api->destroy(waiting);
-        cfg.replay_seconds=300;cfg.audio_rate=48000;cfg.audio_channels=2;cfg.audio_streams=1;cfg.audio_coupled=1;cfg.audio_frame_samples=960;cfg.audio_mapping[1]=1;
+        cfg.periodic_keyframes=1;cfg.replay_seconds=300;cfg.audio_rate=48000;cfg.audio_channels=2;cfg.audio_streams=1;cfg.audio_coupled=1;cfg.audio_frame_samples=960;cfg.audio_mapping[1]=1;
         void* recorder=api->create(&cfg);assert(recorder);api->command(recorder,1);pauseMs(100);assert(api->interest(recorder)&1);
         Source source{recorder,{}};VTCompressionSessionRef encoder=nullptr;
         assert(!VTCompressionSessionCreate(nullptr,640,360,kCMVideoCodecType_H264,nullptr,nullptr,nullptr,output,&source,&encoder));
@@ -95,7 +95,11 @@ int main(int argc,char** argv) {
         }
         CFRelease(image);VTCompressionSessionInvalidate(encoder);CFRelease(encoder);opus_encoder_destroy(opus);
         pauseMs(300);auto s=state(recorder);fprintf(stderr,"Source status: %s, drops %llu\n",s.message,(unsigned long long)s.dropped);assert(!s.failed && s.recording && s.replay_ready && !s.waiting_keyframe && source.fragmentedKeySeen);
-        api->command(recorder,2);pauseMs(100);api->command(recorder,1);pauseMs(100);api->destroy(recorder);
+        assert(s.written_keyframes>=2);
+        api->command(recorder,2);pauseMs(100);api->command(recorder,1);pauseMs(100);
+        assert(!state(recorder).written_keyframes && !state(recorder).can_request_keyframe);
+        api->destroy(recorder);
+        cfg.periodic_keyframes=0;
         unsigned recordings=0;for(NSString* file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nullptr]) if([file.pathExtension isEqual:@"mov"]) {verify([dir stringByAppendingPathComponent:file],true);recordings++;}assert(recordings==2);
         // Record/stop/record with replay OFF and a timestamp gap. The second
         // audio decoder must re-anchor rather than omit audio until it catches up.

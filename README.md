@@ -21,7 +21,7 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
-The current development build restores the previous Original Stream Quality recording behavior by removing periodic host keyframe requests.
+The current development build offers an off-by-default experimental keyframe toggle in Recording settings for Original Stream Quality. Source-copy recording briefly retries a busy file writer on the recorder worker.
 
 Recorder diagnostics in the current development build are saved to `~/Library/Logs/MoonlightLG/recording.log`.
 

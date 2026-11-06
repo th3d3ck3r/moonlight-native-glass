@@ -369,6 +369,7 @@ private struct RecordingSettings: View {
     private static let defaults = UserDefaults(suiteName: "com.moonlight-stream.NativeGlass.Recording")!
     @AppStorage("enabled", store: defaults) private var enabled = false
     @AppStorage("mode", store: defaults) private var mode = 0
+    @AppStorage("periodicKeyframes", store: defaults) private var periodicKeyframes = false
     @AppStorage("codec", store: defaults) private var codec = 1
     @AppStorage("resolution", store: defaults) private var resolution = 0
     @AppStorage("fps", store: defaults) private var fps = 0
@@ -388,6 +389,9 @@ private struct RecordingSettings: View {
             }
             if mode == 0 {
                 Text("Copies H.264 or HEVC video without a second video encode. Resolution, frame rate and bitrate follow the host stream. Recording and replay request a host keyframe when needed, with limited retries. A keyframe can briefly increase bandwidth; no second video encode is performed.").foregroundStyle(.secondary)
+                Toggle("Request Keyframes for Seeking (Experimental)", isOn: $periodicKeyframes)
+                    .accessibilityIdentifier("recording-periodic-keyframes")
+                Text("During Original Stream Quality recording, asks the host for a keyframe at most once every 10 seconds. The host controls when a keyframe arrives. Applies to the next stream.").foregroundStyle(.secondary)
             } else {
                 Picker("Codec", selection: $codec) { Text("H.264").tag(1); Text("HEVC").tag(2) }
                 Picker("Resolution", selection: $resolution) {

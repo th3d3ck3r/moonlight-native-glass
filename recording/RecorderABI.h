@@ -7,7 +7,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define MLG_RECORDER_ABI 4u
+#define MLG_RECORDER_ABI 5u
 #define MLG_RECORDER_MAX_CHUNKS 65536u
 #define MLG_RECORDER_MAX_FRAME_BYTES (32u*1024u*1024u)
 enum MLGRecorderRejection {
@@ -22,17 +22,19 @@ typedef struct {
     uint32_t replay_seconds, memory_megabytes, audio_rate, audio_channels;
     uint32_t audio_streams, audio_coupled, audio_frame_samples; uint8_t audio_mapping[8];
     const char* directory; /* copied by create; local filesystem path */
+    uint32_t periodic_keyframes; /* opt-in source-copy recording only */
 } MLGRecorderConfig;
 typedef struct {
     uint32_t size, active, recording, buffering, replay_ready, saving, failed, waiting_keyframe;
-    uint64_t elapsed_seconds, buffered_seconds, dropped;
+    uint64_t elapsed_seconds, buffered_seconds, dropped, written_keyframes;
+    uint32_t can_request_keyframe;
     char message[512];
 } MLGRecorderStatus;
 typedef struct {
     uint32_t size, abi;
     void* (*create)(const MLGRecorderConfig*);
     void (*destroy)(void*); /* after ingress stopped; drains/finalizes */
-    void (*command)(void*, uint32_t); /* 1 toggle record, 2 save replay, 3 stop, 4 keyframe timeout */
+    void (*command)(void*, uint32_t); /* 1 toggle record, 2 save replay, 3 stop, 4 keyframe timeout, 5 log optional request */
     uint32_t (*interest)(void*); /* bit1 compressed, bit2 decoded, bit4 audio */
     int (*video)(void*, const MLGRecorderChunk*, size_t, uint32_t rtp90k, uint64_t clock_us, int key);
     int (*pixel)(void*, void* cv_pixel_buffer, uint32_t rtp90k, uint64_t clock_us, int hdr);

@@ -5,7 +5,9 @@
 #include "RecorderABI.h"
 #include "AnnexB.h"
 #include "BoundedQueue.h"
+#include "WriterReadiness.h"
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <thread>
 #include <deque>
@@ -21,6 +23,11 @@
 
 namespace {
 constexpr size_t MaxIngress=MLG_RECORDER_MAX_FRAME_BYTES, MaxPackets=256;
+
+uint64_t steadyMilliseconds() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 struct Spool {
     int fd=-1; off_t end=0;
     explicit Spool(NSString* directory) {
@@ -119,15 +126,21 @@ struct Movie {
         if (![writer startWriting]) { error=writer.error.localizedDescription.UTF8String ?: "Cannot start recording"; return false; }
         [writer startSessionAtSourceTime:CMTimeMake(start,90000)]; ready=true; return true;
     }
-    bool append(SamplePtr sample, bool realtime, std::string& error) {
+    bool append(SamplePtr sample, bool realtime, std::string& error, std::atomic<uint64_t>* writerWait=nullptr) {
         if (sample->pts<start) return true;
         AVAssetWriterInput* track=sample->video ? video : audio;
         if (!track) return true;
-        // Export runs on its own thread; live ingestion never waits for a writer.
-        for (unsigned i=0; !realtime && !track.readyForMoreMediaData && writer.status==AVAssetWriterStatusWriting && i<500; ++i)
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // Live source-copy samples stay in order on the recorder worker during
+        // a short stall. Ingress keeps its existing bounded, nonblocking queue.
         CMSampleBufferRef buffer=sample->read();
-        const bool readyForSample=buffer && track.readyForMoreMediaData;
+        const unsigned retries=realtime ? (writerWait ? 15 : 0) : 500;
+        const bool readyForSample=buffer && mlg::waitForWriterReady(retries,
+            [&] {return writer.status==AVAssetWriterStatusWriting;},
+            [&] {return track.readyForMoreMediaData;},
+            [&] {
+                if(writerWait) writerWait->store(steadyMilliseconds());
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            });
         const bool appended=readyForSample && [track appendSampleBuffer:buffer];
         if(buffer) CFRelease(buffer);
         if (!appended) {
@@ -171,6 +184,9 @@ struct Recorder {
     std::atomic<unsigned> interest{0};
     std::atomic<uint32_t> overflow{0};
     std::atomic<uint64_t> drops{0};
+    std::atomic<uint64_t> lastVideoWriteMs{0}, lastWriterWaitMs{0};
+    uint64_t writtenKeyframes=0;
+    bool logNextKeyframe=false;
     MLGRecorderStatus current{};
     bool recordWanted=false, replay=false, waitKey=true;
     std::shared_ptr<Movie> movie;
@@ -227,11 +243,12 @@ struct Recorder {
         current.active=interest.load()!=0; current.recording=recordWanted; current.buffering=replay;
         current.replay_ready=!ring.empty(); current.dropped=drops.load();
         current.waiting_keyframe=cfg.mode==0 && !current.failed && ((recordWanted && !movie) || (replay && ring.empty()));
+        current.written_keyframes=writtenKeyframes;
         current.elapsed_seconds=movie && lastVideo>=movie->start ? (lastVideo-movie->start)/90000 : 0;
         current.buffered_seconds=ring.empty() || lastVideo<ring.front()->pts ? 0 : (lastVideo-ring.front()->pts)/90000;
         snprintf(current.message,sizeof(current.message),"%s",message);
     }
-    void logFailure(NSString* phase, const char* message, NSString* output=nil) {
+    void logRecorderEvent(NSString* phase, const char* message, NSString* output=nil) {
         @autoreleasepool {
             NSString* reason=message ? [NSString stringWithUTF8String:message] : nil;
             NSString* entry=[NSString stringWithFormat:@"%@ %@ file=%@ mode=%@ codec=%u video=%ux%u@%u queued=%zu dropped=%llu: %@\n",
@@ -257,13 +274,13 @@ struct Recorder {
     }
     void workerFailure(const char* detail, const char* status) {
         interest.store(0);
-        logFailure(@"recording worker",detail,movie ? movie->path : nil);
+        logRecorderEvent(@"recording worker",detail,movie ? movie->path : nil);
         std::lock_guard<std::mutex> l(statusMutex);
         current.failed=1;
         snprintf(current.message,sizeof(current.message),"%s",status);
     }
     void fail(const char* text) {
-        logFailure(@"recording stop",text,movie ? movie->path : nil);
+        logRecorderEvent(@"recording stop",text,movie ? movie->path : nil);
         interest.store(0); replay=false; recordWanted=false;
         { std::lock_guard<std::mutex> l(statusMutex); current.failed=1; }
         finishMovie();releaseEncoder();resetAudio(); update(text);
@@ -312,10 +329,14 @@ struct Recorder {
         return [directory stringByAppendingPathComponent:[NSString stringWithFormat:@"MoonlightLG-%@-%@.mov",kind,NSUUID.UUID.UUIDString]];
     }
     void finishMovie() {
-        auto ending=movie; movie.reset(); if(!ending) return;
+        auto ending=movie; movie.reset();
+        writtenKeyframes=0;
+        lastVideoWriteMs.store(0);
+        logNextKeyframe=false;
+        if(!ending) return;
         dispatch_group_enter(exports);
         ending->finish([this,ending](bool ok,NSString* result) {
-            if(!ok) logFailure(@"recording finalize",result.UTF8String,ending->path);
+            if(!ok) logRecorderEvent(@"recording finalize",result.UTF8String,ending->path);
             { std::lock_guard<std::mutex> l(statusMutex); if(!ok) current.failed=1; snprintf(current.message,sizeof(current.message),"%s",result.UTF8String ?: "Finished"); }
             dispatch_group_leave(exports);
         });
@@ -336,12 +357,12 @@ struct Recorder {
                 if(ok) {
                     dispatch_group_enter(exports);
                     output->finish([this,output](bool success,NSString* result) {
-                        if(!success) logFailure(@"replay finalize",result.UTF8String,output->path);
+                        if(!success) logRecorderEvent(@"replay finalize",result.UTF8String,output->path);
                         { std::lock_guard<std::mutex> l(statusMutex); current.saving=0; if(!success) current.failed=1; snprintf(current.message,sizeof(current.message),"%s",result.UTF8String); }
                         dispatch_group_leave(exports);
                     });
                 } else {
-                    logFailure(@"replay export",error.c_str(),file);
+                    logRecorderEvent(@"replay export",error.c_str(),file);
                     std::lock_guard<std::mutex> l(statusMutex); current.saving=0; current.failed=1; snprintf(current.message,sizeof(current.message),"%s",error.c_str());
                 }
             }
@@ -359,7 +380,23 @@ struct Recorder {
                 if(!file || !movie->open(file,sample,cfg.audio_rate,cfg.audio_channels,error)) { fail(file ? error.c_str() : "Cannot create recording folder"); return; }
             }
         } else if(waitKey && !movie) return;
-        if(movie) { std::string error; if(!movie->append(sample,true,error)) { fail(error.c_str()); return; } }
+        if(movie) {
+            std::string error;
+            if(!movie->append(sample,true,error,cfg.mode==0 ? &lastWriterWaitMs : nullptr)) {
+                fail(error.c_str());
+                return;
+            }
+            if(cfg.mode==0 && cfg.periodic_keyframes && sample->video) {
+                lastVideoWriteMs.store(steadyMilliseconds());
+                if(sample->key) {
+                    ++writtenKeyframes;
+                    if(logNextKeyframe) {
+                        logRecorderEvent(@"seek keyframe written","Host keyframe saved",movie->path);
+                        logNextKeyframe=false;
+                    }
+                }
+            }
+        }
         if(replay && !waitKey) {
             if(cfg.replay_seconds>60) {
                 if(!spool || (sample->video && sample->key)) spool=std::make_shared<Spool>(directory);
@@ -556,7 +593,12 @@ struct Recorder {
                         refreshInterest(); update(recordWanted ? "Waiting for next keyframe" : "Recording stopped");
                     } else if(input->kind==12) saveReplay();
                     else if(input->kind==14) fail("Host did not provide a usable keyframe after three requests. Try Custom Hardware Encoding or reconnect.");
-                    else { recordWanted=false; replay=false; interest.store(0); finishMovie(); update("Stopped"); }
+                    else if(input->kind==15) {
+                        if(movie && cfg.mode==0 && cfg.periodic_keyframes) {
+                            logNextKeyframe=true;
+                            logRecorderEvent(@"seek keyframe requested","Optional host request",movie->path);
+                        }
+                    } else { recordWanted=false; replay=false; interest.store(0); finishMovie(); update("Stopped"); }
                 } else if(interest.load()) {
                     if(input->kind==1) compressed(*input);
                     else if(input->kind==2) decoded(*input);
@@ -582,7 +624,7 @@ void destroy(void* p) {delete static_cast<Recorder*>(p);}
 void command(void* p,uint32_t c) {
     auto self=static_cast<Recorder*>(p); auto input=std::make_unique<Input>();input->kind=10+c;
     // UI thread only; bounded retry is handled by reporting failure, never a playback wait.
-    if(!self->enqueue(std::move(input),0,true)) {std::lock_guard<std::mutex> l(self->statusMutex);snprintf(self->current.message,sizeof(self->current.message),"Recorder busy; try the button again");}
+    if(!self->enqueue(std::move(input),0,true) && c!=5) {std::lock_guard<std::mutex> l(self->statusMutex);snprintf(self->current.message,sizeof(self->current.message),"Recorder busy; try the button again");}
 }
 uint32_t interest(void* p) {return static_cast<Recorder*>(p)->interest.load(std::memory_order_relaxed);}
 int videoImpl(void* p,const MLGRecorderChunk* chunks,size_t count,uint32_t rtp,uint64_t clock,int key) {
@@ -621,7 +663,17 @@ int audio(void* p,const void* data,size_t size,uint64_t clock) {
 }
 void status(void* p,MLGRecorderStatus* out) {
     auto self=static_cast<Recorder*>(p);if(!out||out->size!=sizeof(*out)) return;
-    std::lock_guard<std::mutex> l(self->statusMutex);*out=self->current;
+    {
+        std::lock_guard<std::mutex> l(self->statusMutex);
+        *out=self->current;
+    }
+    if(!self->cfg.periodic_keyframes || !out->recording || out->failed || out->saving || !out->written_keyframes) return;
+    const uint64_t lastVideo=self->lastVideoWriteMs.load();
+    const uint64_t lastWait=self->lastWriterWaitMs.load();
+    const uint64_t now=steadyMilliseconds();
+    out->can_request_keyframe=lastVideo && now-lastVideo<2000 &&
+        (!lastWait || now-lastWait>=3000) &&
+        !self->overflow.load() && self->queuedBytes.load()<MaxIngress/16;
 }
 void reject(void* p,uint32_t reason) {static_cast<Recorder*>(p)->overload(reason ? reason : uint32_t(MLG_REJECT_INVALID_FRAME));}
 const MLGRecorderAPI api={sizeof(api),MLG_RECORDER_ABI,create,destroy,command,interest,video,pixel,audio,status,reject};

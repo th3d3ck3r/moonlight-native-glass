@@ -211,7 +211,7 @@ import XCTest
         let about = app.descendants(matching: .any)["native-about"].firstMatch
         XCTAssertTrue(about.waitForExistence(timeout: 10))
         XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", "MoonlightLG", "MoonlightLG")).firstMatch.exists)
-        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "1.3.6.2", "1.3.6.2")).firstMatch.exists)
+        XCTAssertTrue(about.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "1.3.7.0", "1.3.7.0")).firstMatch.exists)
         XCTAssertTrue(about.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Moonlight Qt 6.2.0")).firstMatch.exists)
         let shot = XCTAttachment(screenshot: about.screenshot())
         shot.name = "moonlightlg-about-version"; shot.lifetime = .keepAlways; add(shot)
@@ -253,6 +253,7 @@ import XCTest
             }
             if screen == "settings-recording" {
                 XCTAssertTrue(window.descendants(matching: .any)["recording-enabled"].firstMatch.exists, "Recording opt-in missing")
+                XCTAssertTrue(window.descendants(matching: .any)["recording-periodic-keyframes"].firstMatch.exists, "Seek keyframe opt-in missing")
             }
             if screen == "settings-shortcuts" {
                 XCTAssertTrue(window.staticTexts["Close Stream Window"].exists, "Shortcut bindings missing")

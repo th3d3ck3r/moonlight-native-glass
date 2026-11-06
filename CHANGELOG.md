@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.7.0U — Experimental seek keyframes
+
+- Add an off-by-default Original Stream Quality toggle that requests host keyframes at most once every 10 seconds while the recorder is keeping up. Missing responses do not fail the recording.
+- Allow a short writer-readiness retry on the recorder worker for source-copy samples. Keep the ingress queue bounded and log optional requests and subsequently written keyframes to `recording.log`.
+- Internal build 59, recorder ABI 5. Real-host recording and seeking still need acceptance.
+
 ## 🌙 1.3.6.2U — Recorder diagnostics
 
 - Log recording and replay failures to `~/Library/Logs/MoonlightLG/recording.log` with the clip filename, media position for writer errors, and the writer’s error code when available.
