@@ -1,4 +1,4 @@
-name: Prepare MoonlightLG Release Bundle
+name: Publish MoonlightLG 1.3.7.1
 on:
   push:
     branches: [feature/recording-plugin]
@@ -11,17 +11,20 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare:
-    if: contains(github.event.head_commit.message, '[prepare stable]')
+    if: contains(github.event.head_commit.message, '[publish stable 1.3.7.1]')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    outputs:
+      artifact-id: ${{ steps.bundle.outputs.artifact-id }}
+      artifact-digest: ${{ steps.bundle.outputs.artifact-digest }}
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VALIDATED_SHA: 11ed502e0b301ac632d92eaa7fd23f3322c127ed
-      BUILD_RUN: '41388931149'
-      XCODE_RUN: '41388931202'
-      RELEASE_TAG: moonlightlg-v1.3.6.0
-      VERSION: '1.3.6.0'
+      VALIDATED_SHA: 22e329f252591b0c6b552ded511c6450b107a1ea
+      BUILD_RUN: '42298180675'
+      XCODE_RUN: '42298180681'
+      RELEASE_TAG: moonlightlg-v1.3.7.1
+      VERSION: '1.3.7.1'
     steps:
       - uses: actions/checkout@v5
       - name: Verify stable metadata and exact validated source
@@ -36,28 +39,33 @@ jobs:
             done
             return 1
           }
-          fetch_json "repos/$GH_REPO/actions/runs/$BUILD_RUN" /tmp/build-run.json
-          fetch_json "repos/$GH_REPO/actions/runs/$XCODE_RUN" /tmp/xcode-run.json
+          for run in "$BUILD_RUN" "$XCODE_RUN"; do
+            for attempt in $(seq 1 48); do
+              fetch_json "repos/$GH_REPO/actions/runs/$run" "/tmp/$run.json"
+              if test "$(jq -r .status "/tmp/$run.json")" = completed; then break; fi
+              sleep 25
+            done
+            test "$(jq -r .conclusion "/tmp/$run.json")" = success
+          done
+          mv "/tmp/$BUILD_RUN.json" /tmp/build-run.json
+          mv "/tmp/$XCODE_RUN.json" /tmp/xcode-run.json
           python3 - <<'PY'
           import json, os, plistlib
           info = plistlib.load(open('macos-native/Info.plist', 'rb'))
           assert info['MoonlightLGReleaseChannel'] == 'stable', 'U/E builds must not be published as stable'
           assert info['MoonlightLGVersion'] == os.environ['VERSION']
-          assert info['CFBundleVersion'] == '56'
+          assert info['CFBundleVersion'] == '61'
           for path, name in [('/tmp/build-run.json', 'MoonlightLG macOS Validation'), ('/tmp/xcode-run.json', 'MoonlightLG Xcode Project Validation')]:
               run = json.load(open(path))
               assert run['head_sha'] == os.environ['VALIDATED_SHA']
               assert run['head_branch'] == 'feature/recording-plugin'
               assert run['status'] == 'completed' and run['conclusion'] == 'success' and run['name'] == name
-          # Complete run success covers the matrix and its required tests. GitHub's
-          # historical job-details endpoint currently returns 502 for this run.
-          # Exact-source artifact, architecture and source checks remain below.
           PY
           git fetch --no-tags --depth=1 origin "$VALIDATED_SHA"
           git diff --name-only "$VALIDATED_SHA" "$GITHUB_SHA" > /tmp/release-changes.txt
           python3 - <<'PY'
           paths = open('/tmp/release-changes.txt').read().splitlines()
-          assert all(p in ['README.md', 'CHANGELOG.md'] or p.startswith(('docs/', '.github/workflows/')) for p in paths), paths
+          assert paths == ['.github/workflows/publish-native-preview.yml'], paths
           PY
           test "$(gh api "repos/$GH_REPO/git/ref/heads/feature/recording-plugin" --jq .object.sha)" = "$GITHUB_SHA"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then echo 'Release already exists; refusing to replace it.' >&2; exit 1; fi
@@ -136,7 +144,7 @@ jobs:
               assert any(name.startswith(prefix + path) for name in files), 'Missing bundled submodule source: ' + path
           with zipfile.ZipFile(root / f"MoonlightLG-{os.environ['VERSION']}-arm64.zip") as package:
               info = plistlib.loads(package.read('MoonlightLG.app/Contents/Info.plist'))
-              assert (info['MoonlightLGVersion'], info['MoonlightLGReleaseChannel'], info['CFBundleVersion']) == (os.environ['VERSION'], 'stable', '56')
+              assert (info['MoonlightLGVersion'], info['MoonlightLGReleaseChannel'], info['CFBundleVersion']) == (os.environ['VERSION'], 'stable', '61')
               count = 0
               for name in package.namelist():
                   if package.getinfo(name).file_size < 8: continue
@@ -166,36 +174,18 @@ jobs:
           shutil.copyfile(overlays[0], root / 'overlay-controls-dark.png')
           PY
           cat release-assets/SHA256SUMS.txt
-      - name: Stage authorized release bundle without release-write permissions
-        run: |
-          cp docs/RELEASE_1.3.6.0.md release-assets/RELEASE_NOTES.md
-          cp docs/README_1.3.6.0_RELEASE.md release-assets/README_AFTER_PUBLICATION.md
-          python3 - <<'PY'
-          import json, os, pathlib
-          root = pathlib.Path('release-assets')
-          files = {p.name: p.stat().st_size for p in root.iterdir() if p.is_file()}
-          (root / 'PREPARATION.json').write_text(json.dumps({
-              'version': os.environ['VERSION'], 'build': 56,
-              'validated_commit': os.environ['VALIDATED_SHA'],
-              'macos_run': int(os.environ['BUILD_RUN']), 'xcode_run': int(os.environ['XCODE_RUN']),
-              'publication_hold': False, 'owner_go_required': False,
-              'owner_publication_authorized': True,
-              'publication_access_resolved': False, 'publication_blocked': True,
-              'github_draft_created': False,
-              'draft_creation_blocker': 'GitHub release creation returned HTTP 403 Resource not accessible by integration.',
-              'public_release_unchanged': 'moonlightlg-v1.3.2.0',
-              'files': files
-          }, indent=2) + '\n')
-          PY
+      - name: Stage verified release notes
+        run: cp docs/RELEASE_1.3.7.1.md release-assets/RELEASE_NOTES.md
       - uses: actions/upload-artifact@v6
+        id: bundle
         with:
-          name: MoonlightLG-1.3.6.0-Release-Ready
+          name: MoonlightLG-1.3.7.1-Release-Ready
           path: release-assets/*
           if-no-files-found: error
           retention-days: 90
 
   publish:
-    if: contains(github.event.head_commit.message, '[publish stable]')
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -204,41 +194,27 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VALIDATED_SHA: 11ed502e0b301ac632d92eaa7fd23f3322c127ed
-      RELEASE_TAG: moonlightlg-v1.3.6.0
-      PREP_RUN: '41390729937'
-      PREP_ARTIFACT: '13116774963'
+      VALIDATED_SHA: 22e329f252591b0c6b552ded511c6450b107a1ea
+      RELEASE_TAG: moonlightlg-v1.3.7.1
+      PREP_ARTIFACT: ${{ needs.prepare.outputs.artifact-id }}
+      PREP_DIGEST: ${{ needs.prepare.outputs.artifact-digest }}
     steps:
-      - uses: actions/checkout@v5
-      - name: Verify the approved tag target and staged assets
+      - name: Verify and download the staged bundle
         run: |
-          git fetch --no-tags --depth=1 origin "$VALIDATED_SHA"
-          git diff --name-only "$VALIDATED_SHA" "$GITHUB_SHA" > /tmp/tag-diff
-          python3 - <<'PY'
-          from pathlib import Path
-          allowed = {'README.md', 'CHANGELOG.md', 'docs/RELEASE_1.3.6.0_PREPARATION.md', '.github/workflows/publish-native-preview.yml'}
-          changed = set(Path('/tmp/tag-diff').read_text().splitlines())
-          assert changed <= allowed, changed - allowed
-          PY
           test "$(gh api "repos/$GH_REPO/git/ref/heads/feature/recording-plugin" --jq .object.sha)" = "$GITHUB_SHA"
-          test "$(gh api "repos/$GH_REPO/actions/runs/$PREP_RUN" --jq .conclusion)" = success
-          test "$(gh api "repos/$GH_REPO/actions/artifacts/$PREP_ARTIFACT" --jq .digest)" = 'sha256:ef37198a2e0e6798bb085511dbf661455c06a9e4e703b5601d964c053d34e4bb'
-          test "$(gh api "repos/$GH_REPO/actions/artifacts/$PREP_ARTIFACT" --jq .expired)" = false
-          gh run download "$PREP_RUN" --name MoonlightLG-1.3.6.0-Release-Ready --dir release-assets
-          (
-            cd release-assets
-            sha256sum --check <<'CHECKSUMS'
-          e9f567b3ccec0e9391a3e39df9c97171e290f1244af83db3fc0c58678505ffd3  MoonlightLG-1.3.6.0-arm64.zip
-          5b8af324bb6cd3b5323305f4e5e3c5b4420cdd932f2f4406883199a2ac5e84fd  MoonlightLG-1.3.6.0-source.tar.gz
-          CHECKSUMS
-          )
+          artifact="repos/$GH_REPO/actions/artifacts/$PREP_ARTIFACT"
+          test "$(gh api "$artifact" --jq .digest)" = "sha256:${PREP_DIGEST#sha256:}"
+          test "$(gh api "$artifact" --jq .workflow_run.id)" = "$GITHUB_RUN_ID"
+          test "$(gh api "$artifact" --jq .expired)" = false
+          gh run download "$GITHUB_RUN_ID" --name MoonlightLG-1.3.7.1-Release-Ready --dir release-assets
+          (cd release-assets && sha256sum --check SHA256SUMS.txt)
       - name: Create a draft and verify its uploaded assets
         run: |
           test "$(gh api --paginate "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$RELEASE_TAG\") | .id")" = ''
           test "$(gh api "repos/$GH_REPO/git/matching-refs/tags/$RELEASE_TAG" --jq ".[] | select(.ref == \"refs/tags/$RELEASE_TAG\") | .ref")" = ''
           assets=(
-            release-assets/MoonlightLG-1.3.6.0-arm64.zip
-            release-assets/MoonlightLG-1.3.6.0-source.tar.gz
+            release-assets/MoonlightLG-1.3.7.1-arm64.zip
+            release-assets/MoonlightLG-1.3.7.1-source.tar.gz
             release-assets/SHA256SUMS.txt
             release-assets/LICENSE.txt
             release-assets/THIRD_PARTY_NOTICES.txt
@@ -252,7 +228,7 @@ jobs:
           )
           sha256sum "${assets[@]}" > /tmp/release-assets.sha256
           gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --draft \
-            --title '🌙 MoonlightLG 1.3.6.0 · Crimson Glass' \
+            --title '🌙 MoonlightLG 1.3.7.1 · Crimson Glass' \
             --notes-file release-assets/RELEASE_NOTES.md "${assets[@]}"
           release_id="$(gh api --paginate "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$RELEASE_TAG\") | .id")"
           [[ "$release_id" =~ ^[0-9]+$ ]]
