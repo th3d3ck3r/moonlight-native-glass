@@ -1,12 +1,12 @@
 # MoonlightLG changelog
 
-## 🌙 1.3.6.0 — publication approved, access blocked
+## 🌙 1.3.6.0 — Crimson Glass
 
 - Promote the validated build 55 functionality to stable-labelled build 56 with no feature changes; the app is rebuilt with stable metadata rather than relabelling a U ZIP.
 - Includes three-minute Touch Bar graphs, preserved layout/buttons and the build 54 Audio/Back/moon repairs.
-- Prepare release notes and the emoji-styled README, complete corresponding source, checksums, notices and screenshots. Public links remain on 1.3.2.0 until publication succeeds.
+- Publish the Apple Silicon app, complete corresponding source, checksums, notices and screenshots.
 - Stable build 56 passed exact-source ARM/Intel/Universal macOS and Xcode validation. The read-only release bundle verified 107 ARM64 binaries and 36 dependency-source archives.
-- Owner authorized publication. The prior GitHub release-create HTTP 403 remains unresolved; do not bypass it through alternate credentials, interfaces or targets.
+- GitHub Actions verified all 12 uploaded assets and marked [1.3.6.0](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/moonlightlg-v1.3.6.0) latest. The owner approved the workflow commit as the tag target.
 
 ## 🌙 1.3.6.0U — Touch Bar stats graphs
 
