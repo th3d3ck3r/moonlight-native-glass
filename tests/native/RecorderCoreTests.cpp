@@ -1,4 +1,5 @@
 #include "../../recording/AnnexB.h"
+#include "../../recording/SourceVideoTiming.h"
 #include "../../recording/RecorderABI.h"
 #include "../../recording/KeyframeRecovery.h"
 #include "../../recording/WriterReadiness.h"
@@ -44,6 +45,27 @@ int main() {
     assert(mlg::annexB(sample+4,2).empty());
     assert(mlg::extendRtp(5,0xfffffffa,1000)==1011);
     assert(mlg::extendRtp(95,100,1000)==995);
+    using TimingResult=mlg::SourceVideoTiming::Result;
+    mlg::SourceVideoTiming timing;
+    int64_t previous=-1;
+    auto expectTime=[&](int64_t raw, int64_t expected, TimingResult result) {
+        assert(timing.normalize(raw,previous,60)==result);
+        assert(raw==expected);
+        if(result!=TimingResult::Discontinuity) previous=raw;
+    };
+    expectTime(0,0,TimingResult::Unchanged);
+    expectTime(1500,1500,TimingResult::Unchanged);
+    expectTime(1500,2250,TimingResult::RepairStarted);
+    expectTime(0,3000,TimingResult::RepairContinued);
+    expectTime(3100,3750,TimingResult::RepairContinued);
+    expectTime(4500,4500,TimingResult::Unchanged);
+    expectTime(9000,9000,TimingResult::Unchanged); // Preserve a real gap.
+    expectTime(2999,2999,TimingResult::Discontinuity);
+    expectTime(9000,9750,TimingResult::RepairStarted);
+    for(unsigned i=0;i<7;i++)
+        expectTime(previous,previous+750,TimingResult::RepairContinued);
+    expectTime(previous,previous,TimingResult::Discontinuity);
+
     mlg::BoundedQueue<std::unique_ptr<unsigned>,64> queue;
     std::atomic<unsigned> done{0};
     auto producer=[&](unsigned base) {

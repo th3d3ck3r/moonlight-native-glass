@@ -36,12 +36,17 @@ static void output(void* ref,void*,OSStatus error,VTEncodeInfoFlags,CMSampleBuff
         source->keyBytes=bytes;
     }
     uint32_t rtp=uint32_t(CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(sample),90000,kCMTimeRoundingMethod_Default).value);
+    const uint64_t clock=1000000+uint64_t(rtp)*1000000/90000;
+    // Inject a repeated then backward RTP timestamp after the second IDR,
+    // with the encoded access units and receive clock still in order.
+    if(rtp==61*1500) rtp=60*1500;
+    else if(rtp==62*1500) rtp=59*1500;
     size_t count=std::min(size_t(1024),bytes.size());std::vector<MLGRecorderChunk> chunks;
     for(size_t i=0;i<count;i++) {size_t start=bytes.size()*i/count,end=bytes.size()*(i+1)/count;chunks.push_back({bytes.data()+start,end-start});}
     if(key && count>128) source->fragmentedKeySeen=true;
-    assert(api->video(source->recorder,chunks.data(),chunks.size(),rtp,1000000+uint64_t(rtp)*1000000/90000,key));
+    assert(api->video(source->recorder,chunks.data(),chunks.size(),rtp,clock,key));
 }
-static void verify(NSString* file,bool audio) {
+static void verify(NSString* file,bool audio,unsigned expectedFrames=0) {
     AVURLAsset* asset=[AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:file] options:nil];
     NSArray* video=[asset tracksWithMediaType:AVMediaTypeVideo];assert(video.count==1);
     assert(CMTimeGetSeconds(asset.duration)>1);
@@ -51,6 +56,7 @@ static void verify(NSString* file,bool audio) {
     unsigned frames=0;double last=-1;
     while(CMSampleBufferRef sample=[track copyNextSampleBuffer]) {double t=CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample));assert(t>=last);last=t;frames++;CFRelease(sample);}
     assert(reader.status==AVAssetReaderStatusCompleted && frames>30);
+    if(expectedFrames) assert(frames==expectedFrames);
     if(audio) {
         NSArray* tracks=[asset tracksWithMediaType:AVMediaTypeAudio];assert(tracks.count==1);
         assert(fabs(CMTimeGetSeconds(((AVAssetTrack*)tracks[0]).timeRange.duration)-CMTimeGetSeconds(((AVAssetTrack*)video[0]).timeRange.duration))<0.12);
@@ -100,7 +106,7 @@ int main(int argc,char** argv) {
         assert(!state(recorder).written_keyframes && !state(recorder).can_request_keyframe);
         api->destroy(recorder);
         cfg.periodic_keyframes=0;
-        unsigned recordings=0;for(NSString* file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nullptr]) if([file.pathExtension isEqual:@"mov"]) {verify([dir stringByAppendingPathComponent:file],true);recordings++;}assert(recordings==2);
+        unsigned recordings=0;for(NSString* file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nullptr]) if([file.pathExtension isEqual:@"mov"]) {verify([dir stringByAppendingPathComponent:file],true,240);recordings++;}assert(recordings==2);
         // Record/stop/record with replay OFF and a timestamp gap. The second
         // audio decoder must re-anchor rather than omit audio until it catches up.
         cfg.replay_seconds=0;

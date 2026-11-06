@@ -1,5 +1,10 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.7.1U — Source recording timestamp repair
+
+- Keep Original Stream Quality recording through brief repeated or backward host timestamps. Preserve encoded frames and keyframes, return to host timing when it catches up, and log larger discontinuities.
+- Internal build 60. Real-host recording and seeking still need acceptance.
+
 ## 🌙 1.3.7.0U — Experimental seek keyframes
 
 - Add an off-by-default Original Stream Quality toggle that requests host keyframes at most once every 10 seconds while the recorder is keeping up. Missing responses do not fail the recording.

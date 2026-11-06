@@ -6,6 +6,7 @@
 #include "AnnexB.h"
 #include "BoundedQueue.h"
 #include "WriterReadiness.h"
+#include "SourceVideoTiming.h"
 #include <atomic>
 #include <chrono>
 #include <mutex>
@@ -202,6 +203,8 @@ struct Recorder {
     uint32_t lastRtp=0;
     int64_t ticks=0, lastVideo=-1, audioTicks=0;
     bool haveRtp=false, haveAudio=false;
+    mlg::SourceVideoTiming sourceVideoTiming;
+    uint64_t lastTimingRepairLogMs=0;
     VTCompressionSessionRef encoder=nullptr;
     VTPixelTransferSessionRef transfer=nullptr;
     CVPixelBufferPoolRef pool=nullptr;
@@ -448,7 +451,22 @@ struct Recorder {
             if(format) CFRelease(format); format=fresh;
         }
         if(payload.empty()) return;
-        if(lastVideo>=0 && pts<=lastVideo) { fail("Reordered stream timestamps require Custom Hardware Encoding"); return; }
+        const int64_t rawPts=pts;
+        using TimingResult=mlg::SourceVideoTiming::Result;
+        const auto timingResult=sourceVideoTiming.normalize(pts,lastVideo,cfg.fps);
+        const bool discontinuity=timingResult==TimingResult::Discontinuity;
+        const uint64_t repairLogMs=timingResult==TimingResult::RepairStarted ? steadyMilliseconds() : 0;
+        if(discontinuity || (repairLogMs && (!lastTimingRepairLogMs || repairLogMs-lastTimingRepairLogMs>=5000))) {
+            char detail[256];
+            snprintf(detail,sizeof(detail),"%s (RTP=%u, raw=%lld, previous=%lld, output=%lld; 90 kHz)",
+                discontinuity ?
+                    "Reordered stream timestamps exceed source-copy repair limit" :
+                    "Brief source timestamp overlap corrected",
+                input.rtp,(long long)rawPts,(long long)lastVideo,(long long)pts);
+            if(discontinuity) { fail(detail); return; }
+            lastTimingRepairLogMs=repairLogMs;
+            logRecorderEvent(@"source timestamp repair",detail,movie ? movie->path : nil);
+        }
         CMBlockBufferRef block=nullptr;
         if(CMBlockBufferCreateWithMemoryBlock(nullptr,nullptr,payload.size(),nullptr,nullptr,0,payload.size(),0,&block)) return;
         CMBlockBufferReplaceDataBytes(payload.data(),block,0,payload.size());
