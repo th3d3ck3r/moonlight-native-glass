@@ -193,3 +193,84 @@ jobs:
           path: release-assets/*
           if-no-files-found: error
           retention-days: 90
+
+  publish:
+    if: contains(github.event.head_commit.message, '[publish stable]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VALIDATED_SHA: 11ed502e0b301ac632d92eaa7fd23f3322c127ed
+      RELEASE_TAG: moonlightlg-v1.3.6.0
+      PREP_RUN: '41390729937'
+      PREP_ARTIFACT: '13116774963'
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify the approved tag target and staged assets
+        run: |
+          git fetch --no-tags --depth=1 origin "$VALIDATED_SHA"
+          git diff --name-only "$VALIDATED_SHA" "$GITHUB_SHA" > /tmp/tag-diff
+          python3 - <<'PY'
+          from pathlib import Path
+          allowed = {'README.md', 'CHANGELOG.md', 'docs/RELEASE_1.3.6.0_PREPARATION.md', '.github/workflows/publish-native-preview.yml'}
+          changed = set(Path('/tmp/tag-diff').read_text().splitlines())
+          assert changed <= allowed, changed - allowed
+          PY
+          test "$(gh api "repos/$GH_REPO/git/ref/heads/feature/recording-plugin" --jq .object.sha)" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GH_REPO/actions/runs/$PREP_RUN" --jq .conclusion)" = success
+          test "$(gh api "repos/$GH_REPO/actions/artifacts/$PREP_ARTIFACT" --jq .digest)" = 'sha256:ef37198a2e0e6798bb085511dbf661455c06a9e4e703b5601d964c053d34e4bb'
+          test "$(gh api "repos/$GH_REPO/actions/artifacts/$PREP_ARTIFACT" --jq .expired)" = false
+          gh run download "$PREP_RUN" --name MoonlightLG-1.3.6.0-Release-Ready --dir release-assets
+          (
+            cd release-assets
+            sha256sum --check <<'CHECKSUMS'
+          e9f567b3ccec0e9391a3e39df9c97171e290f1244af83db3fc0c58678505ffd3  MoonlightLG-1.3.6.0-arm64.zip
+          5b8af324bb6cd3b5323305f4e5e3c5b4420cdd932f2f4406883199a2ac5e84fd  MoonlightLG-1.3.6.0-source.tar.gz
+          CHECKSUMS
+          )
+      - name: Create a draft and verify its uploaded assets
+        run: |
+          test "$(gh api --paginate "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$RELEASE_TAG\") | .id")" = ''
+          test "$(gh api "repos/$GH_REPO/git/matching-refs/tags/$RELEASE_TAG" --jq ".[] | select(.ref == \"refs/tags/$RELEASE_TAG\") | .ref")" = ''
+          assets=(
+            release-assets/MoonlightLG-1.3.6.0-arm64.zip
+            release-assets/MoonlightLG-1.3.6.0-source.tar.gz
+            release-assets/SHA256SUMS.txt
+            release-assets/LICENSE.txt
+            release-assets/THIRD_PARTY_NOTICES.txt
+            release-assets/SOURCE_MANIFEST.json
+            release-assets/main-dark.png
+            release-assets/main-compact.png
+            release-assets/settings-video.png
+            release-assets/native-startup-warp.png
+            release-assets/about-dark.png
+            release-assets/overlay-controls-dark.png
+          )
+          sha256sum "${assets[@]}" > /tmp/release-assets.sha256
+          gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --draft \
+            --title '🌙 MoonlightLG 1.3.6.0 · Crimson Glass' \
+            --notes-file release-assets/RELEASE_NOTES.md "${assets[@]}"
+          release_id="$(gh api --paginate "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$RELEASE_TAG\") | .id")"
+          [[ "$release_id" =~ ^[0-9]+$ ]]
+          gh api "repos/$GH_REPO/releases/$release_id" > /tmp/draft-release.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          release = json.loads(Path('/tmp/draft-release.json').read_text())
+          assert release['draft']
+          assert release['target_commitish'] == os.environ['GITHUB_SHA']
+          assert release['tag_name'] == os.environ['RELEASE_TAG']
+          expected = {}
+          for line in Path('/tmp/release-assets.sha256').read_text().splitlines():
+              digest, path = line.split('  ', 1)
+              expected[Path(path).name] = 'sha256:' + digest
+          actual = {asset['name']: asset['digest'] for asset in release['assets'] if asset['state'] == 'uploaded'}
+          assert actual == expected, (actual, expected)
+          PY
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest=true
+          test "$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name)" = "$RELEASE_TAG"
