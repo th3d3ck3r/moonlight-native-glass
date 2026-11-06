@@ -1,5 +1,10 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.6.2U — Recorder diagnostics
+
+- Log recording and replay failures to `~/Library/Logs/MoonlightLG/recording.log` with the clip filename, media position for writer errors, and the writer’s error code when available.
+- Internal build 58.
+
 ## 🌙 1.3.6.1U — Recording rollback
 
 - Restore pre-build-53 Original Stream Quality recording behavior after a report that recording errors out around 30 seconds. Remove periodic host keyframe requests during active recording and retain startup/recovery requests.

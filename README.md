@@ -23,6 +23,8 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 The current development build restores the previous Original Stream Quality recording behavior by removing periodic host keyframe requests.
 
+Recorder diagnostics in the current development build are saved to `~/Library/Logs/MoonlightLG/recording.log`.
+
 ## 📦 Download
 
 ### 🌙 MoonlightLG 1.3.6.0

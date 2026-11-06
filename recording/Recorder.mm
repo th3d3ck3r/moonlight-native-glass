@@ -127,10 +127,21 @@ struct Movie {
         for (unsigned i=0; !realtime && !track.readyForMoreMediaData && writer.status==AVAssetWriterStatusWriting && i<500; ++i)
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         CMSampleBufferRef buffer=sample->read();
-        bool appended=buffer && track.readyForMoreMediaData && [track appendSampleBuffer:buffer];
+        const bool readyForSample=buffer && track.readyForMoreMediaData;
+        const bool appended=readyForSample && [track appendSampleBuffer:buffer];
         if(buffer) CFRelease(buffer);
         if (!appended) {
-            error=writer.error.localizedDescription.UTF8String ?: "Recording writer overloaded; streaming continues"; return false;
+            NSError* cause=writer.error;
+            NSString* reason=cause.localizedDescription;
+            if(!reason) {
+                if(!buffer) reason=@"Sample data could not be read";
+                else if(!readyForSample) reason=@"Writer input was not ready";
+                else reason=@"Writer rejected the sample";
+            }
+            error=[[NSString stringWithFormat:@"%@ append at %.3fs: %@ (writer status %ld, %@ %ld)",
+                sample->video ? @"Video" : @"Audio", double(sample->pts-start)/90000, reason,
+                (long)writer.status, cause.domain ?: @"no error domain", (long)cause.code] UTF8String];
+            return false;
         }
         return true;
     }
@@ -189,8 +200,13 @@ struct Recorder {
         if(cfg.codec==0 && cfg.mode==0) fail("Original Stream Quality supports H.264/HEVC. Select Custom Hardware Encoding for this stream.");
         else refreshInterest();
         worker=std::thread([this]{
-            @try {try {run();} catch(...) {interest.store(0);std::lock_guard<std::mutex> l(statusMutex);current.failed=1;snprintf(current.message,sizeof(current.message),"Recording worker failed; streaming continues");}}
-            @catch(NSException* exception) {interest.store(0);std::lock_guard<std::mutex> l(statusMutex);current.failed=1;snprintf(current.message,sizeof(current.message),"Recording API rejected the media configuration; streaming continues");}
+            @try {
+                try {run();}
+                catch(...) {workerFailure("Recording worker failed", "Recording worker failed; streaming continues");}
+            }
+            @catch(NSException* exception) {
+                workerFailure(exception.reason.UTF8String, "Recording API rejected the media configuration; streaming continues");
+            }
         });
     }
     ~Recorder() {
@@ -215,7 +231,39 @@ struct Recorder {
         current.buffered_seconds=ring.empty() || lastVideo<ring.front()->pts ? 0 : (lastVideo-ring.front()->pts)/90000;
         snprintf(current.message,sizeof(current.message),"%s",message);
     }
+    void logFailure(NSString* phase, const char* message, NSString* output=nil) {
+        @autoreleasepool {
+            NSString* reason=message ? [NSString stringWithUTF8String:message] : nil;
+            NSString* entry=[NSString stringWithFormat:@"%@ %@ file=%@ mode=%@ codec=%u video=%ux%u@%u queued=%zu dropped=%llu: %@\n",
+                [NSDate date],phase,output.lastPathComponent ?: @"(none)",
+                cfg.mode==0 ? @"original" : @"hardware",cfg.codec,cfg.width,cfg.height,cfg.fps,
+                queuedBytes.load(),(unsigned long long)drops.load(),reason ?: @"Unknown recorder error"];
+            dispatch_group_async(exports,exportQueue,^{
+                @autoreleasepool {
+                    NSString* logs=[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Logs/MoonlightLG"];
+                    [[NSFileManager defaultManager] createDirectoryAtPath:logs withIntermediateDirectories:YES attributes:nil error:nullptr];
+                    NSString* file=[logs stringByAppendingPathComponent:@"recording.log"];
+                    NSData* data=[entry dataUsingEncoding:NSUTF8StringEncoding];
+                    int fd=open(file.fileSystemRepresentation,O_WRONLY|O_CREAT|O_APPEND|O_CLOEXEC|O_NOFOLLOW,0600);
+                    bool saved=false;
+                    if(fd>=0) {
+                        saved=write(fd,data.bytes,data.length)==ssize_t(data.length);
+                        close(fd);
+                    }
+                    if(!saved) fprintf(stderr,"%s",entry.UTF8String);
+                }
+            });
+        }
+    }
+    void workerFailure(const char* detail, const char* status) {
+        interest.store(0);
+        logFailure(@"recording worker",detail,movie ? movie->path : nil);
+        std::lock_guard<std::mutex> l(statusMutex);
+        current.failed=1;
+        snprintf(current.message,sizeof(current.message),"%s",status);
+    }
     void fail(const char* text) {
+        logFailure(@"recording stop",text,movie ? movie->path : nil);
         interest.store(0); replay=false; recordWanted=false;
         { std::lock_guard<std::mutex> l(statusMutex); current.failed=1; }
         finishMovie();releaseEncoder();resetAudio(); update(text);
@@ -267,6 +315,7 @@ struct Recorder {
         auto ending=movie; movie.reset(); if(!ending) return;
         dispatch_group_enter(exports);
         ending->finish([this,ending](bool ok,NSString* result) {
+            if(!ok) logFailure(@"recording finalize",result.UTF8String,ending->path);
             { std::lock_guard<std::mutex> l(statusMutex); if(!ok) current.failed=1; snprintf(current.message,sizeof(current.message),"%s",result.UTF8String ?: "Finished"); }
             dispatch_group_leave(exports);
         });
@@ -287,10 +336,12 @@ struct Recorder {
                 if(ok) {
                     dispatch_group_enter(exports);
                     output->finish([this,output](bool success,NSString* result) {
+                        if(!success) logFailure(@"replay finalize",result.UTF8String,output->path);
                         { std::lock_guard<std::mutex> l(statusMutex); current.saving=0; if(!success) current.failed=1; snprintf(current.message,sizeof(current.message),"%s",result.UTF8String); }
                         dispatch_group_leave(exports);
                     });
                 } else {
+                    logFailure(@"replay export",error.c_str(),file);
                     std::lock_guard<std::mutex> l(statusMutex); current.saving=0; current.failed=1; snprintf(current.message,sizeof(current.message),"%s",error.c_str());
                 }
             }
