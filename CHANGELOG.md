@@ -1,5 +1,13 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.7.1 — Recording reliability
+
+- 🛠️ Original Stream Quality now corrects brief duplicate or backward timestamps while preserving compressed video and keyframes.
+- ⏩ Make periodic host keyframe requests opt-in for seeking. Requests are rate-limited and missed responses do not stop recording.
+- 💾 Briefly retry writer backpressure on the recorder worker with bounded buffering.
+- 🧾 Log recording and replay failures, timestamp repairs and experimental keyframe activity to `~/Library/Logs/MoonlightLG/recording.log`.
+- 📦 Build 61 promotes the tested 1.3.7.1U recording code to stable metadata. Long HEVC seeking remains an on-device check.
+
 ## 🌙 1.3.7.1U — Source recording timestamp repair
 
 - Keep Original Stream Quality recording through brief repeated or backward host timestamps. Preserve encoded frames and keyframes, return to host timing when it catches up, and log larger discontinuities.
