@@ -1,5 +1,10 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.6.1U — Recording rollback
+
+- Restore pre-build-53 Original Stream Quality recording behavior after a report that recording errors out around 30 seconds. Remove periodic host keyframe requests during active recording and retain startup/recovery requests.
+- Internal build 57. Keep the Touch Bar fixes and three-minute graphs.
+
 ## 🌙 1.3.6.0 — Crimson Glass
 
 - Promote the validated build 55 functionality to stable-labelled build 56 with no feature changes; the app is rebuilt with stable metadata rather than relabelling a U ZIP.

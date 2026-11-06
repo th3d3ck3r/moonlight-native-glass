@@ -21,6 +21,8 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
+The current development build restores the previous Original Stream Quality recording behavior by removing periodic host keyframe requests.
+
 ## 📦 Download
 
 ### 🌙 MoonlightLG 1.3.6.0

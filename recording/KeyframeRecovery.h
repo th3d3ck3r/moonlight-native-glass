@@ -3,7 +3,7 @@
 namespace mlg {
 // Called only by the engine's UI/status poll, never by a decoder callback.
 // Ask once immediately, retry twice at three-second intervals, then report
-// failure. This recovery policy is separate from periodic recording requests.
+// failure. No periodic IDRs while a usable recording/replay keyframe exists.
 class KeyframeRecovery {
 public:
     enum Result { None, Request, Timeout };
@@ -21,23 +21,5 @@ private:
     unsigned attempts=0;
     uint64_t last=0;
     bool failed=false;
-};
-
-// Status-poll policy only: never schedule work from a decoder callback. Startup
-// recovery retains its own bounded retries and timeout. Ordinary recording IDRs
-// are best-effort and must not turn a missing periodic response into a failure.
-class RecordingKeyframes {
-public:
-    void reset() { armed=false; lastRequest=0; }
-    bool update(bool recording, bool waiting, uint64_t nowMs, uint64_t lastKeyMs) {
-        if (!recording || waiting) { reset(); return false; }
-        if (!armed) { armed=true; lastRequest=nowMs; return false; }
-        const uint64_t latest=lastKeyMs>lastRequest ? lastKeyMs : lastRequest;
-        if (nowMs<latest || nowMs-latest<2000) return false;
-        lastRequest=nowMs; return true;
-    }
-private:
-    bool armed=false;
-    uint64_t lastRequest=0;
 };
 }
