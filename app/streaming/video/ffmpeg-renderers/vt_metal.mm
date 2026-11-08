@@ -8,6 +8,7 @@
 
 #include <SDL_syswm.h>
 #include <Limelight.h>
+#include <mutex>
 #include "streaming/session.h"
 #include "streaming/streamutils.h"
 #include "path.h"
@@ -153,7 +154,8 @@ public:
             return true;
         }
 
-        // Reconfigure geometry only after the previous drawable is finished.
+        // The render worker updates geometry while the main run loop presents.
+        std::lock_guard<std::mutex> lock(m_PresentationMutex);
         drainAsyncPresentation();
 
         // Determine the correct scaled size for the video region
@@ -478,7 +480,8 @@ public:
     }}
 
     // Caller frees frame after we return
-    void renderFrameIntoDrawable(AVFrame* frame, id<CAMetalDrawable> drawable, bool asyncPresentation = false)
+    void renderFrameIntoDrawable(AVFrame* frame, id<CAMetalDrawable> drawable,
+                                 bool asyncPresentation = false, bool measureGpuWait = false)
     { @autoreleasepool {
         std::array<CVMetalTextureRef, MAX_VIDEO_PLANES> cvMetalTextures;
         size_t planes = getFramePlaneCount(frame);
@@ -579,9 +582,9 @@ public:
             m_InFlightFrame = frame;
         }
         else {
-            const uint64_t start = m_LogPresentation ? LiGetMicroseconds() : 0;
+            const uint64_t start = measureGpuWait ? LiGetMicroseconds() : 0;
             [commandBuffer waitUntilCompleted];
-            if (m_LogPresentation) {
+            if (measureGpuWait) {
                 const uint64_t wait = LiGetMicroseconds() - start;
                 if (wait > m_MaxGpuWaitUs) m_MaxGpuWaitUs = wait;
             }
@@ -830,6 +833,7 @@ public:
                 return;
             }
 
+            std::lock_guard<std::mutex> lock(m_PresentationMutex);
             m_AsyncPresentation = m_HwAccel && qgetenv("MOONLIGHTLG_ASYNC_METAL_PRESENTATION") == "1";
             m_LogPresentation = qEnvironmentVariableIntValue("MOONLIGHTLG_MOUSE_DIAGNOSTICS") != 0;
             m_MetalDisplayLink = [[CAMetalDisplayLink alloc] initWithMetalLayer:m_MetalLayer];
@@ -846,6 +850,7 @@ public:
     void stopDisplayLink()
     {
         if (@available(macOS 14, *)) {
+            std::lock_guard<std::mutex> lock(m_PresentationMutex);
             if (m_MetalDisplayLink == nullptr) {
                 return;
             }
@@ -962,8 +967,13 @@ public:
         m_MaxFrameWaitUs = m_MaxGpuWaitUs = 0;
     }
 
-    void renderLatestFrameOnDrawable(id<CAMetalDrawable> drawable, CFTimeInterval targetTimestamp)
+    void renderLatestFrameOnDrawable(CAMetalDisplayLink* link, id<CAMetalDrawable> drawable,
+                                     CFTimeInterval targetTimestamp) API_AVAILABLE(macos(14.0))
     {
+        // A resize, color-space change, or shutdown may be draining the GPU
+        // on the render worker. Never wait for that worker on the input loop.
+        std::unique_lock<std::mutex> lock(m_PresentationMutex, std::try_to_lock);
+        if (!lock.owns_lock() || link != m_MetalDisplayLink) return;
         if (m_LogPresentation) ++m_DisplayUpdates;
         if (m_InFlightCommand) {
             if (m_InFlightCommand.status < MTLCommandBufferStatusCompleted) {
@@ -1003,7 +1013,9 @@ public:
         // Render a frame if we got one in time.
         if (frame != nullptr) {
             if (m_LogPresentation) ++m_DisplayedFrames;
-            renderFrameIntoDrawable(frame, drawable, m_AsyncPresentation && frame->format == AV_PIX_FMT_VIDEOTOOLBOX);
+            renderFrameIntoDrawable(frame, drawable,
+                                    m_AsyncPresentation && frame->format == AV_PIX_FMT_VIDEOTOOLBOX,
+                                    m_LogPresentation);
             if (m_InFlightFrame != frame) av_frame_free(&frame);
         }
         logPresentationTiming();
@@ -1011,6 +1023,7 @@ public:
 
 private:
     bool m_HwAccel;
+    std::mutex m_PresentationMutex;
     bool m_AsyncPresentation = false;
     bool m_LogPresentation = false;
     id<MTLCommandBuffer> m_InFlightCommand = nil;
@@ -1057,7 +1070,7 @@ private:
 
 - (void)metalDisplayLink:(CAMetalDisplayLink *)link
              needsUpdate:(CAMetalDisplayLinkUpdate *)update API_AVAILABLE(macos(14.0)) {
-    _renderer->renderLatestFrameOnDrawable(update.drawable, update.targetTimestamp);
+    _renderer->renderLatestFrameOnDrawable(link, update.drawable, update.targetTimestamp);
 }
 
 @end
