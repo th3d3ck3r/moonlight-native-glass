@@ -264,6 +264,8 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 @property(nonatomic, retain) MLStreamWindowDelegate* windowDelegate;
 @property(nonatomic, copy) NSString* token;
 @property(nonatomic, retain) NSAlert* disconnectConfirmation;
+@property(nonatomic, retain) id<NSObject> streamActivity;
+- (void)beginStreamActivity;
 - (void)windowBecameKey:(NSNotification*)notification;
 - (void)restore:(NSNotification*)notification;
 - (void)menuAction:(NSNotification*)notification;
@@ -362,6 +364,17 @@ bool nativeStartStreamMenuCommands(int fd) {
 }
 
 @implementation MLStreamWindowAccess
+- (void)beginStreamActivity
+{
+    if (self.streamActivity) return;
+    // The helper, rather than the Swift frontend, owns the active stream.
+    // Keep the existing keep-awake preference in control of idle sleep.
+    self.streamActivity = [NSProcessInfo.processInfo
+        beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep | NSActivityLatencyCritical
+        reason:@"MoonlightLG live game stream"];
+    if (self.streamActivity) SDL_Log("MoonlightLG: active stream scheduling assertion acquired");
+}
+
 - (void)windowBecameKey:(NSNotification*)notification
 {
     if (self.stopped || self != streamWindowAccess || nativeConnectionWaiting()) return;
@@ -422,6 +435,11 @@ bool nativeStartStreamMenuCommands(int fd) {
 {
     if (self.stopped) return;
     self.stopped = YES;
+    if (self.streamActivity) {
+        [NSProcessInfo.processInfo endActivity:self.streamActivity];
+        self.streamActivity = nil;
+        SDL_Log("MoonlightLG: active stream scheduling assertion released");
+    }
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
     if (self.windowDelegate.windowID) {
@@ -450,6 +468,7 @@ void nativeAttachStreamWindow(SDL_Window* window) {
     streamWindowAccess.windowDelegate = delegate;
     candidate.delegate = delegate;
     [delegate release];
+    [streamWindowAccess beginStreamActivity];
     nativeOverlayAttach(candidate, streamWindowAccess.token.UTF8String);
     // Overlay attachment reserves SDL_USEREVENT for stock Session events.
     if (!restoreEventType) restoreEventType = SDL_RegisterEvents(1);

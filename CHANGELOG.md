@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.10.1U — Active-stream scheduling
+
+- 🎮 The native engine requests a latency-critical process activity while streaming. This asks macOS to avoid App Nap and timer coalescing for the active helper while preserving the separate idle sleep preference.
+- The request starts when the stream window attaches after Continue and ends during teardown. Trackpad response still needs an on-device comparison.
+- Internal build 65.
+
 ## 🌙 1.3.10.0U — Streaming event-thread load
 
 - ⚡ Prepare Touch Bar measurements on a utility queue and refresh the readout independently of title-bar buttons and layout.
