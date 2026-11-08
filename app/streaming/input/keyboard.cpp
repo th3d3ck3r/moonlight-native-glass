@@ -200,6 +200,8 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
 void SdlInputHandler::handleNativeOverlayAction(int action)
 {
     if (action == 220) {
+        if (m_MouseTrace.enabled()) ++m_MouseTrace.counts.repairRequests;
+        if (m_MouseTrace.stockFocus(m_AbsoluteMouseMode)) return;
         // Title-bar tracking can leave SDL relative mode enabled while its
         // actual mouse focus/cursor association is stale. Repair after tracking,
         // respecting explicit Release Input and absolute desktop mouse mode.

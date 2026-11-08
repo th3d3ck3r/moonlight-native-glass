@@ -10,6 +10,7 @@
 #include "nativeoverlay.h"
 #include "nativetitlebar.h"
 #include "TitlebarFixture.h"
+#include "../../app/native/mousemotiontrace.h"
 
 // Test-only observation of the confinement property already used internally
 // by SDL's Cocoa backend; it is absent from AppKit's public headers.
@@ -112,6 +113,7 @@ public:
     explicit SdlInputHandler(SDL_Window* window) : m_Window(window) {}
     SDL_Window* m_Window;
     bool m_AbsoluteMouseMode = false;
+    MouseMotionTrace m_MouseTrace;
     bool m_NativeCaptureBeforeFocusLoss = false;
     bool m_NativeMenuInputSuspended = false;
     bool m_NativeCaptureBeforeMenu = false;
@@ -419,6 +421,16 @@ int main(int argc, char** argv) {
             pump(); return repaired;
         };
         SdlInputHandler titleInput(window);
+        titleInput.m_MouseTrace.mode = MouseMotionTrace::StockFocus;
+        nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(false); pump();
+        titleInput.m_NativeCaptureBeforeFocusLoss = true;
+        titleInput.notifyFocusGained();
+        titleInput.handleNativeOverlayAction(220); pump();
+        check(!titleInput.isCaptureActive(), "Stock comparison must bypass automatic focus and title-bar repair");
+        titleInput.setCaptureActive(true);
+        check(titleInput.isCaptureActive(), "Stock comparison must still allow explicit capture");
+        titleInput.setCaptureActive(false);
+        titleInput.m_MouseTrace.mode = MouseMotionTrace::Off;
         for (NSString* identifier in @[@"NativeStatistics",@"NativeHardware",@"NativeMute",@"NativeRecord",@"NativeReplay"]) {
             SDL_FlushEvent(nativeOverlayEventType());
             nativeOverlayRestoreStreamFocus(window); titleInput.setCaptureActive(false); pump();

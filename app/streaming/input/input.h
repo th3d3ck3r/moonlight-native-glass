@@ -4,6 +4,9 @@
 #include "backend/computermanager.h"
 
 #include "SDL_compat.h"
+#ifdef Q_OS_MACOS
+#include "native/mousemotiontrace.h"
+#endif
 
 struct GamepadState {
     SDL_GameController* controller;
@@ -161,6 +164,7 @@ public:
 
 private:
 #ifdef Q_OS_MACOS
+    MouseMotionTrace m_MouseTrace;
     bool m_NativeControlsVisible = false;
     bool m_NativeCaptureBeforeControls = false;
     bool m_NativeCaptureBeforeFocusLoss = false;

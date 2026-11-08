@@ -21,7 +21,7 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
-🛠️ In development, right-click a computer in the sidebar and choose **Move Up** or **Move Down** to save a custom order.
+🛠️ In development, right-click a computer in the sidebar and choose **Move Up** or **Move Down** to save a custom order. **Settings → Input → Mouse Diagnostics** can compare capture behavior and log timing in development builds.
 
 ## 📦 Download
 

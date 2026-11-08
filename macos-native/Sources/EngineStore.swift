@@ -17,12 +17,17 @@ final class EngineChannel {
     private var closed = false
     var stopRequested: Bool { closed }
 
-    init(executable: URL, arguments: [String]) {
+    init(executable: URL, arguments: [String], mouseDiagnostics: Int = 0) {
         // A helper can close stdin before exiting. Let FileHandle surface EPIPE
         // as a send error instead of allowing SIGPIPE to terminate the frontend.
         signal(SIGPIPE, SIG_IGN)
         process.executableURL = executable
         process.arguments = arguments
+        if mouseDiagnostics != 0 {
+            var environment = ProcessInfo.processInfo.environment
+            environment["MOONLIGHTLG_MOUSE_DIAGNOSTICS"] = String(mouseDiagnostics)
+            process.environment = environment
+        }
         process.currentDirectoryURL = executable.deletingLastPathComponent()
         process.standardInput = input
         process.standardOutput = output
@@ -142,6 +147,7 @@ struct PairingRequest: Identifiable {
     private let executableOverride: URL?
     private let streamHandoffTimeout: Duration
     private let defaults: UserDefaults
+    static let mouseDiagnosticsKey = "mouseDiagnosticsMode"
     private static let computerOrderKey = "libraryComputerOrder"
     private var computerOrder: [String]
 
@@ -377,7 +383,8 @@ struct PairingRequest: Identifiable {
         streamWindowToken = token
         menuState = NativeMenuState(token: token, nextMode: [1: 2, 0: 1, 2: 0][(values["windowMode"] as? NSNumber)?.intValue ?? 0] ?? 1)
         streamWindowExists = false
-        let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y), token, "await-continue", computer.name, game.name])
+        let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y), token, "await-continue", computer.name, game.name],
+                                   mouseDiagnostics: defaults.integer(forKey: Self.mouseDiagnosticsKey))
         helper.onEvent = { [weak self, weak helper] event in
             guard let self, !self.shuttingDown, self.stream === helper, helper?.stopRequested == false else { return }
             switch event["event"] as? String {

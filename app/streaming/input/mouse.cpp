@@ -100,14 +100,17 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
 
 void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
 {
-    if (!isCaptureActive()) {
-        // Not capturing
-        return;
+    const bool captured = isCaptureActive();
+#ifdef Q_OS_MACOS
+    const bool trace = m_MouseTrace.enabled();
+    const Uint32 now = trace ? SDL_GetTicks() : 0;
+    unsigned batchSize = 1;
+    if (trace && event->which != SDL_TOUCH_MOUSEID) {
+        m_MouseTrace.flush(now);
+        m_MouseTrace.event(*event, now, captured);
     }
-    else if (event->which == SDL_TOUCH_MOUSEID) {
-        // Ignore synthetic mouse events
-        return;
-    }
+#endif
+    if (!captured || event->which == SDL_TOUCH_MOUSEID) return;
 
     // Batch all pending mouse motion events to save CPU time
     Sint32 x = event->x, y = event->y, xrel = event->xrel, yrel = event->yrel;
@@ -117,6 +120,12 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
 
         // Ignore synthetic mouse events
         if (event->which != SDL_TOUCH_MOUSEID) {
+#ifdef Q_OS_MACOS
+            if (trace) {
+                m_MouseTrace.event(*event, SDL_GetTicks(), true);
+                ++batchSize;
+            }
+#endif
             x = event->x;
             y = event->y;
             xrel += event->xrel;
@@ -183,6 +192,9 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
     }
     else {
         LiSendMouseMoveEvent(xrel, yrel);
+#ifdef Q_OS_MACOS
+        if (trace) m_MouseTrace.batch(batchSize);
+#endif
     }
 }
 

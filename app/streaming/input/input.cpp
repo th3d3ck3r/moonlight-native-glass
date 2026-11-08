@@ -40,6 +40,13 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_DragButton(0),
       m_NumFingersDown(0)
 {
+#ifdef Q_OS_MACOS
+    const int traceMode = qEnvironmentVariableIntValue("MOONLIGHTLG_MOUSE_DIAGNOSTICS");
+    if (traceMode == MouseMotionTrace::NativeCapture || traceMode == MouseMotionTrace::StockFocus) {
+        m_MouseTrace.mode = static_cast<MouseMotionTrace::Mode>(traceMode);
+        m_MouseTrace.start();
+    }
+#endif
     // System keys are always captured when running without a DE
     if (!WMUtils::isRunningDesktopEnvironment()) {
         m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
@@ -224,6 +231,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
 SdlInputHandler::~SdlInputHandler()
 {
 #ifdef Q_OS_MACOS
+    if (m_MouseTrace.enabled()) m_MouseTrace.flush(SDL_GetTicks(), true);
     nativeOverlayEndControlsInput();
 #endif
     for (int i = 0; i < MAX_GAMEPADS; i++) {
@@ -281,17 +289,19 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 void SdlInputHandler::notifyFocusLost()
 {
 #ifdef Q_OS_MACOS
+    if (m_MouseTrace.enabled()) ++m_MouseTrace.counts.focusLost;
+    const bool stockFocus = m_MouseTrace.stockFocus(m_AbsoluteMouseMode);
     // Native controls may restore focus before an older SDL focus-loss event
     // drains. That stale event must not release newly restored capture.
     if (m_NativeMenuInputSuspended) { raiseAllKeys(); return; }
-    if (nativeOverlayConfigured() && SDL_GetKeyboardFocus() == m_Window) {
+    if (!stockFocus && nativeOverlayConfigured() && SDL_GetKeyboardFocus() == m_Window) {
         raiseAllKeys();
         return;
     }
     // More than one AppKit/menu focus-loss event can arrive before the stream
     // regains focus. Preserve the first event's intent after relative capture
     // has already been released; an explicit Release Input still clears it.
-    const bool captureBeforeFocusLoss = isCaptureActive() || m_NativeCaptureBeforeFocusLoss;
+    const bool captureBeforeFocusLoss = !stockFocus && (isCaptureActive() || m_NativeCaptureBeforeFocusLoss);
 #endif
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
     // This lets user to interact with our window's title bar and with the buttons in it.
@@ -318,11 +328,12 @@ void SdlInputHandler::notifyFocusLost()
 void SdlInputHandler::notifyFocusGained()
 {
 #ifdef Q_OS_MACOS
+    if (m_MouseTrace.enabled()) ++m_MouseTrace.counts.focusGained;
     if (m_NativeControlsVisible && !m_NativeMenuInputSuspended && SDL_GetKeyboardFocus() == m_Window) {
         nativeOverlayBeginControlsInput(m_Window);
         return;
     }
-    if (nativeOverlayConfigured() && SDL_GetKeyboardFocus() == m_Window &&
+    if (!m_MouseTrace.stockFocus(m_AbsoluteMouseMode) && nativeOverlayConfigured() && SDL_GetKeyboardFocus() == m_Window &&
         m_NativeCaptureBeforeFocusLoss && !m_NativeControlsVisible && !m_NativeMenuInputSuspended) {
         // Returning from the frontend's menu must restore both mouse focus and
         // the prior capture intent. Keyboard focus alone does not repair SDL's
@@ -410,6 +421,9 @@ void SdlInputHandler::setCaptureActive(bool active)
     // Window/decoder events must not hide or recapture the local control cursor.
     if (active && (m_NativeControlsVisible || m_NativeMenuInputSuspended)) return;
     m_NativeCaptureBeforeFocusLoss = false;
+    const bool trace = m_MouseTrace.enabled();
+    const bool wasCaptured = trace && isCaptureActive();
+    const bool wasRelative = trace && SDL_GetRelativeMouseMode();
 #endif
     if (active) {
         // If we're in relative mode, try to activate SDL's relative mouse mode
@@ -462,7 +476,12 @@ void SdlInputHandler::setCaptureActive(bool active)
     // Now update the keyboard grab
     updateKeyboardGrabState();
 #ifdef Q_OS_MACOS
-    nativeTitlebarSetCapture(isCaptureActive());
+    const bool captured = isCaptureActive();
+    if (trace) {
+        if (wasCaptured != captured) ++m_MouseTrace.counts.captureChanges;
+        if (wasRelative != bool(SDL_GetRelativeMouseMode())) ++m_MouseTrace.counts.relativeChanges;
+    }
+    nativeTitlebarSetCapture(captured);
 #endif
 }
 

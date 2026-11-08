@@ -1,5 +1,10 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.9.0U — Trackpad capture diagnostics
+
+- 🖱️ Add an opt-in comparison of native and stock focus behavior for relative mouse capture. The stream log reports event timing, batches, and capture changes.
+- Internal build 63.
+
 ## 🌙 1.3.8.0U — Custom computer order
 
 - 🖥️ Right-click a computer in the sidebar to move it up or down. MoonlightLG remembers the order across discovery refreshes and restarts.

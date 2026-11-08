@@ -26,6 +26,7 @@ struct NativeSettingsView: View {
     @AppStorage(NativeTouchBarPresentation.key) private var touchBarFullWidth = false
     @AppStorage(NativeTouchBarPresentation.failedKey) private var touchBarFullWidthUnavailable = false
     @AppStorage("touchBarLiveStats", store: UserDefaults(suiteName: NativeCrimsonTheme.suite)) private var touchBarLiveStats = true
+    @AppStorage(EngineStore.mouseDiagnosticsKey) private var mouseDiagnostics = 0
     @State private var touchBarError = false
     @State private var pane = SettingsPane.video
     @State private var nativeSize: VideoResolution?
@@ -75,6 +76,15 @@ struct NativeSettingsView: View {
                         }
                     }
                     if pane == .input {
+                        Section("Mouse Diagnostics") {
+                            Picker("Capture comparison", selection: $mouseDiagnostics) {
+                                Text("Off").tag(0)
+                                Text("Log MoonlightLG Capture").tag(1)
+                                Text("Log Stock Focus Behavior").tag(2)
+                            }.accessibilityIdentifier("mouse-capture-comparison")
+                            Text("Applies to the next stream. Stock focus behavior tests relative mouse mode and may require clicking the stream to capture again after switching windows. Timing and capture counts go to the stream log.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }.disabled(store.streamActive)
                         Section { Text("Hide the stream window with Close Stream Window (Control–Option–Shift–Q by default). End the stream with Disconnect or Start + Select + L1 + R1. Disconnect and Exit also quits the host game. In the library, use the D-pad to select games, A to launch, and shoulder buttons to switch computers.").foregroundStyle(.secondary) }
                     }
                     if pane == .network {
