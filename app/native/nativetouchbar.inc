@@ -66,7 +66,7 @@ enum MLTouchMetric { TouchFPS,TouchRTT,TouchBitrate,TouchDecode,TouchHost,TouchQ
     BOOL havePrevious,busy;
     std::array<mlg::TouchBarHistory,TouchMetricCount> histories;
     double historyStreamUpdated;
-    unsigned historyRevision=0, copiedHistoryRevision=0;
+    unsigned historyRevision, copiedHistoryRevision;
     std::shared_ptr<const StreamTelemetry> streamTelemetry;
 }
 @property(nonatomic,assign) BOOL active;
