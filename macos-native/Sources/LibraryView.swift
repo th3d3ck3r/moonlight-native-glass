@@ -273,6 +273,13 @@ struct LibraryView: View {
         if computer.online && !computer.paired { Button("Pair Computer…") { store.pair(computer) }.disabled(!controlsEnabled) }
         Button("Wake Computer") { store.send("wake", ["host": computer.id]) }.disabled(!controlsEnabled)
         if computer.runningApp != 0 { Button("Quit Running App…", role: .destructive) { quitApp = computer }.disabled(!controlsEnabled) }
+        if store.computers.count > 1, let index = store.computers.firstIndex(where: { $0.id == computer.id }) {
+            Divider()
+            Button { store.moveComputer(computer.id, by: -1) } label: { Label("Move Up", systemImage: "arrow.up") }
+                .disabled(!controlsEnabled || index == 0)
+            Button { store.moveComputer(computer.id, by: 1) } label: { Label("Move Down", systemImage: "arrow.down") }
+                .disabled(!controlsEnabled || index == store.computers.count - 1)
+        }
         Divider()
         Button("Remove Computer…", role: .destructive) { removal = computer }.disabled(!controlsEnabled)
     }

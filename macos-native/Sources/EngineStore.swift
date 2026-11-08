@@ -141,16 +141,22 @@ struct PairingRequest: Identifiable {
     private var launchDeadline: Task<Void, Never>?
     private let executableOverride: URL?
     private let streamHandoffTimeout: Duration
+    private let defaults: UserDefaults
+    private static let computerOrderKey = "libraryComputerOrder"
+    private var computerOrder: [String]
 
     var selected: Computer? { computers.first { $0.id == selectedID } }
     var executable: URL? {
         executableOverride ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MoonlightLGEngine.app/Contents/MacOS/Moonlight")
     }
 
-    init(preview: Bool = false, executable: URL? = nil, streamHandoffTimeout: Duration = .seconds(15)) {
+    init(preview: Bool = false, executable: URL? = nil, streamHandoffTimeout: Duration = .seconds(15),
+         defaults: UserDefaults = .standard) {
         self.preview = preview
         executableOverride = executable
         self.streamHandoffTimeout = streamHandoffTimeout
+        self.defaults = defaults
+        computerOrder = preview ? [] : defaults.stringArray(forKey: Self.computerOrderKey) ?? []
         if preview {
             computers = [Computer(id: "preview-computer", name: "Gaming PC", online: true, unknown: false,
                 paired: true, runningApp: 0, address: "192.168.1.20", localAddress: "192.168.1.20",
@@ -222,7 +228,15 @@ struct PairingRequest: Identifiable {
                 guard event["protocol"] as? Int == 1 else { fail("This app and streaming engine use incompatible protocols."); channel?.stop(); return }
                 ready = true; status = "Discovering computers on your local network…"
             case "hosts":
-                computers = try decodeEngineValue(event["hosts"] ?? [], as: [Computer].self).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                let discovered = try decodeEngineValue(event["hosts"] ?? [], as: [Computer].self)
+                let ranks = Dictionary(computerOrder.enumerated().map { ($0.element, $0.offset) },
+                                       uniquingKeysWith: { first, _ in first })
+                computers = discovered.sorted {
+                    let left = ranks[$0.id, default: .max], right = ranks[$1.id, default: .max]
+                    if left != right { return left < right }
+                    let names = $0.name.localizedStandardCompare($1.name)
+                    return names == .orderedSame ? $0.id < $1.id : names == .orderedAscending
+                }
                 if !computers.contains(where: { $0.id == selectedID }) { selectedID = computers.first?.id }
                 status = computers.isEmpty ? "Looking for computers…" : "\(computers.count) computer\(computers.count == 1 ? "" : "s")"
             case "settings":
@@ -283,6 +297,22 @@ struct PairingRequest: Identifiable {
         testingConnection = true
         if !send("testConnection") { testingConnection = false }
     }
+    func moveComputer(_ id: String, by offset: Int) {
+        guard offset == -1 || offset == 1,
+              let index = computers.firstIndex(where: { $0.id == id }),
+              computers.indices.contains(index + offset) else { return }
+
+        // Keep places for hosts absent from this discovery snapshot.
+        let neighbor = computers[index + offset].id
+        let saved = Set(computerOrder)
+        computerOrder.append(contentsOf: computers.map(\.id).filter { !saved.contains($0) })
+        if let from = computerOrder.firstIndex(of: id), let to = computerOrder.firstIndex(of: neighbor) {
+            computerOrder.swapAt(from, to)
+            if !preview { defaults.set(computerOrder, forKey: Self.computerOrderKey) }
+            computers.swapAt(index, index + offset)
+        }
+    }
+
     func refresh() { if channel == nil { start() } else { send("snapshot") } }
     func add(_ address: String) {
         guard !addingHost else { return }

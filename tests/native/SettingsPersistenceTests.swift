@@ -41,6 +41,7 @@ func nativeArgument(_ name: String) -> String? { nil }
         saved = root / 'settings.json'
         values = json.loads(saved.read_text()) if saved.exists() else {'bitrateKbps': 20000, 'fps': 60, 'width': 1920, 'height': 1080, 'autoAdjustBitrate': False, 'enableVsync': True}
         def emit(value): print(json.dumps(value), flush=True)
+        def emit_hosts(): emit({'event': 'hosts', 'hosts': json.loads((root / 'hosts.json').read_text())})
         if len(sys.argv) > 2 and sys.argv[2] == 'stream':
             (root / 'next-stream.json').write_text(json.dumps(values))
             emit({'event': 'connected'})
@@ -48,6 +49,7 @@ func nativeArgument(_ name: String) -> String? { nil }
                 if json.loads(line).get('command') in ('shutdown', 'cancelStream'): break
         else:
             emit({'event': 'ready', 'protocol': 1})
+            emit_hosts()
             emit({'event': 'settings', 'schema': [], 'values': values})
             for line in sys.stdin:
                 command = json.loads(line)
@@ -57,6 +59,8 @@ func nativeArgument(_ name: String) -> String? { nil }
                     temporary = saved.with_suffix('.tmp')
                     temporary.write_text(json.dumps(values)); temporary.replace(saved)
                     emit({'event': 'settings', 'schema': [], 'values': values})
+                elif command['command'] == 'snapshot':
+                    emit_hosts()
                 elif command['command'] == 'pause':
                     emit({'event': 'paused', 'requestID': command['requestID']})
                 elif command['command'] == 'shutdown':
@@ -64,9 +68,38 @@ func nativeArgument(_ name: String) -> String? { nil }
                     break
         """.write(to: executable, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
-        let first = EngineStore(executable: executable)
+        func host(_ id: String, _ name: String) -> Computer {
+            Computer(id: id, name: name, online: true, unknown: false, paired: true,
+                     runningApp: 0, address: "127.0.0.1", localAddress: "127.0.0.1",
+                     serverVersion: "test", gpu: "", supported: true, apps: [])
+        }
+        func writeHosts(_ hosts: [Computer], to directory: URL) throws {
+            try JSONEncoder().encode(hosts).write(to: directory.appendingPathComponent("hosts.json"), options: .atomic)
+        }
+        let a = host("a", "Alpha"), b = host("b", "Bravo"), c = host("c", "Charlie"), d = host("d", "Delta")
+        try writeHosts([b, c, a], to: directory)
+        let defaultsName = "MoonlightLG-HostOrder-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsName)!
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let first = EngineStore(executable: executable, defaults: defaults)
         first.start()
         try await wait { first.ready && first.values["bitrateKbps"] != nil }
+        try await wait { first.computers.count == 3 }
+        precondition(first.computers.map(\.id) == ["a", "b", "c"])
+        first.selectedID = "b"
+        first.moveComputer("c", by: -1)
+        first.moveComputer("a", by: 1)
+        first.moveComputer("c", by: -1) // Already first.
+        precondition(first.computers.map(\.id) == ["c", "a", "b"] && first.selectedID == "b")
+        try writeHosts([d, b, c], to: directory)
+        first.refresh()
+        try await wait { first.computers.map(\.id) == ["c", "b", "d"] }
+        first.moveComputer("d", by: -1)
+        precondition(first.computers.map(\.id) == ["c", "d", "b"])
+        try writeHosts([host("b", "Aardvark"), a, d, c], to: directory)
+        first.refresh()
+        try await wait { first.computers.map(\.id) == ["c", "a", "d", "b"] }
+        precondition(first.selectedID == "b" && first.selected?.name == "Aardvark")
         first.set("bitrateKbps", 64000)
         first.shutdown() // No acknowledgment wait and no focus/Return event.
         let stopped = directory.appendingPathComponent("discovery-stopped")
@@ -76,9 +109,11 @@ func nativeArgument(_ name: String) -> String? { nil }
         precondition(saved["enableVsync"] as? Bool == true && saved["fps"] as? Int == 60, "Editing bitrate changed unrelated settings")
         try FileManager.default.removeItem(at: stopped)
 
-        let second = EngineStore(executable: executable)
+        let second = EngineStore(executable: executable, defaults: UserDefaults(suiteName: defaultsName)!)
         second.start()
         try await wait { second.ready && second.values["bitrateKbps"] != nil }
+        try await wait { second.computers.count == 4 }
+        precondition(second.computers.map(\.id) == ["c", "a", "d", "b"], "Custom host order did not survive a fresh store")
         precondition(second.values["bitrateKbps"] as? Int == 64000, "A fresh store/helper did not reload bitrate")
         let game = Game(id: 1, name: "Desktop", hdr: false, hidden: false, artwork: "")
         let computer = Computer(id: "settings-test", name: "Test", online: true, unknown: false, paired: true,
@@ -93,6 +128,7 @@ func nativeArgument(_ name: String) -> String? { nil }
         let exitDirectory = directory.appendingPathComponent("parent-exit")
         try FileManager.default.createDirectory(at: exitDirectory, withIntermediateDirectories: true)
         try FileManager.default.copyItem(at: executable, to: exitDirectory.appendingPathComponent("settings-engine"))
+        try writeHosts([], to: exitDirectory)
         let parent = Process()
         parent.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
         parent.arguments = ["--parent-exit-child", exitDirectory.path]

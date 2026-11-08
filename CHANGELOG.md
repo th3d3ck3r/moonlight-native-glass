@@ -1,5 +1,10 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.8.0U — Custom computer order
+
+- 🖥️ Right-click a computer in the sidebar to move it up or down. MoonlightLG remembers the order across discovery refreshes and restarts.
+- Internal build 62.
+
 ## 🌙 1.3.7.1 — Recording reliability
 
 - 🛠️ Original Stream Quality now corrects brief duplicate or backward timestamps while preserving compressed video and keyframes.

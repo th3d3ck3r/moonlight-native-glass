@@ -21,6 +21,8 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
+🛠️ In development, right-click a computer in the sidebar and choose **Move Up** or **Move Down** to save a custom order.
+
 ## 📦 Download
 
 ### 🌙 MoonlightLG 1.3.7.1
