@@ -15,6 +15,7 @@ on:
       - 'app/native/**'
       - 'app/streaming/input/**'
       - 'app/streaming/video/ffmpeg.cpp'
+      - 'app/streaming/video/ffmpeg-renderers/vt_metal.mm'
       - 'tests/native/TouchBarTelemetryTests.py'
       - 'tests/native/SettingsPersistenceTests.swift'
       - 'tests/native/NumericPreferenceEditorTests.py'
