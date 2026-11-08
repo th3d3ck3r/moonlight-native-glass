@@ -251,13 +251,17 @@ static MLOverlayController* controller;
         reservedBottom = (self.controls ? 70 : 12) + ceil(size.size.height) + 24*scale + 12;
     }
     for (int i=0;i<2;i++) {
+        if (!copy[i].enabled || !copy[i].text[0]) {
+            if (i==0) [self.statsView reset];
+            [self setPanel:(i==0 ? self.stats : self.status) visible:NO];
+            continue;
+        }
         CGFloat availableHeight = MAX(0,bounds.size.height-24-(i==0 ? reservedBottom : 0));
         NSPanel* panel = i==0 ? self.stats : self.status;
         if (i==0) {
             self.statsView.scale=scale; self.statsView.captured=self.captured;
             self.stats.ignoresMouseEvents=self.captured;
-            if (copy[0].enabled && copy[0].text[0]) [self.statsView present:[NSString stringWithUTF8String:copy[0].text] ?: @"" revision:copy[0].revision];
-            else [self.statsView reset];
+            [self.statsView present:[NSString stringWithUTF8String:copy[0].text] ?: @"" revision:copy[0].revision];
             CGFloat available=MAX(0,availableHeight-32);
             CGFloat height=MIN([self.statsView preferredHeightForWidth:width],available);
             NSString* position=[self.defaults stringForKey:@"position"] ?: @"topLeft";
@@ -266,7 +270,7 @@ static MLOverlayController* controller;
             NSRect frame=NSMakeRect(x,y,width,height);
             if (!NSEqualRects(panel.frame,frame)) [panel setFrame:frame display:NO];
             self.statsView.frame=panel.contentView.bounds; [self.statsView refresh];
-            [self setPanel:panel visible:copy[0].enabled && copy[0].text[0] && self.parent.visible && !self.parent.miniaturized];
+            [self setPanel:panel visible:self.parent.visible && !self.parent.miniaturized];
             applyPanelTheme(panel); panel.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]; continue;
         }
         NSTextField* label=self.statusText;
@@ -288,7 +292,7 @@ static MLOverlayController* controller;
         if (i==1) { x=NSMidX(bounds)-width/2; y=NSMinY(bounds)+(self.controls ? 70 : 12); }
         NSRect frame=NSMakeRect(x,y,width,height);
         if (!NSEqualRects(panel.frame,frame)) [panel setFrame:frame display:NO];
-        BOOL visible=copy[i].enabled && copy[i].text[0] && self.parent.visible && !self.parent.miniaturized;
+        BOOL visible=self.parent.visible && !self.parent.miniaturized;
         [self setPanel:panel visible:visible];
         applyPanelTheme(panel);
     }

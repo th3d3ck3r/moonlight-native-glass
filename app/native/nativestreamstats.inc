@@ -63,12 +63,12 @@ static CGFloat streamDetailHeight(const NativeStreamStats::Row& row,CGFloat widt
     }
     return self;
 }
-- (void)reset { history.clear(); rows.clear(); lastRevision=0; [self refresh]; }
+- (void)reset { if (!lastRevision) return; history.clear(); rows.clear(); lastRevision=0; [self refresh]; }
 - (void)present:(NSString*)text revision:(uint64_t)revision {
     if (revision==lastRevision) return;
     lastRevision=revision; latestTime=NSProcessInfo.processInfo.systemUptime;
     rows=NativeStreamStats::parse(text.UTF8String ?: ""); history.append(rows,latestTime);
-    [self refresh];
+    // The panel updates the frame and refreshes once after applying this sample.
 }
 - (NSUInteger)sampleCount {
     size_t count=0; for (auto& entry:history.samples) count=MAX(count,entry.second.size()); return count;

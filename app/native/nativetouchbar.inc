@@ -66,6 +66,8 @@ enum MLTouchMetric { TouchFPS,TouchRTT,TouchBitrate,TouchDecode,TouchHost,TouchQ
     BOOL havePrevious,busy;
     std::array<mlg::TouchBarHistory,TouchMetricCount> histories;
     double historyStreamUpdated;
+    unsigned historyRevision=0, copiedHistoryRevision=0;
+    std::shared_ptr<const StreamTelemetry> streamTelemetry;
 }
 @property(nonatomic,assign) BOOL active;
 @property(nonatomic,assign) BOOL inlineMode;
@@ -83,6 +85,7 @@ enum MLTouchMetric { TouchFPS,TouchRTT,TouchBitrate,TouchDecode,TouchHost,TouchQ
 @property(nonatomic,assign) double tx;
 - (void)sample;
 - (void)refreshCards;
+- (void)applyStreamTelemetry:(const std::shared_ptr<const StreamTelemetry>&)snapshot;
 - (void)copyHardwareFrom:(MLTouchDashboard*)source;
 - (NSArray*)cardFrames;
 - (NSString*)displayValueForCard:(NSUInteger)index width:(CGFloat)width;
@@ -110,8 +113,8 @@ enum MLTouchMetric { TouchFPS,TouchRTT,TouchBitrate,TouchDecode,TouchHost,TouchQ
 - (NSSize)intrinsicContentSize { return NSMakeSize(350,30); }
 - (NSString*)metric:(NSString*)prefix fallback:(NSString*)fallback {
     // Never present a sample as current once the source stops updating.
-    if (NSProcessInfo.processInfo.systemUptime-self.streamUpdated>4) return fallback;
-    for (const auto& row:NativeStreamStats::parse(self.streamText.UTF8String ?: "")) {
+    if (!streamTelemetry || !self.streamText.length || NSProcessInfo.processInfo.systemUptime-self.streamUpdated>4) return fallback;
+    for (const auto& row:streamTelemetry->rows) {
         NSString* label=[NSString stringWithUTF8String:row.label.c_str()];
         NSString* value=[NSString stringWithUTF8String:row.value.c_str()];
         if ([label hasPrefix:prefix]) return value;
@@ -187,16 +190,26 @@ enum MLTouchMetric { TouchFPS,TouchRTT,TouchBitrate,TouchDecode,TouchHost,TouchQ
     [self setAccessibilityLabel:[spoken componentsJoinedByString:@"; "]];
     self.needsDisplay=YES;
 }
+- (void)applyStreamTelemetry:(const std::shared_ptr<const StreamTelemetry>&)snapshot {
+    if (streamTelemetry==snapshot) return;
+    streamTelemetry=snapshot;
+    self.streamText=snapshot ? ([NSString stringWithUTF8String:snapshot->text.c_str()] ?: @"") : @"";
+    self.streamUpdated=snapshot ? snapshot->updated : 0;
+}
 - (void)copyHardwareFrom:(MLTouchDashboard*)source {
     self.cpu=source.cpu; self.ram=source.ram; self.gpu=source.gpu; self.rx=source.rx; self.tx=source.tx;
-    histories=source->histories; historyStreamUpdated=source->historyStreamUpdated;
+    if (copiedHistoryRevision!=source->historyRevision) {
+        histories=source->histories; historyStreamUpdated=source->historyStreamUpdated;
+        copiedHistoryRevision=source->historyRevision;
+    }
 }
 - (void)sample {
     if (!self.active || busy) return;
     busy=YES;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{
-        MLHardwareReading current=readLocalHardware();
-        double now=NSProcessInfo.processInfo.systemUptime;
+    dispatch_async(hardwareSamplingQueue(), ^{
+        const auto sample=sharedHardwareSample();
+        const auto current=sample.reading;
+        const double now=sample.time;
         dispatch_async(dispatch_get_main_queue(), ^{
             busy=NO; if (!self.active) return;
             double elapsed=now-previousTime;
@@ -212,18 +225,20 @@ enum MLTouchMetric { TouchFPS,TouchRTT,TouchBitrate,TouchDecode,TouchHost,TouchQ
             self.ram=current.memory<0 ? -1 : current.memory/double(NSProcessInfo.processInfo.physicalMemory)*100.; self.gpu=current.gpu;
             histories[TouchCPU].append(now,self.cpu); histories[TouchRAM].append(now,self.ram);
             histories[TouchGPU].append(now,self.gpu); histories[TouchRX].append(now,self.rx); histories[TouchTX].append(now,self.tx);
+            ++historyRevision;
             [self refreshCards];
         });
     });
 }
 - (void)recordStreamHistory {
-    if (!self.streamText.length || self.streamUpdated<=historyStreamUpdated ||
+    if (!streamTelemetry || !self.streamText.length || self.streamUpdated<=historyStreamUpdated ||
         NSProcessInfo.processInfo.systemUptime-self.streamUpdated>4) return;
     historyStreamUpdated=self.streamUpdated;
     static const char* prefixes[]={"Incoming frame rate","Average network latency","Bitrate","Average decoding time",
         "Host processing latency","Average frame queue delay","Average rendering time","Frames dropped by",
         "Frames dropped due","Rendering frame rate"};
-    const auto rows=NativeStreamStats::parse(self.streamText.UTF8String ?: "");
+    ++historyRevision;
+    const auto& rows=streamTelemetry->rows;
     for (int metric=0;metric<TouchCPU;++metric) {
         double value=NAN;
         for (const auto& row:rows) if (row.label.rfind(prefixes[metric],0)==0) {
@@ -713,7 +728,7 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     [self updateTouchPresentation];
     if (!self.window || !self.window.visible || !NSApp.active || !self.window.keyWindow) return;
     // Local sampling only; the streaming engine still owns the stats cadence.
-    [self.touchDashboard sample]; [self refreshTouchBar];
+    [self.touchDashboard sample]; [self refreshTouchBarReadings];
 }
 // Keep secondary pages inside the one Controls popover. Presenting a second
 // NSPopoverTouchBarItem from its expanded bar can dismiss both on hardware.
@@ -889,17 +904,14 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     if ([name isEqual:@"touch.hide"] || [name isEqual:@"touch.disconnect"])
         for (NSPopoverTouchBarItem* popover in self.touchPopovers) [popover dismissPopover:nil];
 }
-- (void)refreshTouchBar {
+- (void)refreshTouchBarReadings {
     if (!self.streamTouchBar) return;
     TitleState copy; { std::lock_guard<std::mutex> lock(stateMutex); copy=state; }
-    for (NSButton* button in self.touchButtons.allValues) { button.bezelColor=touchSurface(); button.contentTintColor=touchAccent(); }
-    self.touchDashboard.streamText=[NSString stringWithUTF8String:copy.streamText.c_str()] ?: @"";
-    self.touchDashboard.streamUpdated=copy.streamUpdated;
+    [self.touchDashboard applyStreamTelemetry:copy.telemetry];
     self.touchDashboard.devicesText=self.controllerCount ? [NSString stringWithFormat:@"%lu · %@",(unsigned long)self.controllerCount,powerDescription(self.batteryLevel)] : @"None connected";
     [self.touchDashboard refreshCards];
     self.touchInlineDashboard.connectionState=(NSInteger)copy.connection;
-    self.touchInlineDashboard.streamText=self.touchDashboard.streamText;
-    self.touchInlineDashboard.streamUpdated=copy.streamUpdated;
+    [self.touchInlineDashboard applyStreamTelemetry:copy.telemetry];
     self.touchInlineDashboard.devicesText=self.touchDashboard.devicesText;
     [self.touchInlineDashboard copyHardwareFrom:self.touchDashboard]; [self.touchInlineDashboard refreshCards];
     NSButton* info=self.touchButtons[@"touch.info"];
@@ -909,6 +921,13 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
         info.image=touchSymbol(copy.connection==NativeConnectionState::Poor || copy.connection==NativeConnectionState::Disconnected ? @"exclamationmark.circle" : @"moon.fill");
     }
     info.toolTip=[NSString stringWithFormat:@"%@ · Stream measurements, decoding, local hardware and controllers",connectionDescription(copy.connection)];
+    if (self.touchLiveStats) [info setAccessibilityLabel:[NSString stringWithFormat:@"%@; %@; tap for more stream information",connectionDescription(copy.connection),self.touchInlineDashboard.accessibilityLabel]];
+    else [info setAccessibilityLabel:info.toolTip.length ? [NSString stringWithFormat:@"%@ · %@",info.title,info.toolTip] : info.title];
+}
+- (void)refreshTouchBar {
+    if (!self.streamTouchBar) return;
+    TitleState copy; { std::lock_guard<std::mutex> lock(stateMutex); copy=state; }
+    for (NSButton* button in self.touchButtons.allValues) { button.bezelColor=touchSurface(); button.contentTintColor=touchAccent(); }
     NSButton* capture=self.touchButtons[@"touch.capture"]; capture.title=copy.captured ? @"Release" : @"Capture";
     capture.image=touchSymbol(copy.captured ? @"cursorarrow.motionlines" : @"cursorarrow");
     capture.bezelColor=copy.captured ? [touchAccent() colorWithAlphaComponent:.45] : [NSColor colorWithWhite:.13 alpha:1];
@@ -947,7 +966,7 @@ static BOOL touchWantsFullWidth(MLStreamTitlebar* owner) {
     }
     for (NSButton* button in self.touchButtons.allValues) button.needsDisplay=YES;
     [(MLTouchSurface*)objc_getAssociatedObject(self.streamTouchBar,&touchSurfaceKey) updateArtwork];
-    if (self.touchLiveStats) [info setAccessibilityLabel:[NSString stringWithFormat:@"%@; %@; tap for more stream information",connectionDescription(copy.connection),self.touchInlineDashboard.accessibilityLabel]];
+    [self refreshTouchBarReadings];
 }
 - (void)invalidateTouchBar {
     self.touchInvalidating=YES;

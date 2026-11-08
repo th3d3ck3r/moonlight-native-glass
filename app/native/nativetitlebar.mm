@@ -3,10 +3,13 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
 #include <mutex>
+#include <memory>
 #include <string>
+#include <cstring>
 #include "nativetitlebar.h"
 #include "nativeoverlay.h"
 #include "nativeplaybackvolume.h"
+#include "nativestreamstats.h"
 
 static BOOL crimsonEnabled() {
     NSUserDefaults* defaults = [[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
@@ -22,11 +25,19 @@ static NSString* const batteryID = @"NativeControllerBattery";
 static NSString* const recordID = @"NativeRecord";
 static NSString* const replayID = @"NativeReplay";
 static NSString* const connectionID = @"NativeConnection";
-struct TitleState { bool telemetryActive=false,recorder=false,recording=false,buffering=false,replayReady=false,saving=false,recorderFailed=false; uint64_t seconds=0; std::string recordingMessage="Recording disabled",streamText; double streamUpdated=0; bool captured=false; bool statistics=false; bool muted=false; NativeConnectionState connection=NativeConnectionState::Connecting; };
+struct StreamTelemetry {
+    std::string text;
+    std::vector<NativeStreamStats::Row> rows;
+    double updated;
+};
+struct TitleState { bool telemetryActive=false,recorder=false,recording=false,buffering=false,replayReady=false,saving=false,recorderFailed=false; uint64_t seconds=0; std::string recordingMessage="Recording disabled"; std::shared_ptr<const StreamTelemetry> telemetry; bool captured=false; bool statistics=false; bool muted=false; NativeConnectionState connection=NativeConnectionState::Connecting; };
 static TitleState state;
 static std::mutex stateMutex;
 static unsigned epoch=0;
-static bool pending=false;
+static bool pending=false, chromeDirty=false;
+static bool telemetryWorkerPending=false, telemetryDirty=false;
+static std::string pendingTelemetry;
+static double pendingTelemetryTime=0;
 
 static void requestTitlebarInputRepair(NSWindow* window);
 // AppKit's green button can retain native title chrome in a fullscreen Space,
@@ -183,6 +194,7 @@ static MLStreamTitlebar* titlebar;
 @interface MLStreamTitlebar (TouchBar) <NSTouchBarDelegate>
 - (void)installTouchBar;
 - (void)refreshTouchBar;
+- (void)refreshTouchBarReadings;
 - (void)invalidateTouchBar;
 - (void)updateTouchPresentation;
 - (void)touchPresentationChanged:(NSNotification*)notification;
@@ -687,18 +699,30 @@ static void requestTitlebarInputRepair(NSWindow* window) {
 
 #include "nativetouchbar.inc"
 
-static void scheduleRefresh() {
-    // Caller holds stateMutex. Every state transition is coalesced and stale
-    // callbacks cannot touch a detached or subsequent stream window.
-    if (pending) return; pending=true; unsigned expected=epoch;
+static void scheduleRefresh(bool updateChrome=true) {
+    // Caller holds stateMutex. Only control changes need the title-bar layout
+    // and button refresh. Telemetry updates publish the Touch Bar readout.
+    chromeDirty |= updateChrome;
+    if (pending) return;
+    pending=true; unsigned expected=epoch;
     dispatch_async(dispatch_get_main_queue(), ^{
-        { std::lock_guard<std::mutex> lock(stateMutex); if (expected!=epoch) return; pending=false; }
-        [titlebar refresh];
+        bool refreshChrome;
+        {
+            std::lock_guard<std::mutex> lock(stateMutex);
+            if (expected!=epoch) return;
+            pending=false; refreshChrome=chromeDirty; chromeDirty=false;
+        }
+        if (refreshChrome) [titlebar refresh];
+        else [titlebar refreshTouchBarReadings];
     });
 }
 void nativeTitlebarSetRecording(bool available,bool recording,bool buffering,bool ready,bool saving,bool failed,uint64_t seconds,const char* message) {
     std::lock_guard<std::mutex> lock(stateMutex);
-    state.recorder=available;state.recording=recording;state.buffering=buffering;state.replayReady=ready;state.saving=saving;state.recorderFailed=failed;state.seconds=seconds;state.recordingMessage=message ? message : "";
+    const char* detail=message ? message : "";
+    if (state.recorder==available && state.recording==recording && state.buffering==buffering &&
+        state.replayReady==ready && state.saving==saving && state.recorderFailed==failed &&
+        state.seconds==seconds && state.recordingMessage==detail) return;
+    state.recorder=available;state.recording=recording;state.buffering=buffering;state.replayReady=ready;state.saving=saving;state.recorderFailed=failed;state.seconds=seconds;state.recordingMessage=detail;
     scheduleRefresh();
 }
 void nativeTitlebarSetCapture(bool captured) { std::lock_guard<std::mutex> lock(stateMutex); if (state.captured!=captured) { state.captured=captured; scheduleRefresh(); } }
@@ -709,9 +733,34 @@ void nativeTitlebarSetStatistics(bool visible) {
 void nativeTitlebarSetStreamInformation(const char* text) {
     std::lock_guard<std::mutex> lock(stateMutex);
     if (!state.telemetryActive) return;
-    state.streamText=text ? std::string(text).substr(0,4096) : "";
-    state.streamUpdated=NSProcessInfo.processInfo.systemUptime;
-    scheduleRefresh();
+    pendingTelemetry.assign(text ? text : "", text ? strnlen(text,4096) : 0);
+    pendingTelemetryTime=NSProcessInfo.processInfo.systemUptime;
+    telemetryDirty=true;
+    if (telemetryWorkerPending) return;
+    telemetryWorkerPending=true;
+    unsigned expected=epoch;
+    static dispatch_queue_t queue=dispatch_queue_create("com.moonlightlg.touchbar.telemetry",
+        dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL,QOS_CLASS_UTILITY,0));
+    dispatch_async(queue, ^{
+        // Keep a single latest-value slot. Parsing never holds the producer's
+        // mutex, and a detached window cannot publish into a new stream.
+        for (;;) {
+            auto next=std::make_shared<StreamTelemetry>();
+            {
+                std::lock_guard<std::mutex> guard(stateMutex);
+                if (expected!=epoch) return;
+                next->text.swap(pendingTelemetry);
+                next->updated=pendingTelemetryTime;
+                telemetryDirty=false;
+            }
+            next->rows=NativeStreamStats::parse(next->text);
+            std::lock_guard<std::mutex> guard(stateMutex);
+            if (expected!=epoch) return;
+            state.telemetry=std::move(next);
+            scheduleRefresh(false);
+            if (!telemetryDirty) { telemetryWorkerPending=false; return; }
+        }
+    });
 }
 void nativeTitlebarSetMuted(bool muted) { std::lock_guard<std::mutex> lock(stateMutex); if (state.muted!=muted) { state.muted=muted; scheduleRefresh(); } }
 void nativeTitlebarSetConnection(NativeConnectionState value) { std::lock_guard<std::mutex> lock(stateMutex); if (state.connection!=value) { state.connection=value; scheduleRefresh(); } }
@@ -784,7 +833,12 @@ void nativeTitlebarAttach(void* window) {
     { std::lock_guard<std::mutex> lock(stateMutex); state.telemetryActive=true; }
 }
 void nativeTitlebarDetach() {
-    { std::lock_guard<std::mutex> lock(stateMutex); epoch++; pending=false; state.telemetryActive=false; state.streamText.clear(); state.streamUpdated=0; }
+    {
+        std::lock_guard<std::mutex> lock(stateMutex);
+        epoch++; pending=false; chromeDirty=false;
+        telemetryWorkerPending=false; telemetryDirty=false; pendingTelemetry.clear();
+        state.telemetryActive=false; state.telemetry.reset();
+    }
     [titlebar invalidate]; [titlebar release]; titlebar=nil;
 }
 void nativeTitlebarSetWindowTransition(bool transitioning) {

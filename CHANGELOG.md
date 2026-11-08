@@ -1,5 +1,11 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.10.0U — Streaming event-thread load
+
+- ⚡ Prepare Touch Bar measurements on a utility queue and refresh the readout independently of title-bar buttons and layout.
+- 📊 Share hardware readings between the Touch Bar and Mac monitor on a serial utility queue. Skip identical recorder status refreshes and hidden overlay layout.
+- Internal build 64.
+
 ## 🌙 1.3.9.0U — Trackpad capture diagnostics
 
 - 🖱️ Add an opt-in comparison of native and stock focus behavior for relative mouse capture. The stream log reports event timing, batches, and capture changes.

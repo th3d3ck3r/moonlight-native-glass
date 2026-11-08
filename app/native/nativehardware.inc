@@ -62,6 +62,25 @@ static MLHardwareReading readLocalHardware() {
     return r;
 }
 
+struct MLHardwareSample {
+    MLHardwareReading reading;
+    double time=0;
+};
+static dispatch_queue_t hardwareSamplingQueue() {
+    static dispatch_queue_t queue=dispatch_queue_create("com.moonlightlg.hardware.sampling",
+        dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL,QOS_CLASS_UTILITY,0));
+    return queue;
+}
+static MLHardwareSample sharedHardwareSample() {
+    // Both clients run here. Combine nearby requests without suppressing the
+    // hardware panel's fastest selectable cadence (0.5 seconds).
+    static MLHardwareSample latest;
+    const double now=NSProcessInfo.processInfo.systemUptime;
+    if (!latest.time || now-latest.time>=.25)
+        latest={readLocalHardware(),NSProcessInfo.processInfo.systemUptime};
+    return latest;
+}
+
 // A separate decoration sits below graph drawing and never owns input.
 @interface MLHardwareMaterial : NSView
 @end
@@ -194,9 +213,10 @@ static MLHardwareReading readLocalHardware() {
 - (void)sample:(NSTimer*)timer {
     if (!self.active || busy || (self.window && !self.window.visible)) return;
     busy=YES;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{
-        MLHardwareReading current=readLocalHardware();
-        double time=NSProcessInfo.processInfo.systemUptime;
+    dispatch_async(hardwareSamplingQueue(), ^{
+        const auto sample=sharedHardwareSample();
+        const auto current=sample.reading;
+        const double time=sample.time;
         dispatch_async(dispatch_get_main_queue(), ^{
             busy=NO; if (!self.active) return;
             double cpu=-1,rx=-1,tx=-1,elapsed=time-previousTime;
