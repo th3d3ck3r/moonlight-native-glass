@@ -1,5 +1,12 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.10.2E — Stream scheduling experiment
+
+- 🎮 Start from build 64 and request a latency-critical activity for the native streaming helper while allowing idle system sleep.
+- ⚡ Request user-interactive QoS for the helper launch and temporarily boost the SDL event thread during the stream.
+- 🧹 Refresh the menu on relevant window events and input actions. Cache native appearance and remove the routine overlay preferences sync.
+- Internal build 66. Trackpad improvement is pending a live comparison.
+
 ## 🌙 1.3.10.0U — Streaming event-thread load
 
 - ⚡ Prepare Touch Bar measurements on a utility queue and refresh the readout independently of title-bar buttons and layout.

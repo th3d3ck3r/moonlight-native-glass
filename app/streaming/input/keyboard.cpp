@@ -343,6 +343,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         if (action >= 0) {
             if (scan >= 0 && scan < SDL_NUM_SCANCODES) m_NativeConsumedKeys[scan] = true;
             handleNativeOverlayAction(action == 11 ? 100 : action);
+            nativeOverlayPerformAction(210);
             return;
         }
     }

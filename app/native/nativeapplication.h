@@ -1,5 +1,8 @@
 #pragma once
 #include <SDL.h>
+// Apply experimental scheduling only while the native SDL stream loop owns input.
+void nativeBeginStreamActivity();
+void nativeEndStreamActivity();
 // Hide the existing native stream window without ending its session.
 bool nativeHideStreamWindow(SDL_Window* window);
 // Session supplies its existing safe fullscreen transition; no renderer logic

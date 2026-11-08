@@ -11,10 +11,12 @@
 #include "nativeplaybackvolume.h"
 #include "nativestreamstats.h"
 
-static BOOL crimsonEnabled() {
+static BOOL crimsonAppearance = YES;
+static void reloadCrimsonAppearance() {
     NSUserDefaults* defaults = [[[NSUserDefaults alloc] initWithSuiteName:@"com.moonlight-stream.NativeGlass.Overlay"] autorelease];
-    return [defaults objectForKey:@"crimsonGlass"] ? [defaults boolForKey:@"crimsonGlass"] : YES;
+    crimsonAppearance = [defaults objectForKey:@"crimsonGlass"] ? [defaults boolForKey:@"crimsonGlass"] : YES;
 }
+static BOOL crimsonEnabled() { return crimsonAppearance; }
 
 static NSString* const captureID = @"NativeCapture";
 static NSString* const hostID = @"NativeHost";
@@ -293,7 +295,7 @@ static void requestTitlebarInputRepair(NSWindow* window) {
         [self updateWindowToolbar];
     });
 }
-- (void)themeChanged:(NSNotification*)notification { [self updateWindowToolbar]; [self refresh]; }
+- (void)themeChanged:(NSNotification*)notification { reloadCrimsonAppearance(); [self updateWindowToolbar]; [self refresh]; }
 - (void)focusChanged:(NSNotification*)notification {
     if (notification.object==self.window || notification.object==NSApp) { [self updateVisibility]; [self updateTouchPresentation]; }
 }
@@ -773,6 +775,7 @@ void nativeTitlebarConnectionStarted() {
 void nativeTitlebarControllersChanged() { [titlebar readControllers]; }
 void nativeTitlebarAttach(void* window) {
     nativeTitlebarDetach();
+    reloadCrimsonAppearance();
     titlebar=[[MLStreamTitlebar alloc] init]; titlebar.window=(NSWindow*)window;
     titlebar.previousFullSizeContent=(titlebar.window.styleMask & NSWindowStyleMaskFullSizeContentView)!=0;
     titlebar.previousMovable=titlebar.window.movable;

@@ -9,10 +9,11 @@
 #include <cstring>
 
 static NSString* const suite = @"com.moonlight-stream.NativeGlass.Overlay";
-static BOOL crimsonEnabled() {
-    NSUserDefaults* d = [[[NSUserDefaults alloc] initWithSuiteName:suite] autorelease];
-    return [d objectForKey:@"crimsonGlass"] ? [d boolForKey:@"crimsonGlass"] : YES;
+static BOOL crimsonAppearance = YES;
+static void reloadCrimsonAppearance(NSUserDefaults* defaults) {
+    crimsonAppearance = [defaults objectForKey:@"crimsonGlass"] ? [defaults boolForKey:@"crimsonGlass"] : YES;
 }
+static BOOL crimsonEnabled() { return crimsonAppearance; }
 static NSColor* crimsonAccent() { return [NSColor colorWithSRGBRed:0.95 green:0.19 blue:0.32 alpha:1]; }
 static NSString* const changed = @"com.moonlight-stream.NativeGlass.overlaySettingsChanged";
 static NSString* const toggle = @"com.moonlight-stream.NativeGlass.toggleStreamControls";
@@ -116,6 +117,7 @@ static MLOverlayController* controller;
 - (instancetype)init {
     if ((self = [super init])) {
         self.defaults = [[[NSUserDefaults alloc] initWithSuiteName:suite] autorelease];
+        reloadCrimsonAppearance(self.defaults);
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:NSWindowDidResizeNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:NSWindowDidMoveNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(windowChanged:) name:NSWindowDidChangeScreenNotification object:nil];
@@ -165,13 +167,16 @@ static MLOverlayController* controller;
     if (self.showingControls && [n.name isEqualToString:NSWindowDidResizeNotification]) [self refresh];
     else [self layoutPanels];
 }
-- (void)settingsChanged:(NSNotification*)n { [self.defaults synchronize]; [self refresh]; }
+- (void)settingsChanged:(NSNotification*)n {
+    [self.defaults synchronize];
+    reloadCrimsonAppearance(self.defaults);
+    [self refresh];
+}
 - (void)accessibilityChanged:(NSNotification*)n { [self refresh]; }
 - (void)toggleControls:(NSNotification*)n { if ([n.object isEqual:self.token]) pushAction(100); }
 - (void)action:(NSButton*)sender { pushAction((int)sender.tag); }
 - (void)dismiss:(id)sender { pushAction(101); }
 - (void)refresh {
-    [self.defaults synchronize];
     applyPanelTheme(self.stats); applyPanelTheme(self.status);
     NSDictionary* custom = [self.defaults dictionaryForKey:@"shortcuts"];
     { std::lock_guard<std::mutex> lock(bindingMutex);

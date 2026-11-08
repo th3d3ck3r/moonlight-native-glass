@@ -23,6 +23,9 @@ final class EngineChannel {
         signal(SIGPIPE, SIG_IGN)
         process.executableURL = executable
         process.arguments = arguments
+        if arguments.starts(with: ["native", "stream"]) {
+            process.qualityOfService = .userInteractive
+        }
         if mouseDiagnostics != 0 {
             var environment = ProcessInfo.processInfo.environment
             environment["MOONLIGHTLG_MOUSE_DIAGNOSTICS"] = String(mouseDiagnostics)

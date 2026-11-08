@@ -14,6 +14,8 @@ void configureNativeBackgroundApplication()
 #include <cstdio>
 #include <string>
 #include <thread>
+#include <pthread.h>
+#include <pthread/qos.h>
 #include <atomic>
 #include <poll.h>
 #include <unistd.h>
@@ -272,6 +274,34 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 @end
 
 static MLStreamWindowAccess* streamWindowAccess;
+// Both calls run on the SDL event thread and apply only to the native helper.
+static id<NSObject> streamActivity;
+static pthread_override_t streamThreadPriority;
+
+void nativeBeginStreamActivity()
+{
+    if (!streamWindowAccess || streamActivity) return;
+    streamActivity = [[NSProcessInfo.processInfo
+        beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep | NSActivityLatencyCritical
+        reason:@"MoonlightLG experimental game stream"] retain];
+    streamThreadPriority = pthread_override_qos_class_start_np(pthread_self(), QOS_CLASS_USER_INTERACTIVE, 0);
+    SDL_Log("MoonlightLG: experimental stream activity=%s, SDL QoS override=%s",
+            streamActivity ? "active" : "unavailable", streamThreadPriority ? "active" : "unavailable");
+}
+
+void nativeEndStreamActivity()
+{
+    if (streamThreadPriority) {
+        pthread_override_qos_class_end_np(streamThreadPriority);
+        streamThreadPriority = nullptr;
+    }
+    if (streamActivity) {
+        [NSProcessInfo.processInfo endActivity:streamActivity];
+        [streamActivity release];
+        streamActivity = nil;
+        SDL_Log("MoonlightLG: experimental stream activity ended");
+    }
+}
 
 bool nativeStreamDisconnectConfirmationVisible() { return streamWindowAccess.disconnectConfirmation != nil; }
 static void cancelDisconnectConfirmation(bool restoreInput) {
