@@ -27,6 +27,9 @@ struct NativeSettingsView: View {
     @AppStorage(NativeTouchBarPresentation.failedKey) private var touchBarFullWidthUnavailable = false
     @AppStorage("touchBarLiveStats", store: UserDefaults(suiteName: NativeCrimsonTheme.suite)) private var touchBarLiveStats = true
     @AppStorage(EngineStore.mouseDiagnosticsKey) private var mouseDiagnostics = 0
+    #if arch(arm64)
+    @AppStorage(EngineStore.asyncMetalPresentationKey) private var asyncMetalPresentation = false
+    #endif
     @State private var touchBarError = false
     @State private var pane = SettingsPane.video
     @State private var nativeSize: VideoResolution?
@@ -71,6 +74,14 @@ struct NativeSettingsView: View {
                     if pane == .overlay { OverlaySettings() }
                     if pane == .shortcuts { ShortcutSettings() }
                     if pane == .video {
+                        #if arch(arm64)
+                        Section("Apple Silicon Experiment") {
+                            Toggle("Asynchronous Metal Presentation", isOn: $asyncMetalPresentation)
+                                .accessibilityIdentifier("async-metal-presentation-toggle")
+                            Text("Applies to the next stream. Select Metal, enable Vertical Sync, and use hardware video decoding for this comparison.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }.disabled(store.streamActive)
+                        #endif
                         Section {
                             Text("Automatic selections use Moonlight Qt's normal capability checks. HDR and codecs depend on your Mac, display and host.").font(.callout).foregroundStyle(.secondary)
                         }

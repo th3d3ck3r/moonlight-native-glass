@@ -26,6 +26,13 @@ func nativeArgument(_ name: String) -> String? { nil }
         exit 0
         """.write(to: helper, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: helper.path)
+        let regularStream = EngineChannel(executable: helper, arguments: ["native", "stream"])
+        precondition(regularStream.process.environment?["MOONLIGHTLG_ASYNC_METAL_PRESENTATION"] == "0")
+        let trialStream = EngineChannel(executable: helper, arguments: ["native", "stream"], mouseDiagnostics: 1, asyncMetalPresentation: true)
+        precondition(trialStream.process.environment?["MOONLIGHTLG_ASYNC_METAL_PRESENTATION"] == "1")
+        precondition(trialStream.process.environment?["MOONLIGHTLG_MOUSE_DIAGNOSTICS"] == "1")
+        precondition(trialStream.process.qualityOfService == .userInteractive)
+
         let computer = Computer(id: "test", name: "Test", online: true, unknown: false, paired: true,
             runningApp: 0, address: "127.0.0.1", localAddress: "127.0.0.1", serverVersion: "test", gpu: "", supported: true, apps: [])
         let game = Game(id: 1, name: "Test", hdr: false, hidden: false, artwork: "")

@@ -1,5 +1,12 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.10.3U — Stream scheduling and Apple Silicon Metal trial
+
+- 🎮 Carry forward the active-stream activity, prioritize the native helper and SDL input thread, and release the thread override on exit.
+- ⚡ Refresh stream menu state only for relevant events and cache stream appearance preferences between changes.
+- 🍎 Add a default-off asynchronous Metal presentation toggle for Apple Silicon hardware decode with Vertical Sync. Mouse Diagnostics also logs Metal frame timing for comparison.
+- Internal build 67.
+
 ## 🌙 1.3.10.1U — Active-stream scheduling
 
 - 🎮 The native engine requests a latency-critical process activity while streaming. This asks macOS to avoid App Nap and timer coalescing for the active helper while preserving the separate idle sleep preference.

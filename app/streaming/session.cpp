@@ -2071,6 +2071,7 @@ void Session::exec()
 #ifdef Q_OS_MACOS
     // Native menu state and explicit mute are session-local presentation controls.
     nativeRecorderStart();
+    nativeBeginStreamThreadPriority();
     bool nativeUserMuted = false;
     auto publishNativeMenu = [&] {
         nativePublishMenuState(m_Window, m_InputHandler->nativeMenuCaptureIntent(),
@@ -2138,7 +2139,10 @@ void Session::exec()
                 // This internal command is scoped to the original SDL window;
                 // ignore stale repair requests after replacement or disconnect.
                 if (Uint32(reinterpret_cast<uintptr_t>(event.user.data1))==SDL_GetWindowID(m_Window) &&
-                    !nativeStreamDisconnectConfirmationVisible()) m_InputHandler->handleNativeOverlayAction(action);
+                    !nativeStreamDisconnectConfirmationVisible()) {
+                    m_InputHandler->handleNativeOverlayAction(action);
+                    publishNativeMenu();
+                }
                 continue;
             }
             nativeAcknowledgeMenuAction(action, Uint32(reinterpret_cast<uintptr_t>(event.user.data1)));
@@ -2169,8 +2173,24 @@ void Session::exec()
             publishNativeMenu();
             continue;
         }
-        if (nativeOverlayConfigured() && (event.type == SDL_KEYUP || event.type == SDL_WINDOWEVENT))
-            nativeOverlayPerformAction(210);
+        if (nativeOverlayConfigured() && event.type == SDL_WINDOWEVENT &&
+            event.window.windowID == SDL_GetWindowID(m_Window)) {
+            switch (event.window.event) {
+            case SDL_WINDOWEVENT_SHOWN:
+            case SDL_WINDOWEVENT_HIDDEN:
+            case SDL_WINDOWEVENT_SIZE_CHANGED:
+            case SDL_WINDOWEVENT_MINIMIZED:
+            case SDL_WINDOWEVENT_MAXIMIZED:
+            case SDL_WINDOWEVENT_RESTORED:
+            case SDL_WINDOWEVENT_ENTER:
+            case SDL_WINDOWEVENT_LEAVE:
+            case SDL_WINDOWEVENT_FOCUS_GAINED:
+            case SDL_WINDOWEVENT_FOCUS_LOST:
+                // Publish after this window event has taken effect.
+                nativeOverlayPerformAction(210);
+                break;
+            }
+        }
 #endif
         switch (event.type) {
         case SDL_QUIT:
@@ -2438,6 +2458,14 @@ void Session::exec()
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
             presence.runCallbacks();
+#ifdef Q_OS_MACOS
+            if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT &&
+                nativeOverlayConfigured() && !m_InputHandler->nativeMenuCaptureIntent()) {
+                m_InputHandler->handleMouseButtonEvent(&event.button);
+                if (m_InputHandler->nativeMenuCaptureIntent()) publishNativeMenu();
+                break;
+            }
+#endif
             m_InputHandler->handleMouseButtonEvent(&event.button);
             break;
         case SDL_MOUSEMOTION:
@@ -2500,6 +2528,7 @@ void Session::exec()
 
 DispatchDeferredCleanup:
 #ifdef Q_OS_MACOS
+    nativeEndStreamThreadPriority();
     nativeRecorderQuiesce();
     if (nativeStreamMenuCommandsEnabled()) stopNativeStreamWindow();
 #endif

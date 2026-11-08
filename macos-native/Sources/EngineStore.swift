@@ -17,15 +17,24 @@ final class EngineChannel {
     private var closed = false
     var stopRequested: Bool { closed }
 
-    init(executable: URL, arguments: [String], mouseDiagnostics: Int = 0) {
+    init(executable: URL, arguments: [String], mouseDiagnostics: Int = 0, asyncMetalPresentation: Bool = false) {
         // A helper can close stdin before exiting. Let FileHandle surface EPIPE
         // as a send error instead of allowing SIGPIPE to terminate the frontend.
         signal(SIGPIPE, SIG_IGN)
         process.executableURL = executable
         process.arguments = arguments
-        if mouseDiagnostics != 0 {
+        let nativeStream = arguments.starts(with: ["native", "stream"])
+        if nativeStream {
+            process.qualityOfService = .userInteractive
+        }
+        if mouseDiagnostics != 0 || nativeStream {
             var environment = ProcessInfo.processInfo.environment
-            environment["MOONLIGHTLG_MOUSE_DIAGNOSTICS"] = String(mouseDiagnostics)
+            if mouseDiagnostics != 0 {
+                environment["MOONLIGHTLG_MOUSE_DIAGNOSTICS"] = String(mouseDiagnostics)
+            }
+            if nativeStream {
+                environment["MOONLIGHTLG_ASYNC_METAL_PRESENTATION"] = asyncMetalPresentation ? "1" : "0"
+            }
             process.environment = environment
         }
         process.currentDirectoryURL = executable.deletingLastPathComponent()
@@ -148,6 +157,7 @@ struct PairingRequest: Identifiable {
     private let streamHandoffTimeout: Duration
     private let defaults: UserDefaults
     static let mouseDiagnosticsKey = "mouseDiagnosticsMode"
+    static let asyncMetalPresentationKey = "asyncMetalPresentation"
     private static let computerOrderKey = "libraryComputerOrder"
     private var computerOrder: [String]
 
@@ -384,7 +394,8 @@ struct PairingRequest: Identifiable {
         menuState = NativeMenuState(token: token, nextMode: [1: 2, 0: 1, 2: 0][(values["windowMode"] as? NSNumber)?.intValue ?? 0] ?? 1)
         streamWindowExists = false
         let helper = EngineChannel(executable: executable, arguments: ["native", "stream", computer.id, String(game.id), String(x), String(y), token, "await-continue", computer.name, game.name],
-                                   mouseDiagnostics: defaults.integer(forKey: Self.mouseDiagnosticsKey))
+                                   mouseDiagnostics: defaults.integer(forKey: Self.mouseDiagnosticsKey),
+                                   asyncMetalPresentation: defaults.bool(forKey: Self.asyncMetalPresentationKey))
         helper.onEvent = { [weak self, weak helper] event in
             guard let self, !self.shuttingDown, self.stream === helper, helper?.stopRequested == false else { return }
             switch event["event"] as? String {

@@ -1,5 +1,8 @@
 #pragma once
 #include <SDL.h>
+// Scope the SDL event thread priority to the native stream loop.
+void nativeBeginStreamThreadPriority();
+void nativeEndStreamThreadPriority();
 // Hide the existing native stream window without ending its session.
 bool nativeHideStreamWindow(SDL_Window* window);
 // Session supplies its existing safe fullscreen transition; no renderer logic

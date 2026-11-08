@@ -14,6 +14,8 @@ void configureNativeBackgroundApplication()
 #include <cstdio>
 #include <string>
 #include <thread>
+#include <pthread.h>
+#include <pthread/qos.h>
 #include <atomic>
 #include <poll.h>
 #include <unistd.h>
@@ -274,6 +276,22 @@ bool nativeStreamWindowHasHiddenFullscreen(SDL_Window* window)
 @end
 
 static MLStreamWindowAccess* streamWindowAccess;
+static pthread_override_t streamThreadPriority;
+
+void nativeBeginStreamThreadPriority()
+{
+    if (!streamWindowAccess || streamThreadPriority) return;
+    streamThreadPriority = pthread_override_qos_class_start_np(pthread_self(), QOS_CLASS_USER_INTERACTIVE, 0);
+    SDL_Log("MoonlightLG: SDL stream QoS override %s", streamThreadPriority ? "acquired" : "unavailable");
+}
+
+void nativeEndStreamThreadPriority()
+{
+    if (!streamThreadPriority) return;
+    pthread_override_qos_class_end_np(streamThreadPriority);
+    streamThreadPriority = nullptr;
+    SDL_Log("MoonlightLG: SDL stream QoS override released");
+}
 
 bool nativeStreamDisconnectConfirmationVisible() { return streamWindowAccess.disconnectConfirmation != nil; }
 static void cancelDisconnectConfirmation(bool restoreInput) {

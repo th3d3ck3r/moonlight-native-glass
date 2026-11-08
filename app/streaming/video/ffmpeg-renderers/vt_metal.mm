@@ -153,6 +153,9 @@ public:
             return true;
         }
 
+        // Reconfigure geometry only after the previous drawable is finished.
+        drainAsyncPresentation();
+
         // Determine the correct scaled size for the video region
         SDL_Rect src, dst;
         src.x = src.y = 0;
@@ -475,7 +478,7 @@ public:
     }}
 
     // Caller frees frame after we return
-    virtual void renderFrameIntoDrawable(AVFrame* frame, id<CAMetalDrawable> drawable)
+    void renderFrameIntoDrawable(AVFrame* frame, id<CAMetalDrawable> drawable, bool asyncPresentation = false)
     { @autoreleasepool {
         std::array<CVMetalTextureRef, MAX_VIDEO_PLANES> cvMetalTextures;
         size_t planes = getFramePlaneCount(frame);
@@ -569,8 +572,20 @@ public:
         [commandBuffer presentDrawable:drawable];
         [commandBuffer commit];
 
-        // Wait for the command buffer to complete and free our CVMetalTextureCache references
-        [commandBuffer waitUntilCompleted];
+        if (asyncPresentation) {
+            // The display link owns this frame until the command completes.
+            // The completion handler above owns the plane textures.
+            m_InFlightCommand = [commandBuffer retain];
+            m_InFlightFrame = frame;
+        }
+        else {
+            const uint64_t start = m_LogPresentation ? LiGetMicroseconds() : 0;
+            [commandBuffer waitUntilCompleted];
+            if (m_LogPresentation) {
+                const uint64_t wait = LiGetMicroseconds() - start;
+                if (wait > m_MaxGpuWaitUs) m_MaxGpuWaitUs = wait;
+            }
+        }
     }}
 
     // Caller frees frame after we return
@@ -815,11 +830,16 @@ public:
                 return;
             }
 
+            m_AsyncPresentation = m_HwAccel && qgetenv("MOONLIGHTLG_ASYNC_METAL_PRESENTATION") == "1";
+            m_LogPresentation = qEnvironmentVariableIntValue("MOONLIGHTLG_MOUSE_DIAGNOSTICS") != 0;
             m_MetalDisplayLink = [[CAMetalDisplayLink alloc] initWithMetalLayer:m_MetalLayer];
             m_MetalDisplayLink.preferredFrameLatency = 1.0f;
             m_MetalDisplayLink.preferredFrameRateRange = m_FrameRateRange;
             m_MetalDisplayLink.delegate = [[DisplayLinkDelegate alloc] initWithRenderer:this];
             [m_MetalDisplayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+            if (m_AsyncPresentation || m_LogPresentation) {
+                SDL_Log("MoonlightLG: Apple Silicon Metal presentation is %s", m_AsyncPresentation ? "asynchronous" : "synchronous");
+            }
         }
     }
 
@@ -832,6 +852,8 @@ public:
 
             [m_MetalDisplayLink invalidate];
             m_MetalDisplayLink = nullptr;
+            drainAsyncPresentation();
+            logPresentationTiming(true);
         }
     }
 
@@ -910,8 +932,49 @@ public:
         return unhandledStateFlags == 0;
     }
 
+    void drainAsyncPresentation()
+    {
+        if (!m_InFlightCommand) return;
+        [m_InFlightCommand waitUntilCompleted];
+        releaseAsyncPresentation();
+    }
+
+    void releaseAsyncPresentation()
+    {
+        [m_InFlightCommand release];
+        m_InFlightCommand = nil;
+        av_frame_free(&m_InFlightFrame);
+    }
+
+    void logPresentationTiming(bool final = false)
+    {
+        if (!m_LogPresentation) return;
+        const uint64_t now = LiGetMicroseconds();
+        if (m_TimingIntervalStart == 0) m_TimingIntervalStart = now;
+        if (!final && now - m_TimingIntervalStart < 1000000) return;
+        if (m_DisplayUpdates) {
+            SDL_Log("MoonlightLG: Metal timing t_us=%llu async=%d callbacks=%u submitted=%u busy=%u max_frame_wait_us=%llu max_gpu_wait_us=%llu",
+                    (unsigned long long)now, m_AsyncPresentation, m_DisplayUpdates, m_DisplayedFrames, m_BusyDrawables,
+                    (unsigned long long)m_MaxFrameWaitUs, (unsigned long long)m_MaxGpuWaitUs);
+        }
+        m_TimingIntervalStart = final ? 0 : now;
+        m_DisplayUpdates = m_DisplayedFrames = m_BusyDrawables = 0;
+        m_MaxFrameWaitUs = m_MaxGpuWaitUs = 0;
+    }
+
     void renderLatestFrameOnDrawable(id<CAMetalDrawable> drawable, CFTimeInterval targetTimestamp)
     {
+        if (m_LogPresentation) ++m_DisplayUpdates;
+        if (m_InFlightCommand) {
+            if (m_InFlightCommand.status < MTLCommandBufferStatusCompleted) {
+                // Keep the latest frame queued without blocking the input run loop.
+                if (m_LogPresentation) ++m_BusyDrawables;
+                logPresentationTiming();
+                return;
+            }
+            releaseAsyncPresentation();
+        }
+
         AVFrame* frame = nullptr;
 
         // Determine how long we can wait depending on how long our CAMetalDisplayLink
@@ -919,10 +982,12 @@ public:
         // half the per-frame interval for a new frame to become available.
         int waitTimeMs = ((targetTimestamp - CACurrentMediaTime()) * 1000) / 2;
         if (waitTimeMs < 0) {
+            logPresentationTiming();
             return;
         }
 
         // Wait for a new frame to be ready
+        const uint64_t start = m_LogPresentation ? LiGetMicroseconds() : 0;
         SDL_LockMutex(m_FrameLock);
         if (m_LatestUnrenderedFrame != nullptr || SDL_CondWaitTimeout(m_FrameReady, m_FrameLock, waitTimeMs) == 0) {
             frame = m_LatestUnrenderedFrame;
@@ -930,15 +995,32 @@ public:
         }
         SDL_UnlockMutex(m_FrameLock);
 
-        // Render a frame if we got one in time
-        if (frame != nullptr) {
-            renderFrameIntoDrawable(frame, drawable);
-            av_frame_free(&frame);
+        if (m_LogPresentation) {
+            const uint64_t wait = LiGetMicroseconds() - start;
+            if (wait > m_MaxFrameWaitUs) m_MaxFrameWaitUs = wait;
         }
+
+        // Render a frame if we got one in time.
+        if (frame != nullptr) {
+            if (m_LogPresentation) ++m_DisplayedFrames;
+            renderFrameIntoDrawable(frame, drawable, m_AsyncPresentation && frame->format == AV_PIX_FMT_VIDEOTOOLBOX);
+            if (m_InFlightFrame != frame) av_frame_free(&frame);
+        }
+        logPresentationTiming();
     }
 
 private:
     bool m_HwAccel;
+    bool m_AsyncPresentation = false;
+    bool m_LogPresentation = false;
+    id<MTLCommandBuffer> m_InFlightCommand = nil;
+    AVFrame* m_InFlightFrame = nullptr;
+    uint64_t m_TimingIntervalStart = 0;
+    uint64_t m_MaxFrameWaitUs = 0;
+    uint64_t m_MaxGpuWaitUs = 0;
+    unsigned m_DisplayUpdates = 0;
+    unsigned m_DisplayedFrames = 0;
+    unsigned m_BusyDrawables = 0;
     SDL_Window* m_Window;
     AVBufferRef* m_HwContext;
     CAMetalLayer* m_MetalLayer;
