@@ -14,7 +14,7 @@ jobs:
     if: contains(github.event.head_commit.message, '[publish stable 1.3.10.3]')
     name: MoonlightLG UI window smoke test
     runs-on: macos-26-intel
-    timeout-minutes: 15
+    timeout-minutes: 22
     steps:
       - uses: actions/checkout@v5
         with:
@@ -24,6 +24,12 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
+      - name: Install the Metal compiler if needed
+        run: |
+          if ! xcrun metal --version; then
+            xcodebuild -downloadComponent MetalToolchain
+          fi
+          xcrun metal --version
       - name: Test menu, restore and removed hover before UI capture
         run: |
           mkdir -p build
