@@ -10,7 +10,49 @@ concurrency:
   group: publish-moonlightlg-stable
   cancel-in-progress: false
 jobs:
+  ui:
+    if: contains(github.event.head_commit.message, '[publish stable 1.3.10.3]')
+    name: MoonlightLG UI window smoke test
+    runs-on: macos-26-intel
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: 81ff5546ded40b641ed3a581e4a5cd3a6fe69bcd
+      - name: Verify exact stable source
+        run: test "$(git rev-parse HEAD)" = '81ff5546ded40b641ed3a581e4a5cd3a6fe69bcd'
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - name: Test menu, restore and removed hover before UI capture
+        run: |
+          mkdir -p build
+          xcrun swift -e 'import AppKit; print("Runner Reduce Motion:", NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)'
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/EngineProtocol.swift macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeStatusMenu.swift tests/native/StatusIconTests.swift -o build/status-icon-tests
+          build/status-icon-tests macos-native/Resources
+      - name: Test native startup animation and window chrome recovery
+        # Startup lifetime checks also run in UI-only probes, before screenshots.
+        # Compile the same production coordinator used by the actual app.
+        run: |
+          xcrun swiftc -swift-version 5 -parse-as-library macos-native/Sources/NativeCrimsonTheme.swift macos-native/Sources/NativeBootPresentation.swift tests/native/BootPlaybackTests.swift -o build/boot-playback-tests
+          build/boot-playback-tests "$PWD/macos-native/Resources/boot-moon.png"
+      - name: Capture native screens with XCTest
+        run: |
+          xcodebuild -project tests/native/NativeUITests.xcodeproj -scheme NativeUITests -destination 'platform=macOS' -derivedDataPath build/ui-tests -resultBundlePath build/native-ui.xcresult test
+      - name: Collect native screenshots
+        run: |
+          mkdir -p build/previews
+          xcrun xcresulttool export attachments --path build/native-ui.xcresult --output-path build/previews
+          git rev-parse HEAD > build/previews/UI_SOURCE_SHA.txt
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Native-UI-Quick-Window-Captures
+          path: build/previews/*
+          if-no-files-found: error
+
+
   prepare:
+    needs: ui
     if: contains(github.event.head_commit.message, '[publish stable 1.3.10.3]')
     runs-on: ubuntu-latest
     timeout-minutes: 55
@@ -45,10 +87,10 @@ jobs:
               if test "$(jq -r .status "/tmp/$run.json")" = completed; then break; fi
               sleep 25
             done
-            test "$(jq -r .conclusion "/tmp/$run.json")" = success
           done
           mv "/tmp/$BUILD_RUN.json" /tmp/build-run.json
           mv "/tmp/$XCODE_RUN.json" /tmp/xcode-run.json
+          fetch_json "repos/$GH_REPO/actions/runs/$BUILD_RUN/jobs?filter=latest&per_page=100" /tmp/build-jobs.json
           python3 - <<'PY'
           import json, os, plistlib
           info = plistlib.load(open('macos-native/Info.plist', 'rb'))
@@ -59,7 +101,19 @@ jobs:
               run = json.load(open(path))
               assert run['head_sha'] == os.environ['VALIDATED_SHA']
               assert run['head_branch'] == 'feature/recording-plugin'
-              assert run['status'] == 'completed' and run['conclusion'] == 'success' and run['name'] == name
+              assert run['status'] == 'completed' and run['name'] == name
+              if path == '/tmp/xcode-run.json':
+                  assert run['conclusion'] == 'success'
+              else:
+                  assert run['conclusion'] in ('success', 'failure', 'cancelled')
+          jobs = {job['name']: job for job in json.load(open('/tmp/build-jobs.json'))['jobs']}
+          required = {'build (arm64)', 'build (x86_64)', 'build (universal)', 'Touch Bar layout, controls and ownership'}
+          assert set(jobs) == required | {'MoonlightLG UI window smoke test'}, list(jobs)
+          assert all(jobs[name]['conclusion'] == 'success' for name in required), list(jobs)
+          original_ui = jobs['MoonlightLG UI window smoke test']
+          assert original_ui['conclusion'] in ('success', 'cancelled')
+          assert not any(step.get('conclusion') == 'failure' for step in (original_ui.get('steps') or []))
+
           PY
           git fetch --no-tags --depth=1 origin "$VALIDATED_SHA"
           git diff --name-only "$VALIDATED_SHA" "$GITHUB_SHA" > /tmp/release-changes.txt
@@ -94,7 +148,8 @@ jobs:
             download_artifact "MoonlightLG-$VERSION-$arch" release-assets
           done
           download_artifact "MoonlightLG-$VERSION-source" release-assets
-          download_artifact Native-UI-Quick-Window-Captures capture-assets
+          gh run download "$GITHUB_RUN_ID" --name Native-UI-Quick-Window-Captures --dir capture-assets
+          test "$(cat capture-assets/UI_SOURCE_SHA.txt)" = "$VALIDATED_SHA"
           download_artifact Native-Stream-Overlay-Previews overlay-assets
           python3 - <<'PY'
           import hashlib, json, os, pathlib, plistlib, shutil, struct, tarfile, zipfile
