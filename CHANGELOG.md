@@ -1,5 +1,14 @@
 # MoonlightLG changelog
 
+## 🌙 1.3.10.3 — Stream responsiveness
+
+- 🎮 Prioritize the streaming helper and its input event loop during active streams.
+- ⚡ Reduce redundant stream menu and appearance refreshes. Hardware sampling runs on a background queue.
+- 🍎 Add optional Asynchronous Metal Presentation on Apple Silicon. It is off by default and uses Metal, hardware decoding and Vertical Sync.
+- 🖱️ Add mouse capture and Metal timing diagnostics. The M1 owner reported a modest improvement with asynchronous presentation enabled.
+- 🖥️ Save a custom computer order from the library sidebar.
+- 📦 Stable build 68 promotes the tested 1.3.10.3U application behavior.
+
 ## 🌙 1.3.10.3U — Stream scheduling and Apple Silicon Metal trial
 
 - 🎮 Carry forward the active-stream activity, prioritize the native helper and SDL input thread, and release the thread override on exit.
