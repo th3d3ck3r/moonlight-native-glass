@@ -1,18 +1,18 @@
 <div align="center">
 
-![MoonlightLG](https://raw.githubusercontent.com/th3d3ck3r/moonlight-native-glass/moonlightlg-v1.3.6.0/readme-assets/images/moonlightlg-banner.svg)
+![MoonlightLG](https://raw.githubusercontent.com/th3d3ck3r/moonlight-native-glass/moonlightlg-v1.3.10.3/readme-assets/images/moonlightlg-banner.svg)
 
 # 🌙 MoonlightLG
 
 ### Your games. Your Mac. A native interface.
 
-**1.3.6.0 · Crimson Glass · Apple Silicon · Moonlight Qt 6.2.0**
+**1.3.10.3 · Crimson Glass · Apple Silicon · Moonlight Qt 6.2.0**
 
-[![Download](https://img.shields.io/badge/Download-1.3.6.0-crimson)](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/moonlightlg-v1.3.6.0)
+[![Download](https://img.shields.io/badge/Download-1.3.10.3-crimson)](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/moonlightlg-v1.3.10.3)
 ![macOS](https://img.shields.io/badge/macOS-15%2B-silver)
 ![Apple Silicon](https://img.shields.io/badge/Apple_Silicon-arm64-blue)
 ![Updates](https://img.shields.io/badge/Updates-Manual-8A2BE2)
-[![License](https://img.shields.io/badge/License-GPLv3-blue)](https://github.com/th3d3ck3r/moonlight-native-glass/blob/moonlightlg-v1.3.6.0/LICENSE)
+[![License](https://img.shields.io/badge/License-GPLv3-blue)](https://github.com/th3d3ck3r/moonlight-native-glass/blob/moonlightlg-v1.3.10.3/LICENSE)
 
 A native macOS client for Sunshine and compatible GameStream hosts, including VibePollo.
 A near-black **Crimson Glass** interface, deep-red accents, native navigation, and the Moonlight streaming engine underneath.
@@ -21,15 +21,17 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 </div>
 
+🎮 This release prioritizes stream input and reduces UI work during gameplay. **Settings → Video** includes optional Asynchronous Metal Presentation for Apple Silicon, and **Settings → Input** includes mouse timing diagnostics.
+
 ## 📦 Download
 
-### 🌙 MoonlightLG 1.3.6.0
+### 🌙 MoonlightLG 1.3.10.3
 
 | Your Mac | Package |
 |---|---|
-| 🍎 **Apple Silicon — M1 and newer** | [**Download Apple Silicon-only ZIP**](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.6.0/MoonlightLG-1.3.6.0-arm64.zip) |
+| 🍎 **Apple Silicon — M1 and newer** | [**Download Apple Silicon-only ZIP**](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.10.3/MoonlightLG-1.3.10.3-arm64.zip) |
 
-[📝 Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/moonlightlg-v1.3.6.0) · [🔐 SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.6.0/SHA256SUMS.txt) · [📚 Changelog](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/recording-plugin/CHANGELOG.md) · [Earlier releases](https://github.com/th3d3ck3r/moonlight-native-glass/releases)
+[📝 Release notes](https://github.com/th3d3ck3r/moonlight-native-glass/releases/tag/moonlightlg-v1.3.10.3) · [🔐 SHA-256 checksums](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.10.3/SHA256SUMS.txt) · [📚 Changelog](https://github.com/th3d3ck3r/moonlight-native-glass/blob/feature/recording-plugin/CHANGELOG.md) · [Earlier releases](https://github.com/th3d3ck3r/moonlight-native-glass/releases)
 
 **Requires macOS 15 or later.** Apple Silicon-only includes arm64 code throughout the app, bundled engine, frameworks, and plugins. This release delivers the Apple Silicon-only package; earlier Intel/Universal packages remain in [release history](https://github.com/th3d3ck3r/moonlight-native-glass/releases).
 
@@ -54,14 +56,14 @@ A near-black **Crimson Glass** interface, deep-red accents, native navigation, a
 
 | 🌑 Crimson Glass library | 🎛️ Stream controls |
 |---|---|
-| ![MoonlightLG Crimson Glass library](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.6.0/main-dark.png) | ![MoonlightLG native stream controls](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.6.0/overlay-controls-dark.png) |
+| ![MoonlightLG Crimson Glass library](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.10.3/main-dark.png) | ![MoonlightLG native stream controls](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.10.3/overlay-controls-dark.png) |
 
 <details>
 <summary>🚀 Startup, Settings, and About</summary>
 
-![MoonlightLG startup](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.6.0/native-startup-warp.png)
-![MoonlightLG video settings](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.6.0/settings-video.png)
-![MoonlightLG About](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.6.0/about-dark.png)
+![MoonlightLG startup](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.10.3/native-startup-warp.png)
+![MoonlightLG video settings](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.10.3/settings-video.png)
+![MoonlightLG About](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.10.3/about-dark.png)
 
 </details>
 
@@ -83,7 +85,7 @@ Updating MoonlightLG preserves its existing preference and pairing identities. P
 Download `SHA256SUMS.txt` alongside the ZIP. For the Apple Silicon package, open that folder in Terminal and run:
 
 ```bash
-shasum -a 256 MoonlightLG-1.3.6.0-arm64.zip
+shasum -a 256 MoonlightLG-1.3.10.3-arm64.zip
 ```
 
 Compare the result with the matching filename in `SHA256SUMS.txt`.
@@ -101,14 +103,13 @@ Compare the result with the matching filename in `SHA256SUMS.txt`.
 
 Closing a windowed stream hides it. Click the menu bar moon to bring it back. Shortcuts can be customized in Settings. **Disconnect and Exit** also quits the host game.
 
-## 🆕 In 1.3.6.0
+## 🆕 In 1.3.10.3
 
-- 📈 Three minutes of auto-scaling Touch Bar graphs, drawn inside the existing cards without changing their layout or buttons.
-- 🌑 Balanced compact statistics and protected central moon artwork across composed pages.
-- 🔊 The crimson native volume slider stays outside horizontal scrolling; Audio/Back keeps the same owning surface.
-- 🌌 Supplied Smoke and Moon pulse animations, finite startup and nonblocking Continue/Cancel/Retry.
-- 💾 Bandwidth autosave survives restart and reaches the next stream.
-- 🎬 Original Stream Quality recording periodically requests host keyframes. Long-duration playback remains an owner acceptance check.
+- 🎮 Prioritize the streaming helper and input loop during play, with fewer redundant interface refreshes.
+- 🍎 Try **Asynchronous Metal Presentation** on Apple Silicon. Choose **Metal** in **Settings → Video**, use hardware decoding, enable **Vertical Sync**, then reconnect. Asynchronous presentation is off by default.
+- 🖱️ Compare mouse capture modes and log input and Metal timing in **Settings → Input → Mouse Diagnostics**.
+- 📊 Touch Bar and hardware telemetry run on background queues.
+- 🖥️ Right-click a computer to move it up or down in the sidebar. The order persists across restarts.
 
 ## 🧪 Validation and compatibility
 
@@ -123,25 +124,25 @@ For a problem report, include your Mac model, macOS version, host software, wind
 Use Xcode 26+, Qt 6.11.2, and Python 3:
 
 ```bash
-git clone --recurse-submodules --branch moonlightlg-v1.3.6.0 https://github.com/th3d3ck3r/moonlight-native-glass.git
+git clone --recurse-submodules --branch moonlightlg-v1.3.10.3 https://github.com/th3d3ck3r/moonlight-native-glass.git
 cd moonlight-native-glass
-git checkout 11ed502e0b301ac632d92eaa7fd23f3322c127ed
+git checkout 81ff5546ded40b641ed3a581e4a5cd3a6fe69bcd
 bash scripts/build-native-macos.sh arm64
 # Intel:     bash scripts/build-native-macos.sh x86_64
 # Universal: bash scripts/build-native-macos.sh universal
 ```
 
-Open **MoonlightLG.xcodeproj** for the main app, Startup Preview, and UI Preview schemes. The app and corresponding source archive were built from commit `11ed502e0b301ac632d92eaa7fd23f3322c127ed`. The release tag points to the publishing workflow commit, which differs only in documentation and the release workflow. The `feature/recording-plugin` branch contains ongoing development. `master` retains the upstream engine baseline and project overview.
+Open **MoonlightLG.xcodeproj** for the main app, Startup Preview, and UI Preview schemes. The app and corresponding source archive were built from commit `81ff5546ded40b641ed3a581e4a5cd3a6fe69bcd`. The release tag points to this exact source commit. The `feature/recording-plugin` branch contains ongoing development. `master` retains the upstream engine baseline and project overview.
 
 ## 💛 Credits & license
 
 **About MoonlightLG → Licenses & Notices** opens the bundled offline copyright and license texts. **Corresponding Source** opens the complete release source package, including application submodules and pinned dependency source archives.
 
-[📦 Corresponding source](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.6.0/MoonlightLG-1.3.6.0-source.tar.gz) · [📜 Third-party notices](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.6.0/THIRD_PARTY_NOTICES.txt)
+[📦 Corresponding source](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.10.3/MoonlightLG-1.3.10.3-source.tar.gz) · [📜 Third-party notices](https://github.com/th3d3ck3r/moonlight-native-glass/releases/download/moonlightlg-v1.3.10.3/THIRD_PARTY_NOTICES.txt)
 
 Built on [Moonlight Qt](https://github.com/moonlight-stream/moonlight-qt) and [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c), with a native SwiftUI/AppKit frontend. Original copyright and license attribution are retained.
 
-[GPL-3.0 license](https://github.com/th3d3ck3r/moonlight-native-glass/blob/moonlightlg-v1.3.6.0/LICENSE)
+[GPL-3.0 license](https://github.com/th3d3ck3r/moonlight-native-glass/blob/moonlightlg-v1.3.10.3/LICENSE)
 
 This software is based in part on the work of the FreeType Team.
 This software is based in part on the work of the Independent JPEG Group.
