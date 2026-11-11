@@ -9,7 +9,7 @@ and macOS permissions. Do not rebrand upstream copyright/license attribution.
 ## Versions (user-required)
 
 The user-facing scheme is `redesign.major.minor.hotfix`, without leading zeros.
-The current stable release is **1.3.6.0** (internal build 56). Each component is a nonnegative
+The current stable release is **1.3.10.3** (internal build 68). Each component is a nonnegative
 integer with no decimal rollover: `1.2.9.0` → `1.2.10.0` → `1.2.11.0`.
 
 - `U`: unreleased development work. Share U build links only directly with the user.
@@ -54,6 +54,6 @@ honestly; CI cross-builds Intel on Apple Silicon.
 
 ## Publication
 
-MoonlightLG 1.3.6.0 is public. The owner approved the publishing workflow commit as the tag target for this release. The app and complete corresponding source are from the validated build commit `11ed502e0b301ac632d92eaa7fd23f3322c127ed`. The tag commit differs only in documentation and release workflow files. See [the release record](docs/RELEASE_1.3.6.0_PREPARATION.md).
+MoonlightLG 1.3.10.3 is public and marked latest. The tag and complete corresponding source point to the exact validated stable build commit `81ff5546ded40b641ed3a581e4a5cd3a6fe69bcd`. See [the release record](docs/RELEASE_1.3.10.3_PREPARATION.md).
 
 The preparation job uses read-only permissions. Publication requires explicit owner approval and verification of the release assets. Preserve historical release records and do not merge or delete branches as part of publication.
