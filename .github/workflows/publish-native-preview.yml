@@ -8,12 +8,12 @@ permissions:
   actions: read
 concurrency:
   group: publish-moonlightlg-stable
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   ui:
     if: contains(github.event.head_commit.message, '[publish stable 1.3.10.3]')
     name: MoonlightLG UI window smoke test
-    runs-on: macos-26-intel
+    runs-on: macos-26
     timeout-minutes: 22
     steps:
       - uses: actions/checkout@v5
@@ -46,11 +46,13 @@ jobs:
         run: |
           xcodebuild -project tests/native/NativeUITests.xcodeproj -scheme NativeUITests -destination 'platform=macOS' -derivedDataPath build/ui-tests -resultBundlePath build/native-ui.xcresult test
       - name: Collect native screenshots
+        if: always()
         run: |
           mkdir -p build/previews
           xcrun xcresulttool export attachments --path build/native-ui.xcresult --output-path build/previews
           git rev-parse HEAD > build/previews/UI_SOURCE_SHA.txt
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: Native-UI-Quick-Window-Captures
           path: build/previews/*
